@@ -1,0 +1,20 @@
+{
+  "cwd": ".",
+  "name": "capkeo-sport-mini-app",
+  "framework": "react-typescript",
+  "cssPreProcessor": "scss",
+  "includeTailwind": true,
+  "package": "zmp-ui",
+  "stateManagement": "none",
+  "newProject": false,
+  "template": "single-view",
+  "theming": {
+    "customColor": true,
+    "color": "#7C5CFF",
+    "darkTheme": true,
+    "iconFonts": true,
+    "fillBars": false,
+    "useUiKits": true
+  }
+}
+

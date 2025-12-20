@@ -1,0 +1,256 @@
+import type { Match } from '../types'
+
+// Mock matches data - sẽ thay bằng API call sau
+export const mockMatches: Match[] = [
+  {
+    id: '1',
+    status: 'MATCHED',
+    teamA: {
+      id: 'team-a',
+      name: 'Your Team',
+      logo: 'https://via.placeholder.com/100',
+      level: '5',
+      gender: 'Nam',
+    },
+    teamB: {
+      id: 'team-b',
+      name: 'FC WINNER',
+      logo: 'https://via.placeholder.com/100',
+      level: '4-5',
+      gender: 'Nam',
+    },
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'received-1',
+    status: 'MATCHED',
+    teamA: {
+      id: 'team-a',
+      name: 'Your Team',
+      logo: 'https://via.placeholder.com/100',
+      level: '5',
+      gender: 'Nam',
+    },
+    teamB: {
+      id: 'team-received',
+      name: 'Thunder FC',
+      logo: 'https://via.placeholder.com/100',
+      level: '4',
+      gender: 'Nam',
+    },
+    date: 'Thứ Bảy, 02/11',
+    time: '18:00',
+    location: 'Sân bóng E, Quận 1',
+    isReceived: true, // Đối thủ đã gửi kèo đến
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: '2',
+    status: 'CAPPING',
+    teamA: {
+      id: 'team-a',
+      name: 'Your Team',
+      logo: 'https://via.placeholder.com/100',
+      level: '5',
+      gender: 'Nam',
+    },
+    teamB: {
+      id: 'team-c',
+      name: 'Dragon Fire FC',
+      logo: 'https://via.placeholder.com/100',
+      level: '4',
+      gender: 'Mixed',
+    },
+    // Match này chưa có gợi ý - sẽ hiển thị nút "Gợi ý kèo"
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    zaloChatLink: 'https://zalo.me/g/example123',
+  },
+  {
+    id: 'capping-with-suggestion',
+    status: 'CAPPING',
+    teamA: {
+      id: 'team-a',
+      name: 'Your Team',
+      logo: 'https://via.placeholder.com/100',
+      level: '5',
+      gender: 'Nam',
+    },
+    teamB: {
+      id: 'team-suggestion',
+      name: 'Lightning FC',
+      logo: 'https://via.placeholder.com/100',
+      level: '4',
+      gender: 'Nam',
+    },
+    // Match này có gợi ý từ đối thủ - sẽ hiển thị nút "Xác nhận kèo"
+    suggestion: {
+      suggestedBy: 'teamB',
+      date: 'Thứ Bảy, 05/11',
+      time: '18:00',
+      location: 'Sân bóng F, Quận 2',
+      notes: 'Sân 7, lệ phí 500k/team',
+      createdAt: new Date(Date.now() - 86400000).toISOString(), // 1 ngày trước
+    },
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    zaloChatLink: 'https://zalo.me/g/example456',
+  },
+  {
+    id: 'capping-my-suggestion',
+    status: 'CAPPING',
+    teamA: {
+      id: 'team-a',
+      name: 'Your Team',
+      logo: 'https://via.placeholder.com/100',
+      level: '5',
+      gender: 'Nam',
+    },
+    teamB: {
+      id: 'team-my-suggestion',
+      name: 'Storm FC',
+      logo: 'https://via.placeholder.com/100',
+      level: '4',
+      gender: 'Nam',
+    },
+    // Match này có gợi ý từ team hiện tại - sẽ hiển thị nút "Chỉnh sửa gợi ý"
+    suggestion: {
+      suggestedBy: 'teamA',
+      date: 'Chủ Nhật, 06/11',
+      time: '16:00',
+      location: 'Sân bóng G, Quận 3',
+      notes: 'Sân 5, có thể đổi thời gian nếu cần',
+      createdAt: new Date(Date.now() - 3600000).toISOString(), // 1 giờ trước
+    },
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    zaloChatLink: 'https://zalo.me/g/example789',
+  },
+  {
+    id: '3',
+    status: 'CONFIRMED',
+    teamA: {
+      id: 'team-a',
+      name: 'Team A',
+      logo: 'https://via.placeholder.com/100',
+      level: '4',
+      gender: 'Nam',
+    },
+    teamB: {
+      id: 'team-d',
+      name: 'Team B',
+      logo: 'https://via.placeholder.com/100',
+      level: '4',
+      gender: 'Nam',
+    },
+    date: 'Thứ Bảy, 28/10',
+    time: '19:00',
+    location: 'Sân bóng A, Quận 7',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: '4',
+    status: 'UPCOMING',
+    teamA: {
+      id: 'team-a',
+      name: 'Team A',
+      logo: 'https://via.placeholder.com/100',
+      level: '4',
+      gender: 'Nam',
+    },
+    teamB: {
+      id: 'team-e',
+      name: 'Team B',
+      logo: 'https://via.placeholder.com/100',
+      level: '4',
+      gender: 'Nam',
+    },
+    date: 'Thứ Bảy, 28/10',
+    time: '19:00',
+    location: 'Sân bóng A, Quận 7',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: '5',
+    status: 'FINISHED',
+    teamA: {
+      id: 'team-a',
+      name: 'Victory FC',
+      logo: 'https://via.placeholder.com/100',
+      level: '4',
+      gender: 'Nam',
+    },
+    teamB: {
+      id: 'team-f',
+      name: 'Spartans United',
+      logo: 'https://via.placeholder.com/100',
+      level: '4',
+      gender: 'Nam',
+    },
+    date: 'Sat, 23 Oct 2023',
+    time: '19:00',
+    location: 'Central Stadium',
+    score: {
+      teamA: 5,
+      teamB: 3,
+    },
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'pending-1',
+    status: 'PENDING',
+    teamA: {
+      id: 'team-a',
+      name: 'Your Team',
+      logo: 'https://via.placeholder.com/100',
+      level: '5',
+      gender: 'Nam',
+    },
+    teamB: {
+      id: 'team-pending',
+      name: 'Pending Team',
+      logo: 'https://via.placeholder.com/100',
+      level: '4',
+      gender: 'Nam',
+    },
+    date: 'Chủ Nhật, 30/10',
+    time: '16:00',
+    location: 'Sân bóng C',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'confirming-1',
+    status: 'CONFIRMING',
+    teamA: {
+      id: 'team-a',
+      name: 'Your Team',
+      logo: 'https://via.placeholder.com/100',
+      level: '5',
+      gender: 'Nam',
+    },
+    teamB: {
+      id: 'team-confirming',
+      name: 'Confirming Team',
+      logo: 'https://via.placeholder.com/100',
+      level: '4',
+      gender: 'Nam',
+    },
+    date: 'Thứ Hai, 31/10',
+    time: '18:00',
+    location: 'Sân bóng D',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+]
+
+// Helper function to get match by id
+export const getMatchById = (id: string): Match | undefined => {
+  return mockMatches.find((match) => match.id === id)
+}
+

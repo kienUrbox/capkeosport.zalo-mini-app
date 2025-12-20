@@ -1,0 +1,17 @@
+{
+  "app": {
+    "title": "Cap Kèo Sport",
+    "textColor": {
+      "light": "white",
+      "dark": "white"
+    },
+    "statusBar": "transparent",
+    "actionBarHidden": true,
+    "hideIOSSafeAreaBottom": true,
+    "hideAndroidBottomNavigationBar": false
+  },
+  "listCSS": [],
+  "listSyncJS": [],
+  "listAsyncJS": []
+}
+
