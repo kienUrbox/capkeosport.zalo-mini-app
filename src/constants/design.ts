@@ -140,13 +140,14 @@ export const TYPOGRAPHY = {
   caption: 'text-xs font-normal leading-normal',
 } as const
 
-// Common Icon Names - Based on HTML Design Files
+// Common Icon Names - Using Material Icons (hosted by Zalo CDN)
+// Full list: https://fonts.google.com/icons
 export const ICONS = {
   // Navigation
   arrow_back: 'arrow_back',
   arrow_back_ios_new: 'arrow_back_ios_new',
   chevron_right: 'chevron_right',
-  
+
   // Actions
   add: 'add',
   close: 'close',
@@ -159,7 +160,7 @@ export const ICONS = {
   sync: 'sync',
   tune: 'tune',
   unfold_more: 'unfold_more',
-  
+
   // Match & Sports
   calendar_today: 'calendar_today',
   calendar_month: 'calendar_month',
@@ -173,9 +174,9 @@ export const ICONS = {
   favorite: 'favorite',
   check_circle: 'check_circle',
   event_busy: 'event_busy',
-  event_upcoming: 'event_upcoming',
+  event_upcoming: 'event',
   history: 'history',
-  
+
   // Team & Social
   groups: 'groups',
   group_add: 'group_add',
@@ -183,19 +184,19 @@ export const ICONS = {
   grass: 'grass',
   signal_cellular_alt: 'signal_cellular_alt',
   shield: 'shield',
-  
+
   // Gender
   male: 'male',
   female: 'female',
   man: 'man',
   woman: 'woman',
-  
+
   // UI Elements
   notifications: 'notifications',
   add_photo_alternate: 'add_photo_alternate',
   inbox: 'inbox',
   home: 'home',
   person: 'person',
-  swords: 'swords',
+  swords: 'sports_kabaddi', // Alternative to swords
 } as const
 
