@@ -12,6 +12,7 @@ build/
 dist-ssr/
 *.tsbuildinfo
 
+football-connect
 # Environment variables
 .env
 .env.local

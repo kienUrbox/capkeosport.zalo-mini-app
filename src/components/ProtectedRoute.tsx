@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Navigate } from 'react-router-dom'
-import { AuthService } from '../services/api/services'
-import { zaloThreeStepAuthService } from '../services/zalo-three-step-auth'
+import { AuthService } from '@/services/api/services'
+import { zaloThreeStepAuthService } from '@/services/zalo-three-step-auth'
 
 export interface ProtectedRouteProps {
   children: React.ReactNode

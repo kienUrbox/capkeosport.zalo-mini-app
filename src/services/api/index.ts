@@ -1,10 +1,10 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 
 // API Configuration
-export const API_BASE_URL = 'https://capkeosportnestjs-production.up.railway.app/api/v1';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://api.capkeosport.com/api/v1';
 
 // Import centralized types
-import { ApiResponse } from '../../types/api.types';
+import { ApiResponse } from '@/types/api.types';
 
 // Create axios instance with default configuration
 const apiClient: AxiosInstance = axios.create({

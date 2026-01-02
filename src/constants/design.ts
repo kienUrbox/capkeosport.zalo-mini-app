@@ -1,152 +1,229 @@
 /**
  * Design System Constants
- * Chuẩn hóa icons, font sizes, spacing cho toàn bộ app
+ * Chuẩn hóa spacing, font sizes cho toàn bộ app
+ * Scale theo 8px base unit (8, 12, 16, 20, 24, 32, 40, 48)
  */
 
-// Icon Sizes
-export const ICON_SIZES = {
-  xs: 'text-base', // 16px
-  sm: 'text-lg', // 18px
-  md: 'text-xl', // 20px
-  lg: 'text-2xl', // 24px - Default
-  xl: 'text-3xl', // 30px
-  '2xl': 'text-4xl', // 36px
-  '3xl': 'text-5xl', // 48px
-} as const
+// ============== SPACING SCALE ==============
+/**
+ * Scale dựa trên 8px grid system
+ * - xs: 4px - micro spacing (icon padding, tight gaps)
+ * - sm: 8px - tight spacing (related items)
+ * - md: 12px - compact spacing (cards, forms)
+ * - lg: 16px - default spacing (sections, components)
+ * - xl: 24px - relaxed spacing (between sections)
+ * - 2xl: 32px - generous spacing (major sections)
+ * - 3xl: 40px - hero spacing
+ * - 4xl: 48px - maximum spacing
+ */
 
-// Font Sizes
-export const FONT_SIZES = {
-  xs: 'text-xs', // 12px
-  sm: 'text-sm', // 14px
-  base: 'text-base', // 16px
-  lg: 'text-lg', // 18px
-  xl: 'text-xl', // 20px
-  '2xl': 'text-2xl', // 24px
-  '3xl': 'text-3xl', // 30px
-  '4xl': 'text-4xl', // 36px
-  '5xl': 'text-5xl', // 48px
-} as const
-
-// Spacing
+// Gap spacing (flex/grid gap)
 export const SPACING = {
-  xs: 'gap-1', // 4px
-  sm: 'gap-2', // 8px
-  md: 'gap-3', // 12px
-  lg: 'gap-4', // 16px
-  xl: 'gap-6', // 24px
+  none: 'gap-0',
+  xs: 'gap-1',   // 4px
+  sm: 'gap-2',   // 8px
+  md: 'gap-3',   // 12px
+  lg: 'gap-4',   // 16px
+  xl: 'gap-6',   // 24px
   '2xl': 'gap-8', // 32px
+  '3xl': 'gap-10', // 40px
 } as const
 
+// Padding (internal spacing)
 export const PADDING = {
-  xs: 'p-2', // 8px
-  sm: 'p-3', // 12px
-  md: 'p-4', // 16px - Default
-  lg: 'p-6', // 24px
-  xl: 'p-8', // 32px
+  none: 'p-0',
+  xs: 'p-2',     // 8px
+  sm: 'p-3',     // 12px
+  md: 'p-4',     // 16px - default cho cards
+  lg: 'p-6',     // 24px
+  xl: 'p-8',     // 32px
 } as const
 
-export const MARGIN = {
-  xs: 'm-2',
-  sm: 'm-3',
-  md: 'm-4',
-  lg: 'm-6',
-  xl: 'm-8',
-} as const
-
+// Vertical spacing (space-y)
 export const SPACE_Y = {
-  xs: 'space-y-1',
-  sm: 'space-y-2',
-  md: 'space-y-3',
-  lg: 'space-y-4', // Default
-  xl: 'space-y-6',
-  '2xl': 'space-y-8',
+  none: 'space-y-0',
+  xs: 'space-y-1',   // 4px
+  sm: 'space-y-2',   // 8px
+  md: 'space-y-3',   // 12px
+  lg: 'space-y-4',   // 16px - default
+  xl: 'space-y-6',   // 24px
+  '2xl': 'space-y-8', // 32px
 } as const
 
-// Border Radius
+// Horizontal spacing (space-x)
+export const SPACE_X = {
+  none: 'space-x-0',
+  xs: 'space-x-1',
+  sm: 'space-x-2',
+  md: 'space-x-3',
+  lg: 'space-x-4',
+  xl: 'space-x-6',
+} as const
+
+// ============== FONT SIZES ==============
+/**
+ * Typography scale với 1.25 (major third) ratio
+ * - caption: 12px - small text, labels
+ * - small: 14px - secondary text
+ * - base: 16px - body text (default)
+ * - md: 18px - emphasized text
+ * - lg: 20px - subtitles
+ * - xl: 24px - cards titles, important info
+ * - 2xl: 28px - section headings
+ * - 3xl: 32px - page headings
+ * - 4xl: 36px - hero headings
+ */
+export const FONT_SIZES = {
+  caption: 'text-xs',    // 12px - labels, meta info
+  small: 'text-sm',      // 14px - secondary text, descriptions
+  base: 'text-base',     // 16px - body text (default)
+  md: 'text-lg',         // 18px - emphasized content
+  lg: 'text-xl',         // 20px - card titles
+  xl: 'text-2xl',        // 24px - section headers
+  '2xl': 'text-[28px]',  // 28px - page headings
+  '3xl': 'text-[32px]',  // 32px - hero headings
+  '4xl': 'text-[36px]',  // 36px - display
+} as const
+
+// ============== ICON SIZES ==============
+export const ICON_SIZES = {
+  xs: 'text-sm',    // 14px - compact icons
+  sm: 'text-base',  // 16px - small icons
+  md: 'text-lg',    // 18px - medium icons
+  lg: 'text-xl',    // 20px - default icons
+  xl: 'text-2xl',   // 24px - large icons
+  '2xl': 'text-3xl', // 30px - hero icons
+} as const
+
+// ============== COMPONENT SPECS ==============
+
+// Section spacing (khoảng cách giữa các section lớn)
+export const SECTION = {
+  spacing: 'gap-5',      // 20px - khoảng cách giữa sections
+  padding: 'px-5',       // 20px - horizontal padding
+  titleSize: FONT_SIZES.xl,  // 24px
+  titleSpacing: 'mb-4',  // 16px - khoảng cách dưới section title
+} as const
+
+// Header Component
+export const HEADER = {
+  height: 'h-14',         // 56px - standard header height
+  padding: 'px-4 py-3',   // horizontal 16px, vertical 12px
+  titleSize: FONT_SIZES.lg,    // 20px
+  iconSize: ICON_SIZES.lg,     // 20px
+  iconButtonSize: 'size-9',    // 36px - clickable area
+} as const
+
+// Button Component
+export const BUTTON = {
+  height: {
+    sm: 'h-10',   // 40px
+    md: 'h-11',   // 44px - default
+    lg: 'h-12',   // 48px
+  },
+  padding: {
+    sm: 'px-4 py-2',   // 16px horizontal, 8px vertical
+    md: 'px-5 py-2.5', // 20px horizontal, 10px vertical
+    lg: 'px-6 py-3',   // 24px horizontal, 12px vertical
+  },
+  fontSize: {
+    sm: FONT_SIZES.small,  // 14px
+    md: FONT_SIZES.base,   // 16px
+    lg: FONT_SIZES.md,     // 18px
+  },
+  iconSize: ICON_SIZES.md, // 18px
+  borderRadius: 'lg',      // rounded-lg (12px)
+  gap: SPACING.sm,         // gap-2 (8px)
+} as const
+
+// Card Component
+export const CARD = {
+  padding: {
+    sm: PADDING.sm,     // p-3 (12px)
+    md: PADDING.md,     // p-4 (16px) - default
+    lg: PADDING.lg,     // p-6 (24px)
+  },
+  borderRadius: 'lg',   // rounded-xl (12px)
+  gap: SPACING.md,      // gap-3 (12px) - internal spacing
+  marginBottom: 'mb-4', // 16px - khoảng cách giữa cards
+} as const
+
+// Input Component
+export const INPUT = {
+  height: {
+    sm: 'h-10',   // 40px
+    md: 'h-11',   // 44px - default
+    lg: 'h-12',   // 48px
+  },
+  padding: 'px-4 py-3',      // horizontal 16px, vertical 12px
+  fontSize: FONT_SIZES.base, // 16px
+  borderRadius: CARD.borderRadius,
+  iconSize: ICON_SIZES.lg,   // 20px
+  labelSpacing: 'mb-1.5',    // 6px - label to input gap
+  errorSpacing: 'mt-1.5',    // 6px - input to error gap
+} as const
+
+// List Item (PlayerCard, TeamCard, etc.)
+export const LIST_ITEM = {
+  padding: 'p-3',      // 12px
+  gap: SPACING.md,     // gap-3 (12px)
+  avatarSize: 48,      // 48px avatar
+  borderRadius: 'lg',  // rounded-xl
+} as const
+
+// ============== TYPOGRAPHY ==============
+export const TYPOGRAPHY = {
+  heading: {
+    page: 'text-[32px] font-bold leading-tight tracking-tight',      // Page title
+    section: 'text-2xl font-bold leading-tight tracking-tight',      // Section title
+    card: 'text-xl font-bold leading-tight tracking-tight',          // Card title
+    small: 'text-lg font-bold leading-tight',                        // Small heading
+  },
+  body: {
+    base: 'text-base font-normal leading-relaxed',      // 16px
+    small: 'text-sm font-normal leading-relaxed',       // 14px
+  },
+  label: 'text-sm font-medium leading-normal',          // 14px - form labels
+  caption: 'text-xs font-normal leading-normal',        // 12px - meta info
+} as const
+
+// ============== BORDER RADIUS ==============
 export const BORDER_RADIUS = {
   none: 'rounded-none',
-  sm: 'rounded', // 0.5rem - 8px
-  md: 'rounded-lg', // 1rem - 16px - Default
-  lg: 'rounded-xl', // 1.5rem - 24px
-  xl: 'rounded-2xl', // 2rem - 32px
-  '2xl': 'rounded-3xl', // 3rem - 48px
+  sm: 'rounded-lg',      // 8px - small elements
+  md: 'rounded-xl',      // 12px - default (buttons, cards, inputs)
+  lg: 'rounded-2xl',     // 16px - larger cards
+  xl: 'rounded-3xl',     // 24px - hero elements
   full: 'rounded-full',
 } as const
 
-// Header Styles
-export const HEADER = {
-  height: 'h-16', // 64px
-  padding: 'px-4 py-2',
-  titleSize: 'text-lg', // 18px
-  titleWeight: 'font-bold',
-  titleTracking: 'tracking-[-0.015em]',
-  iconSize: ICON_SIZES.lg, // 24px
-  iconButtonSize: 'size-10', // 40px
+// ============== LAYOUT ==============
+/**
+ * Layout spacing cho fixed elements (header, bottom nav, etc.)
+ */
+export const LAYOUT = {
+  // Header height (bao gồm safe area)
+  headerHeight: 'h-14',         // 56px - header content
+  headerTotalHeight: 'h-[72px]', // ~72px - bao gồm safe area top
+
+  // Bottom nav height (bao gồm safe area)
+  bottomNavHeight: 'h-[72px]',  // 72px - bottom nav content
+
+  // Content padding bottom để tránh bị che bởi bottom nav
+  // Dùng pb-safe-with-nav để auto-adjust: safe-area-inset-bottom + 72px
+  contentPaddingBottom: 'pb-safe-with-nav',
+  contentPaddingBottomStatic: 'pb-24', // 96px - fallback cho devices không có safe area
 } as const
 
-// Button Styles
-export const BUTTON = {
-  height: {
-    sm: 'h-10', // 40px
-    md: 'h-12', // 48px - Default
-    lg: 'h-14', // 56px
-  },
-  padding: {
-    sm: 'px-4 py-2',
-    md: 'px-6 py-3',
-    lg: 'px-8 py-4',
-  },
-  fontSize: {
-    sm: 'text-sm',
-    md: 'text-base', // Default
-    lg: 'text-lg',
-  },
-  iconSize: ICON_SIZES.md, // 20px
-  borderRadius: BORDER_RADIUS.md, // rounded-lg
-} as const
-
-// Card Styles
-export const CARD = {
-  padding: PADDING.md, // p-4
-  borderRadius: BORDER_RADIUS.md, // rounded-lg
-  gap: SPACING.lg, // gap-4
-} as const
-
-// Input Styles
-export const INPUT = {
-  height: {
-    sm: 'h-10',
-    md: 'h-12',
-    lg: 'h-14', // Default
-  },
-  padding: 'px-4 py-3',
-  fontSize: 'text-base',
-  borderRadius: BORDER_RADIUS.md,
-  iconSize: ICON_SIZES.lg, // 24px
-} as const
-
-// Typography
-export const TYPOGRAPHY = {
-  heading: {
-    '1': 'text-3xl font-bold leading-tight tracking-[-0.015em]',
-    '2': 'text-2xl font-bold leading-tight tracking-[-0.015em]',
-    '3': 'text-xl font-bold leading-tight tracking-[-0.015em]',
-    '4': 'text-lg font-bold leading-tight tracking-[-0.015em]',
-  },
-  body: {
-    base: 'text-base font-normal leading-normal',
-    sm: 'text-sm font-normal leading-normal',
-  },
-  caption: 'text-xs font-normal leading-normal',
-} as const
-
-// Common Icon Names - Using Material Icons (hosted by Zalo CDN)
-// Full list: https://fonts.google.com/icons
+// ============== ICON NAMES ==============
 export const ICONS = {
   // Navigation
   arrow_back: 'arrow_back',
   arrow_back_ios_new: 'arrow_back_ios_new',
   chevron_right: 'chevron_right',
+  chevron_left: 'chevron_left',
+  arrow_forward: 'arrow_forward',
+  home: 'home',
 
   // Actions
   add: 'add',
@@ -160,6 +237,10 @@ export const ICONS = {
   sync: 'sync',
   tune: 'tune',
   unfold_more: 'unfold_more',
+  visibility: 'visibility',
+  delete: 'delete',
+  check_circle: 'check_circle',
+  star: 'star',
 
   // Match & Sports
   calendar_today: 'calendar_today',
@@ -172,15 +253,15 @@ export const ICONS = {
   chat_bubble: 'chat_bubble',
   scoreboard: 'scoreboard',
   favorite: 'favorite',
-  check_circle: 'check_circle',
   event_busy: 'event_busy',
-  event_upcoming: 'event',
+  event: 'event',
   history: 'history',
+  sports_soccer: 'sports_soccer',
+  bolt: 'bolt',
 
   // Team & Social
   groups: 'groups',
   group_add: 'group_add',
-  sports_soccer: 'sports_soccer',
   grass: 'grass',
   signal_cellular_alt: 'signal_cellular_alt',
   shield: 'shield',
@@ -193,10 +274,25 @@ export const ICONS = {
 
   // UI Elements
   notifications: 'notifications',
+  notifications_active: 'notifications_active',
   add_photo_alternate: 'add_photo_alternate',
   inbox: 'inbox',
-  home: 'home',
   person: 'person',
-  swords: 'sports_kabaddi', // Alternative to swords
+  more_vert: 'more_vert',
+  settings: 'settings',
+  help: 'help',
+  info: 'info',
 } as const
 
+// ============== COLORS ==============
+export const FC_COLORS = {
+  primary: '#11d473',
+  primaryDark: '#0ea65a',
+  primaryLight: '#4ae19a',
+  bgLight: '#f6f8f7',
+  bgDark: '#102219',
+  surfaceDark: '#1c2721',
+  surfaceLight: '#ffffff',
+  borderDark: '#2a3b32',
+  textSecondary: '#9db9ab',
+} as const

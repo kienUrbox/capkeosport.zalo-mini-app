@@ -8,7 +8,8 @@
     "statusBar": "transparent",
     "actionBarHidden": true,
     "hideIOSSafeAreaBottom": true,
-    "hideAndroidBottomNavigationBar": false
+    "hideAndroidBottomNavigationBar": false,
+    "themeColor": "#11d473"
   },
   "listCSS": [],
   "listSyncJS": [],

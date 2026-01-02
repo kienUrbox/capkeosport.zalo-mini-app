@@ -1,4 +1,4 @@
-import { api } from "./index";
+import { api } from './index';
 import {
   User,
   AuthTokens,
@@ -8,7 +8,7 @@ import {
   RefreshTokenDto,
   UpdateProfileDto,
   ApiResponse,
-} from "../../types/api.types";
+} from '@/types/api.types';
 
 export class AuthService {
   /**
