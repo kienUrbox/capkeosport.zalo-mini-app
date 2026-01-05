@@ -1,7 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Header, Icon, Button } from '@/components/ui';
+import { Header, Icon, Button, AddMemberBottomSheet } from '@/components/ui';
+import { TeamDetailSkeleton } from '@/components/ui/Skeleton';
 import { appRoutes } from '@/utils/navigation';
+import { TeamService } from '@/services/api/team.service';
+import type { Team } from '@/services/api/team.service';
 
 /**
  * TeamDetail Screen
@@ -12,6 +15,78 @@ const TeamDetailScreen: React.FC = () => {
   const navigate = useNavigate();
   const { teamId } = useParams<{ teamId: string }>();
 
+  const [team, setTeam] = useState<Team | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showAddMemberSheet, setShowAddMemberSheet] = useState(false);
+
+  useEffect(() => {
+    const fetchTeamDetail = async () => {
+      if (!teamId) return;
+
+      try {
+        setIsLoading(true);
+        setError(null);
+        const response = await TeamService.getTeamById(teamId);
+
+        if (response.success && response.data) {
+          setTeam(response.data);
+        } else {
+          setError('Không thể tải thông tin đội');
+        }
+      } catch (err: any) {
+        console.error('Failed to fetch team detail:', err);
+        setError(err?.message || 'Có lỗi xảy ra');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchTeamDetail();
+  }, [teamId]);
+
+  // Helper function to format gender display
+  const formatGender = (gender: string) => {
+    if (gender === 'MALE' || gender === 'Nam') return 'Nam';
+    if (gender === 'FEMALE' || gender === 'Nữ') return 'Nữ';
+    return 'Mixed'; // Changed from 'Nam/Nữ' to 'Mixed'
+  };
+
+  // Helper function to get gender icon
+  const getGenderIcon = (gender: string) => {
+    if (gender === 'MALE' || gender === 'Nam') return 'male';
+    if (gender === 'FEMALE' || gender === 'Nữ') return 'female';
+    return 'wc';
+  };
+
+  if (isLoading) {
+    return (
+      <>
+        <Header title="Chi tiết đội bóng" onBack={() => navigate(-1)} />
+        <TeamDetailSkeleton />
+      </>
+    );
+  }
+
+  if (error || !team) {
+    return (
+      <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark pb-24">
+        <Header title="Chi tiết đội bóng" onBack={() => navigate(-1)} />
+        <div className="flex-1 flex items-center justify-center px-4">
+          <div className="text-center">
+            <Icon name="error" className="text-4xl mb-2 text-red-500" />
+            <p className="text-sm text-red-500 mb-4">{error || 'Không tìm thấy đội bóng'}</p>
+            <Button variant="ghost" onClick={() => navigate(-1)}>Quay lại</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Get first 3 member avatars for display
+  const memberAvatars = team.members?.slice(0, 3).map(m => m.user?.avatar).filter(Boolean) || [];
+  const remainingCount = Math.max(0, (team.membersCount || 0) - (team.members?.length || 0));
+
   return (
     <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark pb-24">
       <Header title="Chi tiết đội bóng" onBack={() => navigate(-1)} />
@@ -19,20 +94,34 @@ const TeamDetailScreen: React.FC = () => {
       {/* Cover & Header Info */}
       <div className="relative">
         <div className="h-40 w-full overflow-hidden">
-          <div className="w-full h-full bg-center bg-cover" style={{ backgroundImage: 'linear-gradient(to bottom, rgba(16,34,25,0.2), rgba(16,34,25,0.9)), url("https://lh3.googleusercontent.com/aida-public/AB6AXuCmyUKbWlNoXecN8CHjDjXp5IddTXSZcP54Wsk-N5ToWcDBY3c0ajCtNHeKoxBtrQxx45dG68lIuAm3RfLR-EDZ34oN-empT027zV4qSqw-KP-LP29-k5zEGdKhbfBCpmC2SjktJZQF51194CD6Z2yLba-cu9x_2ZYymXZkxBWQyV7VoXMLrmmV9Rousy5Hg6cXZBppIM_t5rA-LOgv4IAtemyaXG1M0JWiKiLojEln5-wN9zaAwCASwfWb-EYF0qmb4KW_MnwhEhOQ")' }}></div>
+          {team.banner ? (
+            <img src={team.banner} className="w-full h-full object-cover" alt="Team Banner" />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-primary/20 to-green-600/20" />
+          )}
         </div>
         <div className="absolute -bottom-10 left-1/2 -translate-x-1/2">
           <div className="size-24 rounded-full border-4 border-background-light dark:border-background-dark bg-surface-dark overflow-hidden shadow-lg">
-            <img className="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDgMiy1WmLO4CLqqm08LykjhNM_VUb8V7nJx8NNcKoNfLzmRWdsXEY_yV2U8cG0uLrYD5laTf2l7i5hxH15lGifO4dHiHKSnIBF8xOwAetdY2Ph1wP9lUYUr_y8p5zqgbC1osTFvvawVoHAHSc4TnIGOasCaFPaLTNNT0RG42RZc638OH_blB4k8j2K5Wy6oshulBAF96Y0pK-ZEtM8PzpbYc6wAcqMfliTLkZ87SXPQrX6d-idB1W5RkrQMu7ekYTrs0E0UJARtEq9" alt="Team Logo" />
+            {team.logo ? (
+              <img className="w-full h-full object-cover" src={team.logo} alt={team.name} />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-primary to-green-600 flex items-center justify-center text-white font-bold text-2xl">
+                {team.name.charAt(0)}
+              </div>
+            )}
           </div>
         </div>
       </div>
 
       <div className="mt-12 text-center px-4">
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">FC Sài Gòn</h1>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{team.name}</h1>
         <div className="flex justify-center gap-2 mt-3">
-          <span className="px-3 py-1 rounded-full bg-gray-200 dark:bg-white/10 text-xs font-medium flex items-center gap-1"><Icon name="wc" className="text-sm" /> Nam</span>
-          <span className="px-3 py-1 rounded-full bg-gray-200 dark:bg-white/10 text-xs font-medium flex items-center gap-1"><Icon name="hotel_class" className="text-sm" /> Trung bình</span>
+          <span className="px-3 py-1 rounded-full bg-gray-200 dark:bg-white/10 text-xs font-medium flex items-center gap-1">
+            <Icon name={getGenderIcon(team.gender)} className="text-sm" /> {formatGender(team.gender)}
+          </span>
+          <span className="px-3 py-1 rounded-full bg-gray-200 dark:bg-white/10 text-xs font-medium flex items-center gap-1">
+            <Icon name="hotel_class" className="text-sm" /> {team.level}
+          </span>
         </div>
       </div>
 
@@ -43,74 +132,93 @@ const TeamDetailScreen: React.FC = () => {
             <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0"><Icon name="location_on" className="text-lg" /></div>
             <div>
               <p className="text-xs text-gray-500 uppercase font-bold">Khu vực</p>
-              <p className="text-sm font-medium">Quận 7, TP.HCM</p>
+              <p className="text-sm font-medium">{team.location?.address || 'Chưa cập nhật'}</p>
             </div>
           </div>
-          <div className="w-full h-px bg-gray-100 dark:bg-white/5"></div>
-          <div className="flex gap-3">
-            <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0"><Icon name="sports_soccer" className="text-lg" /></div>
-            <div>
-              <p className="text-xs text-gray-500 uppercase font-bold">Loại sân</p>
-              <p className="text-sm font-medium">Sân 5 • Sân 7</p>
-            </div>
-          </div>
-          <div className="w-full h-px bg-gray-100 dark:bg-white/5"></div>
-          <div className="flex gap-3">
-            <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0"><Icon name="info" className="text-lg" /></div>
-            <div>
-              <p className="text-xs text-gray-500 uppercase font-bold">Giới thiệu</p>
-              <p className="text-sm font-normal text-gray-600 dark:text-gray-300">Đội bóng văn phòng, đá vui vẻ là chính, giao lưu học hỏi, không cay cú.</p>
-            </div>
-          </div>
+          {team.pitch && team.pitch.length > 0 && (
+            <>
+              <div className="w-full h-px bg-gray-100 dark:bg-white/5"></div>
+              <div className="flex gap-3">
+                <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0"><Icon name="sports_soccer" className="text-lg" /></div>
+                <div>
+                  <p className="text-xs text-gray-500 uppercase font-bold">Loại sân</p>
+                  <p className="text-sm font-medium">{team.pitch.map(p => `Sân ${p}`).join(' • ')}</p>
+                </div>
+              </div>
+            </>
+          )}
+          {team.description && (
+            <>
+              <div className="w-full h-px bg-gray-100 dark:bg-white/5"></div>
+              <div className="flex gap-3">
+                <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0"><Icon name="info" className="text-lg" /></div>
+                <div>
+                  <p className="text-xs text-gray-500 uppercase font-bold">Giới thiệu</p>
+                  <p className="text-sm font-normal text-gray-600 dark:text-gray-300">{team.description}</p>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
       {/* Stats */}
-      <div className="px-4 mt-6">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-bold text-lg">Chỉ số đội</h3>
-          <span className="text-primary text-sm font-medium">Chi tiết</span>
+      {team.stats && (team.stats.attack || team.stats.defense || team.stats.technique) && (
+        <div className="px-4 mt-6">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-bold text-lg">Chỉ số đội</h3>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            {team.stats.attack !== undefined && (
+              <div className="bg-white dark:bg-surface-dark p-3 rounded-xl border border-gray-100 dark:border-white/5 flex flex-col items-center gap-2">
+                <div className="size-10 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center"><Icon name="flash_on" /></div>
+                <span className="text-xs font-medium text-gray-500">Tấn công</span>
+                <span className="font-bold text-lg">{(team.stats.attack / 10).toFixed(1)}</span>
+              </div>
+            )}
+            {team.stats.defense !== undefined && (
+              <div className="bg-white dark:bg-surface-dark p-3 rounded-xl border border-gray-100 dark:border-white/5 flex flex-col items-center gap-2">
+                <div className="size-10 bg-blue-500/10 text-blue-500 rounded-full flex items-center justify-center"><Icon name="shield" /></div>
+                <span className="text-xs font-medium text-gray-500">Phòng thủ</span>
+                <span className="font-bold text-lg">{(team.stats.defense / 10).toFixed(1)}</span>
+              </div>
+            )}
+            {team.stats.technique !== undefined && (
+              <div className="bg-white dark:bg-surface-dark p-3 rounded-xl border border-gray-100 dark:border-white/5 flex flex-col items-center gap-2">
+                <div className="size-10 bg-primary/10 text-primary rounded-full flex items-center justify-center"><Icon name="sports_soccer" /></div>
+                <span className="text-xs font-medium text-gray-500">Kỹ thuật</span>
+                <span className="font-bold text-lg">{(team.stats.technique / 10).toFixed(1)}</span>
+              </div>
+            )}
+          </div>
         </div>
-        <div className="grid grid-cols-3 gap-3">
-          <div className="bg-white dark:bg-surface-dark p-3 rounded-xl border border-gray-100 dark:border-white/5 flex flex-col items-center gap-2">
-            <div className="size-10 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center"><Icon name="flash_on" /></div>
-            <span className="text-xs font-medium text-gray-500">Tấn công</span>
-            <span className="font-bold text-lg">7.5</span>
-          </div>
-          <div className="bg-white dark:bg-surface-dark p-3 rounded-xl border border-gray-100 dark:border-white/5 flex flex-col items-center gap-2">
-            <div className="size-10 bg-blue-500/10 text-blue-500 rounded-full flex items-center justify-center"><Icon name="shield" /></div>
-            <span className="text-xs font-medium text-gray-500">Phòng thủ</span>
-            <span className="font-bold text-lg">6.0</span>
-          </div>
-          <div className="bg-white dark:bg-surface-dark p-3 rounded-xl border border-gray-100 dark:border-white/5 flex flex-col items-center gap-2">
-            <div className="size-10 bg-primary/10 text-primary rounded-full flex items-center justify-center"><Icon name="sports_soccer" /></div>
-            <span className="text-xs font-medium text-gray-500">Kỹ thuật</span>
-            <span className="font-bold text-lg">8.5</span>
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* Members Summary Link */}
       <div className="px-4 mt-6">
-        <h3 className="font-bold text-lg mb-3">Thành viên (14)</h3>
+        <h3 className="font-bold text-lg mb-3">Thành viên ({team.membersCount || 0})</h3>
         <div
-          onClick={() => navigate(appRoutes.teamMembers(teamId))}
+          onClick={() => teamId && navigate(appRoutes.teamMembers(teamId))}
           className="flex items-center justify-between p-4 rounded-xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-white/5 shadow-sm active:bg-gray-50 dark:active:bg-white/5 cursor-pointer transition-colors"
         >
           <div className="flex items-center gap-3">
             <div className="flex -space-x-3">
-              {[
-                "https://lh3.googleusercontent.com/aida-public/AB6AXuAVTbFbEVKyBAT5wyQDrv7lnWXESXkvb8eUj3e1kAsxwVEClkl8R16ZgndkQ5MiXIdQeQyikmJyFpSrs3gy7Nrh05FPLNvuUbee73ajLOhm2zbYP1u1G91fw5tAfKsZcyOiz-XpOxEqIYlOZH1F19lsDCgBqycoEm50-LjpGnmU3tjLRWzTOcS13En2OwxJErDMn8WYetuT0WKhCzhW4r4NVFR4y_ecMILTeqfpytlGSOu72Vbx0sSKpF6dfRg_nc69NMCY_Mtpsy9m",
-                "https://lh3.googleusercontent.com/aida-public/AB6AXuDljyEJhi2zU-3QBVHfZ8QbZfKnazIoWQZAmqG7G1mNu8s6VsSJGYsnixLJaJTzhPxmh96DLuOiFNI1dhApZXHqobLdDAGMJ8S0abR7anNyvUa1FhvaUAKEa4EKyuvyXFWNuXksQRp__T-86x-LocMMsoVsxRdEV1tW9Ae2gRsreDNFbVDoY4TUev0aKDr6INDrJBmeXcL5K55IKacorRikenjrfUvZkE8bnSGxs3BMP1b6N6AUwZy8zBlI_B4Y6hsK8LoFmzlVF-al",
-                "https://lh3.googleusercontent.com/aida-public/AB6AXuA834-l0cKqY_4j-wZgqKqXlF3N5Qk7RjE1M4Xp8S6T2W9V0Z_L5H3Y_c7B6D1F9G2J8K4Lm0N3P5Q7R8S1T9V2W4X6Y0Z8L5K3M1N9P7Q4R2S6T8V0W3X5Y7Z9/avatar.png"
-              ].map((img, i) => (
+              {memberAvatars.map((avatar, i) => (
                 <div key={i} className="size-10 rounded-full border-2 border-white dark:border-surface-dark overflow-hidden bg-gray-200">
-                  <img src={img} className="w-full h-full object-cover" />
+                  {avatar ? (
+                    <img src={avatar} className="w-full h-full object-cover" alt={`Member ${i + 1}`} />
+                  ) : (
+                    <div className="w-full h-full bg-gray-300 flex items-center justify-center">
+                      <Icon name="person" className="text-gray-400" />
+                    </div>
+                  )}
                 </div>
               ))}
-              <div className="size-10 rounded-full border-2 border-white dark:border-surface-dark bg-gray-100 dark:bg-white/10 flex items-center justify-center text-xs font-bold text-gray-500">
-                +11
-              </div>
+              {remainingCount > 0 && (
+                <div className="size-10 rounded-full border-2 border-white dark:border-surface-dark bg-gray-100 dark:bg-white/10 flex items-center justify-center text-xs font-bold text-gray-500">
+                  +{remainingCount}
+                </div>
+              )}
             </div>
             <div className="flex flex-col">
               <span className="font-bold text-sm text-slate-900 dark:text-white">Xem tất cả</span>
@@ -130,13 +238,28 @@ const TeamDetailScreen: React.FC = () => {
             variant="secondary"
             className="flex-1"
             icon="edit"
-            onClick={() => navigate(appRoutes.teamEdit(teamId))}
+            onClick={() => navigate(appRoutes.teamEdit(teamId!), { state: { team } })}
           >
             Sửa đội
           </Button>
-          <Button variant="primary" className="flex-[1.5]" icon="sports" onClick={() => navigate(appRoutes.matchFind)}>Cáp kèo</Button>
+          <Button
+            variant="secondary"
+            className="flex-1"
+            icon="person_add"
+            onClick={() => setShowAddMemberSheet(true)}
+          >
+            Thêm TV
+          </Button>
+          <Button variant="primary" className="flex-[1.2]" icon="sports" onClick={() => navigate(appRoutes.matchFind)}>Cáp kèo</Button>
         </div>
       </div>
+
+      {/* Add Member Bottom Sheet */}
+      <AddMemberBottomSheet
+        isOpen={showAddMemberSheet}
+        onClose={() => setShowAddMemberSheet(false)}
+        teamId={teamId}
+      />
     </div>
   );
 };

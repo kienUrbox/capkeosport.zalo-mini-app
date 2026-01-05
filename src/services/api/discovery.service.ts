@@ -1,36 +1,97 @@
 import { api } from './index';
 
-// Request/Response types
+// Request types - Match API documentation
 export interface DiscoveryFilterDto {
-  center: {
-    lat: number;
-    lng: number;
-  };
-  radius: number;
-  level?: string;
-  gender?: 'male' | 'female' | 'mixed';
-  pitchType?: '5' | '7';
+  lat: number;
+  lng: number;
+  radius?: number;
+  level?: string[]; // ["Trung bình", "Khá", "Giỏi"]
+  gender?: string[]; // ["Nam", "Nữ", "Mixed"]
+  teamId?: string; // Exclude specific team ID
+  exclude?: string[]; // Exclude list of team IDs
+  limit?: number;
+  minScore?: number;
+  sortBy?: 'distance' | 'compatibility' | 'quality' | 'activity';
+  sortOrder?: 'ASC' | 'DESC';
+}
+
+export interface TeamStats {
+  attack: number;
+  defense: number;
+  technique: number;
+}
+
+export interface TeamLocation {
+  lat: number;
+  lng: number;
+  address: string;
 }
 
 export interface DiscoveredTeam {
   id: string;
   name: string;
   logo: string;
-  level?: string;
+  level: string;
+  gender: string;
+  stats: TeamStats;
+  location: TeamLocation;
   distance: number;
-  matchScore: number;
-  location: string;
+  membersCount: number;
+  compatibilityScore: number;
+  qualityScore: number;
+  activityScore: number;
+  lastActive: string;
+}
+
+export interface DiscoverySearchInfo {
+  center: {
+    lat: number;
+    lng: number;
+  };
+  radius: number;
+  filters: {
+    level?: string[];
+    gender?: string[];
+  };
 }
 
 export interface DiscoveryResponse {
   teams: DiscoveredTeam[];
-  hasMore: boolean;
+  total: number;
+  searchInfo: DiscoverySearchInfo;
 }
 
-export interface CreateSwipeDto {
-  targetTeamId: string;
-  action: 'like' | 'pass';
+export interface DiscoveryStats {
+  totalTeamsDiscovered: number;
+  averageDistance: number;
+  mostPreferredLevel: string;
+  mostPreferredGender: string;
+  lastDiscoveryTime: string;
 }
+
+export interface RecommendedParams {
+  recommendedLevel: string[];
+  recommendedGender: string[];
+  recommendedRadius: number;
+  preferredLocations: TeamLocation[];
+}
+
+// Helper to map Gender enum to Vietnamese
+const GENDER_MAP: Record<string, string> = {
+  MALE: 'Nam',
+  FEMALE: 'Nữ',
+  MIXED: 'Mixed',
+  Nam: 'Nam',
+  Nữ: 'Nữ',
+  Mixed: 'Mixed',
+};
+
+// Helper to map Vietnamese back to enum (exported for use in other files)
+export const REVERSE_GENDER_MAP: Record<string, string> = {
+  Nam: 'MALE',
+  Nữ: 'FEMALE',
+  Mixed: 'MIXED',
+};
 
 /**
  * Discovery Service
@@ -40,22 +101,30 @@ export interface CreateSwipeDto {
 export const DiscoveryService = {
   /**
    * Discover teams nearby
+   * POST /discovery
    */
-  discoverTeams: async (filters: DiscoveryFilterDto) => {
-    return api.post<DiscoveryResponse>('/discovery', filters);
+  discoverTeams: async (params: DiscoveryFilterDto) => {
+    // Map gender enums to Vietnamese for API
+    const mappedParams = {
+      ...params,
+      gender: params.gender?.map(g => GENDER_MAP[g] || g),
+    };
+    return api.post<DiscoveryResponse>('/discovery', mappedParams);
   },
 
   /**
-   * Swipe on a team (like/pass)
+   * Get discovery statistics
+   * GET /api/v1/discovery/stats
    */
-  swipeTeam: async (swipeData: CreateSwipeDto) => {
-    return api.post<import('../../stores/match.store').SwipeResponse>('/swipes', swipeData);
+  getStats: async () => {
+    return api.get<DiscoveryStats>('/discovery/stats');
   },
 
   /**
-   * Get swipe stats
+   * Get recommended search parameters
+   * GET /api/v1/discovery/recommendations
    */
-  getSwipeStats: async () => {
-    return api.get('/swipes/stats');
+  getRecommendations: async () => {
+    return api.get<RecommendedParams>('/discovery/recommendations');
   },
 };

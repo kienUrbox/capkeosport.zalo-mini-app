@@ -1,7 +1,22 @@
-import React, { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { Button, Header, Icon, Input } from '@/components/ui';
 import { appRoutes } from '@/utils/navigation';
+import { TeamService } from '@/services/api/team.service';
+import type { Team, UpdateTeamDto } from '@/services/api/team.service';
+import {
+  PITCH_TYPE_UI_VALUES,
+  TEAM_LEVELS,
+  formatPitchFromApi,
+  formatPitchForApi,
+  formatGenderFromApi,
+  formatGenderForApi,
+} from '@/constants/design';
+
+// Define location state type
+interface LocationState {
+  team?: Team;
+}
 
 /**
  * EditTeam Screen
@@ -10,12 +25,81 @@ import { appRoutes } from '@/utils/navigation';
  */
 const EditTeamScreen: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const locationState = location.state as LocationState | undefined;
   const { teamId } = useParams<{ teamId: string }>();
-  const [level, setLevel] = useState('Trung bình');
-  const [gender, setGender] = useState('Nam');
+
+  const [team, setTeam] = useState<Team | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Form state
+  const [name, setName] = useState('');
+  const [level, setLevel] = useState('Mới chơi');
+  const [gender, setGender] = useState('Nam'); // Must be 'Nam', 'Nữ', or 'Mixed'
   const [pitchTypes, setPitchTypes] = useState<string[]>(['5', '7']);
   const [stats, setStats] = useState({ attack: 7.5, defense: 6.0, technique: 8.5 });
+  const [locationAddress, setLocationAddress] = useState('');
+  const [description, setDescription] = useState('');
   const [isCalculating, setIsCalculating] = useState(false);
+
+  // Fetch team data on mount - check state first, only call API if needed
+  useEffect(() => {
+    const initTeamData = async () => {
+      if (!teamId) return;
+
+      // Check if team data is passed from navigation state
+      if (locationState?.team) {
+        const data = locationState.team;
+        setTeam(data);
+        setName(data.name);
+        setLevel(data.level);
+        setGender(formatGenderFromApi(data.gender));
+        setPitchTypes(formatPitchFromApi(data.pitch || []));
+        setStats({
+          attack: (data.stats?.attack || 75) / 10,
+          defense: (data.stats?.defense || 70) / 10,
+          technique: (data.stats?.technique || 72) / 10,
+        });
+        setLocationAddress(data.location?.address || '');
+        setDescription(data.description || '');
+        setIsLoading(false);
+        return;
+      }
+
+      // No state passed, fetch from API
+      try {
+        setIsLoading(true);
+        const response = await TeamService.getTeamById(teamId);
+
+        if (response.success && response.data) {
+          const data = response.data;
+          setTeam(data);
+          setName(data.name);
+          setLevel(data.level);
+          setGender(formatGenderFromApi(data.gender));
+          setPitchTypes(formatPitchFromApi(data.pitch || []));
+          setStats({
+            attack: (data.stats?.attack || 75) / 10,
+            defense: (data.stats?.defense || 70) / 10,
+            technique: (data.stats?.technique || 72) / 10,
+          });
+          setLocationAddress(data.location?.address || '');
+          setDescription(data.description || '');
+        } else {
+          setError('Không thể tải thông tin đội');
+        }
+      } catch (err: unknown) {
+        console.error('Failed to fetch team:', err);
+        setError(err instanceof Error ? err.message : 'Có lỗi xảy ra');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initTeamData();
+  }, [teamId, locationState]);
 
   const togglePitch = (type: string) => {
     setPitchTypes(prev =>
@@ -29,22 +113,83 @@ const EditTeamScreen: React.FC = () => {
 
   const calculateAverageStats = () => {
     setIsCalculating(true);
-    // Simulate API call or calculation delay
     setTimeout(() => {
-      // Mock result: "Calculated" averages
       setStats({
         attack: 8.2,
         defense: 7.1,
-        technique: 7.9
+        technique: 7.9,
       });
       setIsCalculating(false);
     }, 1000);
   };
 
-  const handleSave = () => {
-    // TODO: Implement save team logic
-    navigate(appRoutes.teamDetail(teamId));
+  const handleSave = async () => {
+    if (!teamId) return;
+
+    try {
+      setIsSaving(true);
+      setError(null);
+
+      const updateData: UpdateTeamDto = {
+        name,
+        gender: formatGenderForApi(gender),
+        level,
+        pitch: formatPitchForApi(pitchTypes),
+        stats: {
+          attack: Math.round(stats.attack * 10),
+          defense: Math.round(stats.defense * 10),
+          technique: Math.round(stats.technique * 10),
+        },
+        description: description || undefined,
+        location: team?.location ? {
+          ...team.location,
+          address: locationAddress,
+        } : undefined,
+      };
+
+      const response = await TeamService.updateTeam(teamId, updateData);
+
+      if (response.success) {
+        navigate(appRoutes.teamDetail(teamId));
+      } else {
+        setError('Không thể cập nhật thông tin đội');
+      }
+    } catch (err: any) {
+      console.error('Failed to update team:', err);
+      setError(err?.message || 'Có lỗi xảy ra');
+    } finally {
+      setIsSaving(false);
+    }
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark pb-safe">
+        <Header title="Chỉnh sửa thông tin đội" onBack={() => navigate(-1)} />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <Icon name="refresh" className="animate-spin text-4xl text-primary mb-4" />
+            <p className="text-sm text-gray-500">Đang tải thông tin đội...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && !team) {
+    return (
+      <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark pb-safe">
+        <Header title="Chỉnh sửa thông tin đội" onBack={() => navigate(-1)} />
+        <div className="flex-1 flex items-center justify-center px-4">
+          <div className="text-center">
+            <Icon name="error" className="text-4xl mb-2 text-red-500" />
+            <p className="text-sm text-red-500 mb-4">{error}</p>
+            <Button variant="ghost" onClick={() => navigate(-1)}>Quay lại</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark pb-safe">
@@ -56,7 +201,11 @@ const EditTeamScreen: React.FC = () => {
         <div className="flex flex-col gap-4">
           {/* Banner Upload */}
           <div className="relative w-full h-36 rounded-xl overflow-hidden bg-gray-800 border-2 border-gray-300 dark:border-gray-600 cursor-pointer group">
-            <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuCmyUKbWlNoXecN8CHjDjXp5IddTXSZcP54Wsk-N5ToWcDBY3c0ajCtNHeKoxBtrQxx45dG68lIuAm3RfLR-EDZ34oN-empT027zV4qSqw-KP-LP29-k5zEGdKhbfBCpmC2SjktJZQF51194CD6Z2yLba-cu9x_2ZYymXZkxBWQyV7VoXMLrmmV9Rousy5Hg6cXZBppIM_t5rA-LOgv4IAtemyaXG1M0JWiKiLojEln5-wN9zaAwCASwfWb-EYF0qmb4KW_MnwhEhOQ" className="w-full h-full object-cover opacity-75 group-hover:opacity-50 transition-opacity" />
+            {team?.banner ? (
+              <img src={team.banner} className="w-full h-full object-cover opacity-75 group-hover:opacity-50 transition-opacity" alt="Banner" />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-primary/20 to-green-600/20" />
+            )}
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="bg-black/50 p-2 rounded-full border border-white/20">
                 <Icon name="add_photo_alternate" className="text-white text-xl" />
@@ -67,7 +216,13 @@ const EditTeamScreen: React.FC = () => {
           {/* Logo Upload */}
           <div className="flex items-center gap-4 px-2 -mt-10 relative z-10">
             <div className="relative size-24 rounded-full bg-surface-dark border-4 border-background-light dark:border-background-dark shadow-xl overflow-hidden group cursor-pointer">
-              <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuDgMiy1WmLO4CLqqm08LykjhNM_VUb8V7nJx8NNcKoNfLzmRWdsXEY_yV2U8cG0uLrYD5laTf2l7i5hxH15lGifO4dHiHKSnIBF8xOwAetdY2Ph1wP9lUYUr_y8p5zqgbC1osTFvvawVoHAHSc4TnIGOasCaFPaLTNNT0RG42RZc638OH_blB4k8j2K5Wy6oshulBAF96Y0pK-ZEtM8PzpbYc6wAcqMfliTLkZ87SXPQrX6d-idB1W5RkrQMu7ekYTrs0E0UJARtEq9" className="w-full h-full object-cover" />
+              {team?.logo ? (
+                <img src={team.logo} className="w-full h-full object-cover" alt="Logo" />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-primary to-green-600 flex items-center justify-center text-white font-bold text-2xl">
+                  {name.charAt(0)}
+                </div>
+              )}
               <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                 <Icon name="edit" className="text-white text-lg" />
               </div>
@@ -81,13 +236,18 @@ const EditTeamScreen: React.FC = () => {
 
         {/* Basic Info */}
         <div className="space-y-5">
-          <Input label="Tên đội bóng" defaultValue="FC Sài Gòn" icon="groups" />
+          <Input
+            label="Tên đội bóng"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            icon="groups"
+          />
 
           {/* Level */}
           <div className="flex flex-col gap-2">
             <label className="text-sm font-medium text-gray-600 dark:text-text-secondary ml-1">Trình độ</label>
             <div className="grid grid-cols-2 gap-3">
-              {['Vui vẻ', 'Trung bình', 'Khá', 'Bán chuyên'].map((l) => (
+              {TEAM_LEVELS.map((l) => (
                 <button
                   key={l}
                   onClick={() => setLevel(l)}
@@ -110,7 +270,7 @@ const EditTeamScreen: React.FC = () => {
               {[
                 { label: 'Nam', icon: 'male' },
                 { label: 'Nữ', icon: 'female' },
-                { label: 'Nam/Nữ', icon: 'wc' }
+                { label: 'Mixed', icon: 'wc' }
               ].map((g) => (
                 <button
                   key={g.label}
@@ -132,7 +292,7 @@ const EditTeamScreen: React.FC = () => {
           <div className="flex flex-col gap-2">
             <label className="text-sm font-medium text-gray-600 dark:text-text-secondary ml-1">Loại sân thường đá</label>
             <div className="flex gap-3">
-              {['5', '7', '11'].map((p) => (
+              {PITCH_TYPE_UI_VALUES.map((p) => (
                 <button
                   key={p}
                   onClick={() => togglePitch(p)}
@@ -221,22 +381,37 @@ const EditTeamScreen: React.FC = () => {
             </div>
           </div>
 
-          <Input label="Khu vực hoạt động" defaultValue="Quận 7, TP.HCM" icon="location_on" />
+          <Input
+            label="Khu vực hoạt động"
+            value={locationAddress}
+            onChange={(e) => setLocationAddress(e.target.value)}
+            icon="location_on"
+          />
 
           <div className="flex flex-col gap-2">
             <label className="text-sm font-medium text-gray-600 dark:text-text-secondary ml-1">Giới thiệu ngắn</label>
             <textarea
               className="w-full bg-white dark:bg-surface-dark border border-gray-200 dark:border-border-dark rounded-xl p-4 text-slate-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-primary focus:border-transparent min-h-[100px] resize-none"
               placeholder="Mô tả về đội bóng, tiêu chí giao lưu..."
-              defaultValue="Đội bóng văn phòng, đá vui vẻ là chính, giao lưu học hỏi, không cay cú."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
             ></textarea>
           </div>
         </div>
       </div>
 
       <div className="mt-auto p-4 border-t border-gray-200 dark:border-white/5 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur z-20">
-        <Button fullWidth onClick={handleSave}>
-          LƯU THAY ĐỔI
+        {error && (
+          <div className="mb-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+          </div>
+        )}
+        <Button
+          fullWidth
+          onClick={handleSave}
+          disabled={isSaving}
+        >
+          {isSaving ? 'Đang lưu...' : 'LƯU THAY ĐỔI'}
         </Button>
       </div>
     </div>

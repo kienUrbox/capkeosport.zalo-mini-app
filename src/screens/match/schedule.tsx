@@ -1,336 +1,312 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Icon, TeamAvatar, Button, BottomNav } from '@/components/ui';
+import {
+  Icon,
+  TeamAvatar,
+  Button,
+  PendingMatchCard,
+  UpcomingMatchCard,
+  HistoryMatchCard,
+  SchedulePendingSkeleton,
+  ScheduleUpcomingSkeleton,
+  ScheduleHistorySkeleton,
+} from '@/components/ui';
 import { appRoutes } from '@/utils/navigation';
-
-type TabType = 'pending' | 'live' | 'history';
-
-interface PendingMatch {
-  id: string;
-  team: string;
-  avatar: string;
-  time: string;
-  date: string;
-  location: string;
-  type: 'received' | 'sent' | 'accepted';
-  message?: string;
-}
-
-interface ActiveMatch {
-  id: string;
-  team: string;
-  avatar: string;
-  time: string;
-  date: string;
-  location: string;
-  score?: string;
-  stage: 'upcoming' | 'live' | 'finished';
-}
-
-interface HistoryMatch {
-  id: string;
-  date: string;
-  result: 'W' | 'L' | 'D';
-  score: string;
-  opponent: string;
-  avatar: string;
-  location: string;
-}
-
-const MY_TEAMS = [
-  {
-    id: 't1',
-    name: 'FC Sài Gòn',
-    logo: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDgMiy1WmLO4CLqqm08LykjhNM_VUb8V7nJx8NNcKoNfLzmRWdsXEY_yV2U8cG0uLrYD5laTf2l7i5hxH15lGifO4dHiHKSnIBF8xOwAetdY2Ph1wP9lUYUr_y8p5zqgbC1osTFvvawVoHAHSc4TnIGOasCaFPaLTNNT0RG42RZc638OH_blB4k8j2K5Wy6oshulBAF96Y0pK-ZEtM8PzpbYc6wAcqMfliTLkZ87SXPQrX6d-idB1W5RkrQMu7ekYTrs0E0UJARtEq9',
-  },
-  {
-    id: 't2',
-    name: 'Old Boys FC',
-    logo: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDljyEJhi2zU-3QBVHfZ8QbZfKnazIoWQZAmqG7G1mNu8s6VsSJGYsnixLJaJTzhPxmh96DLuOiFNI1dhApZXHqobLdDAGMJ8S0abR7anNyvUa1FhvaUAKEa4EKyuvyXFWNuXksQRp__T-86x-LocMMsoVsxRdEV1tW9Ae2gRsreDNFbVDoY4TUev0aKDr6INDrJBmeXcL5K55IKacorRikenjrfUvZkE8bnSGxs3BMP1b6N6AUwZy8zBlI_B4Y6hsK8LoFmzlVF-al',
-  },
-];
+import { useScheduleData } from '@/hooks/useScheduleData';
+import { useMyTeams, useSelectedTeam, useTeamActions, useTeamStore } from '@/stores/team.store';
+import { useMatchActions } from '@/stores/match.store';
+import type { TabType } from '@/stores/match.store';
 
 /**
  * MatchSchedule Screen
  *
  * 3-tab interface: Pending (Chờ kèo), Live (Lịch đấu), History (Lịch sử)
  * Each tab has completely different card layouts and actions.
+ *
+ * Features:
+ * - Lazy loading: Only fetch data when tab is activated
+ * - Infinite scroll: Load more pages when scrolling to bottom
+ * - Pull-to-refresh: Pull down to refresh current tab
  */
 const MatchScheduleScreen: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabType>('pending');
   const [showTeamSelector, setShowTeamSelector] = useState(false);
-  const [currentTeam, setCurrentTeam] = useState(MY_TEAMS[0]);
+
+  // Pull-to-refresh state
+  const [pullState, setPullState] = useState({
+    isPulling: false,
+    pullDistance: 0,
+    shouldRefresh: false,
+  });
+
+  // Use real data from stores
+  const myTeams = useMyTeams();
+  const teamStore = useTeamStore();
+  const currentTeam = useSelectedTeam();
+  const { setSelectedTeam, fetchMyTeams } = useTeamActions();
+
+  const {
+    pendingMatches,
+    upcomingMatches,
+    historyMatches,
+    isLoadingPending,
+    isLoadingUpcoming,
+    isLoadingHistory,
+    isRefreshing,
+    isLoadingMore,
+    error,
+    fetchTabOnDemand,
+    loadMore,
+    refreshTab,
+    resetAll,
+    hasMore,
+  } = useScheduleData(currentTeam?.id);
+
+  // Refs for infinite scroll and pull-to-refresh
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const touchStartY = useRef(0);
+  const currentScrollTop = useRef(0);
+
+  const matchActions = useMatchActions();
 
   // Simple toast helper
   const showToast = (message: string) => {
+    // TODO: Implement proper toast
     alert(message);
   };
 
   const tabs = [
     { id: 'pending' as const, label: 'Chờ kèo' },
-    { id: 'live' as const, label: 'Lịch đấu' },
+    { id: 'upcoming' as const, label: 'Lịch đấu' },
     { id: 'history' as const, label: 'Lịch sử' },
   ];
 
-  const pendingMatches: PendingMatch[] = [
-    {
-      id: '1',
-      team: 'Văn Phòng Utd',
-      avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAgxBAaJQou-skfFZH5ACWZ-qpEWdiR7OC1Ed1HCHOREyVUCtHmKYJGQoYC_UPMXGDEoSsU1p4tKlT0V4O1ROjwVxJaHO-xN6R7H-6b9U5j_4n47evOpJOrLBTseQ-vBpPT1DoR5gIISwy_i5KqGzMuHbLw5yuB5wSsdt0hkXXz32EfnKqFH933RZnWk5JsZ9Shpst4HVWLru7fZ_PKYR4qvSBh3_fOxfHYyHSzrOMtfQtTbuV4gR064mquc2XNzjS07DUl8OA1r18W',
-      time: '18:00',
-      date: '16/05',
-      location: 'Sân K34',
-      type: 'received',
-      message: 'Giao lưu nhẹ nhàng chia tiền sân nha bạn!',
-    },
-    {
-      id: '2',
-      team: 'Tiger FC',
-      avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBdSvJy9n3m4nDJboxMNyYIffoPOU-q_PGbSpEtCD7oZ3QLnawTx_1DEjQVzWpwzx6GI0HV0JsCpXaMYDzdOusm7IV8SDt-tv7lcvKkU9jgDe0q4JLtzD9NXRWWP0gualfKFckerrNu7uXjyLayhLsD4LPOLodvjUQxqIKDw0C25gTjlVsjebdqgrT6zpzHAJNBdjD7Sf8i6GBSnDq9Gn6J1kwtIiNbLUTGWhLS8YzzlBfZQNtaxu43uCkI2p3Y1JZYeAdvo81iUYE7',
-      time: '19:30',
-      date: '18/05',
-      location: 'Sân Viettel',
-      type: 'sent',
-    },
-    {
-      id: '3',
-      team: 'Cá Sấu FC',
-      avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCeKRp8PNX06N8qLy6aBysvvgnzY-M6lgYIfjhgqTodyPAi2wEW2ob_i9EdMrg8MfmRcDkKx4X1otwpwsJuurICNxkC_6NKoRY36WfdJ2kDRuocVwGO1wPOFcfF1ylENUtxowUKtSAjmJSMgVAVR05f7ZjvDYTy67BitLR1YGQHDW26ppWzT6L3bGi3pAN6Ywt84Rl87aEm2sulKC-OEey-aMiAqZFBuNCeqdpuKa6C_mCcF6VXAvavSend-1KFuh3Iqg6Ft1dnFLRE',
-      time: '20:00',
-      date: '20/05',
-      location: 'Sân Chảo Lửa',
-      type: 'accepted',
-      message: 'Đã chốt sân số 3, anh em nhớ mang áo xanh nhé.',
-    },
-  ];
+  // Handle tab change with lazy loading
+  const handleTabChange = (tabId: TabType) => {
+    setActiveTab(tabId);
+    fetchTabOnDemand(tabId);
+  };
 
-  const activeMatches: ActiveMatch[] = [
-    {
-      id: '4',
-      team: 'Storm FC',
-      avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCdPDVsU8HjXm7-BhSIWmJN6Ol7OqhYE-e1RWAMjoVIKjbNnq9dTvsofyF6O-IG9qZze4u9TELsdTw6yyQ0vM5hr4HG5UeAXrqppEiD9TXiHp8zXV3qkl3BjxK32D45DodzuIog1UC5VF1iK8OH_TX-Jfe2hwNZ0bINoK0E14pNsxl5jXu32L6N-r3L2I-pOD2FnpVliWPD6Fcb4DPQcf-ET4_XYzK_vs5HNlL1loJ7zsLl7Ra4JyZhj0n_i2Rt6F4OEDVLMo9k9Ucg',
-      time: "35'",
-      date: 'Hôm nay',
-      location: 'Sân Quận 7',
-      score: '2 - 1',
-      stage: 'live',
-    },
-    {
-      id: '5',
-      team: 'FC Anh Em',
-      avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBypvDsi-D_phTOtQVDsuko1_OaeLHOPwHmhVianjSwwv5eXiQ5TI7fie-VKOFm-iNPkFWxJww3Phok10XnM2xeMBaAhHiM6qPUAdUNYq5nf1AvtF-q24k4xmzXc1hWjuPlMOqQOniDFxVh0ZkHaooaQ4OYzSSuMP9u6TNYh0DkSG6liPhKWavxJG405PNn8issj3m_-RoaeJs2kPsmhV5S0nTTxwPAbxwfKAPtRPkzmjUDq4_45ql8q8y7Byllkt5Ou8PGPsisKYJp',
-      time: '19:30',
-      date: 'Tối nay',
-      location: 'Sân PM',
-      stage: 'upcoming',
-    },
-    {
-      id: '6',
-      team: 'Old Boys',
-      avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDljyEJhi2zU-3QBVHfZ8QbZfKnazIoWQZAmqG7G1mNu8s6VsSJGYsnixLJaJTzhPxmh96DLuOiFNI1dhApZXHqobLdDAGMJ8S0abR7anNyvUa1FhvaUAKEa4EKyuvyXFWNuXksQRp__T-86x-LocMMsoVsxRdEV1tW9Ae2gRsreDNFbVDoY4TUev0aKDr6INDrJBmeXcL5K55IKacorRikenjrfUvZkE8bnSGxs3BMP1b6N6AUwZy8zBlI_B4Y6hsK8LoFmzlVF-al',
-      time: 'Kết thúc',
-      date: 'Vừa xong',
-      location: 'Sân K34',
-      score: '4 - 3',
-      stage: 'finished',
-    },
-  ];
+  // Reset and load initial tab when team changes
+  useEffect(() => {
+    if (currentTeam?.id) {
+      resetAll();
+      setActiveTab('pending');
+      fetchTabOnDemand('pending');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentTeam?.id]);
 
-  const historyMatches: HistoryMatch[] = [
-    {
-      id: 'h1',
-      date: '12/05',
-      result: 'W',
-      score: '5 - 3',
-      opponent: 'Cá Sấu FC',
-      avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCeKRp8PNX06N8qLy6aBysvvgnzY-M6lgYIfjhgqTodyPAi2wEW2ob_i9EdMrg8MfmRcDkKx4X1otwpwsJuurICNxkC_6NKoRY36WfdJ2kDRuocVwGO1wPOFcfF1ylENUtxowUKtSAjmJSMgVAVR05f7ZjvDYTy67BitLR1YGQHDW26ppWzT6L3bGi3pAN6Ywt84Rl87aEm2sulKC-OEey-aMiAqZFBuNCeqdpuKa6C_mCcF6VXAvavSend-1KFuh3Iqg6Ft1dnFLRE',
-      location: 'Sân Chảo Lửa',
-    },
-    {
-      id: 'h2',
-      date: '10/05',
-      result: 'L',
-      score: '2 - 4',
-      opponent: 'Tiger Utd',
-      avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBdSvJy9n3m4nDJboxMNyYIffoPOU-q_PGbSpEtCD7oZ3QLnawTx_1DEjQVzWpwzx6GI0HV0JsCpXaMYDzdOusm7IV8SDt-tv7lcvKkU9jgDe0q4JLtzD9NXRWWP0gualfKFckerrNu7uXjyLayhLsD4LPOLodvjUQxqIKDw0C25gTjlVsjebdqgrT6zpzHAJNBdjD7Sf8i6GBSnDq9Gn6J1kwtIiNbLUTGWhLS8YzzlBfZQNtaxu43uCkI2p3Y1JZYeAdvo81iUYE7',
-      location: 'Sân K34',
-    },
-    {
-      id: 'h3',
-      date: '01/05',
-      result: 'D',
-      score: '3 - 3',
-      opponent: 'Văn Phòng FC',
-      avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAgxBAaJQou-skfFZH5ACWZ-qpEWdiR7OC1Ed1HCHOREyVUCtHmKYJGQoYC_UPMXGDEoSsU1p4tKlT0V4O1ROjwVxJaHO-xN6R7H-6b9U5j_4n47evOpJOrLBTseQ-vBpPT1DoR5gIISwy_i5KqGzMuHbLw5yuB5wSsdt0hkXXz32EfnKqFH933RZnWk5JsZ9Shpst4HVWLru7fZ_PKYR4qvSBh3_fOxfHYyHSzrOMtfQtTbuV4gR064mquc2XNzjS07DUl8OA1r18W',
-      location: 'Sân Quận 7',
-    },
-  ];
+  // Infinite scroll with IntersectionObserver
+  useEffect(() => {
+    // Cleanup previous observer
+    observerRef.current?.disconnect();
 
-  const handleNavTabChange = (tab: string) => {
-    switch (tab) {
-      case 'home':
-        navigate(appRoutes.dashboard, { replace: true });
-        break;
-      case 'schedule':
-        // Already here
-        break;
-      case 'match':
-        navigate(appRoutes.matchFind, { replace: true });
-        break;
-      case 'team':
-        navigate(appRoutes.teams, { replace: true });
-        break;
-      case 'profile':
-        navigate(appRoutes.profile, { replace: true });
-        break;
+    // Only setup if tab has more data to load
+    if (!hasMore(activeTab)) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore(activeTab)) {
+          loadMore(activeTab);
+        }
+      },
+      { threshold: 0.1, rootMargin: '100px' }
+    );
+
+    const sentinel = sentinelRef.current;
+    if (sentinel) {
+      observer.observe(sentinel);
+      observerRef.current = observer;
+    }
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [activeTab, hasMore, loadMore]);
+
+  // Pull-to-refresh handlers
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartY.current = e.touches[0].clientY;
+    currentScrollTop.current = e.currentTarget.scrollTop;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    // Only allow pull when at the top
+    if (currentScrollTop.current > 0) return;
+
+    const currentY = e.touches[0].clientY;
+    const diff = currentY - touchStartY.current;
+
+    // Only respond to downward pull
+    if (diff > 0) {
+      setPullState({
+        isPulling: true,
+        pullDistance: Math.min(diff * 0.5, 120), // Damping effect
+        shouldRefresh: diff > 100,
+      });
     }
   };
 
-  const renderPendingStatus = (type: PendingMatch['type']) => {
-    switch (type) {
-      case 'received':
-        return (
-          <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border border-yellow-500/20">
-            Lời mời mới
-          </span>
-        );
-      case 'sent':
-        return (
-          <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-gray-500/10 text-gray-500 border border-gray-500/20">
-            Đã gửi • Chờ phản hồi
-          </span>
-        );
-      case 'accepted':
-        return (
-          <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20">
-            Đã đồng ý
-          </span>
-        );
+  const handleTouchEnd = async () => {
+    if (pullState.shouldRefresh) {
+      await refreshTab(activeTab);
     }
+
+    setPullState({
+      isPulling: false,
+      pullDistance: 0,
+      shouldRefresh: false,
+    });
   };
 
-  const renderPendingActions = (match: PendingMatch) => {
-    switch (match.type) {
-      case 'received':
-        return (
-          <div className="flex gap-3 mt-3" onClick={(e) => e.stopPropagation()}>
-            <Button
-              variant="secondary"
-              className="flex-1 h-10 text-xs"
-              icon="close"
-              onClick={() => showToast('Đã từ chối lời mời')}
-            >
-              Từ chối
-            </Button>
-            <Button className="flex-1 h-10 text-xs" icon="check" onClick={() => showToast('Đã chấp nhận lời mời')}>
-              Chấp nhận
-            </Button>
-          </div>
-        );
-      case 'sent':
-        return (
-          <div className="flex gap-3 mt-3" onClick={(e) => e.stopPropagation()}>
-            <Button variant="secondary" className="flex-1 h-10 text-xs" icon="undo" onClick={() => showToast('Đã hủy lời mời')}>
-              Hủy lời mời
-            </Button>
-            <Button variant="secondary" className="flex-1 h-10 text-xs" icon="edit" onClick={() => navigate(appRoutes.matchInvite)}>
-              Sửa thông tin
-            </Button>
-          </div>
-        );
-      case 'accepted':
-        return (
-          <div className="flex gap-3 mt-3" onClick={(e) => e.stopPropagation()}>
-            <Button variant="secondary" className="flex-1 h-10 text-xs" icon="chat" onClick={() => showToast('Mở chat...')}>
-              Nhắn tin
-            </Button>
-            <Button className="flex-1 h-10 text-xs bg-primary text-slate-900 shadow-lg shadow-primary/20" icon="handshake" onClick={() => showToast('Đã chốt kèo thành công')}>
-              Chốt kèo
-            </Button>
-          </div>
-        );
+  // Fetch teams if not loaded
+  useEffect(() => {
+    if (myTeams.length === 0 && !teamStore.isLoading) {
+      fetchMyTeams();
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const renderActiveStatus = (stage: ActiveMatch['stage']) => {
-    switch (stage) {
-      case 'upcoming':
-        return (
-          <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-            Sắp diễn ra
-          </span>
-        );
-      case 'live':
-        return (
-          <span className="flex items-center gap-1.5 text-xs font-bold px-2 py-0.5 rounded-md bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
-            </span>
-            Đang đá
-          </span>
-        );
-      case 'finished':
-        return (
-          <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-gray-500/10 text-gray-500 border border-gray-500/20">
-            Vừa kết thúc
-          </span>
-        );
-    }
-  };
+  // Show loading state while fetching teams
+  if (teamStore.isLoading && myTeams.length === 0) {
+    return (
+      <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark pb-safe-with-nav">
+        <div className="pt-6 px-4 pb-2">
+          <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white">Lịch thi đấu</h1>
+        </div>
+        <div className="flex flex-col items-center justify-center flex-1">
+          <Icon name="refresh" className="animate-spin text-4xl text-primary mb-4" />
+          <p className="text-sm text-gray-500">Đang tải danh sách đội...</p>
+        </div>
+      </div>
+    );
+  }
 
-  const renderActiveActions = (match: ActiveMatch) => {
-    switch (match.stage) {
-      case 'upcoming':
-        return (
-          <div
-            className="flex gap-3 mt-4 pt-3 border-t border-gray-100 dark:border-white/5"
-            onClick={(e) => e.stopPropagation()}
+  // Show empty state if no teams exist
+  if (myTeams.length === 0) {
+    return (
+      <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark pb-safe-with-nav">
+        <div className="pt-6 px-4 pb-2">
+          <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white">Lịch thi đấu</h1>
+        </div>
+        <div className="flex flex-col items-center justify-center flex-1 p-4">
+          <Icon name="sports_soccer" className="text-6xl text-gray-400 mb-4" />
+          <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-2">
+            Chưa có đội bóng
+          </h2>
+          <p className="text-sm text-gray-500 text-center mb-6">
+            Bạn cần tạo đội bóng trước khi xem lịch thi đấu
+          </p>
+          <Button
+            className="w-full max-w-xs"
+            icon="add"
+            onClick={() => navigate(appRoutes.teamsCreate)}
           >
-            <Button variant="secondary" className="flex-1 h-9 text-xs" icon="person_off" onClick={() => showToast('Đã báo bận')}>
-              Báo bận
-            </Button>
-            <Button className="flex-1 h-9 text-xs" icon="how_to_reg" onClick={() => showToast('Đã điểm danh thành công')}>
-              Điểm danh
-            </Button>
-          </div>
-        );
-      case 'live':
-        return (
-          <div className="flex gap-3 mt-4" onClick={(e) => e.stopPropagation()}>
-            <Button
-              variant="secondary"
-              className="flex-1 h-10 text-xs border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/30 dark:text-red-400 dark:hover:bg-red-900/10"
-              icon="flag"
-              onClick={() => showToast('Trận đấu đã kết thúc')}
-            >
-              Kết thúc
-            </Button>
-            <Button
-              className="flex-[1.5] h-10 text-xs bg-red-500 text-white hover:bg-red-600 shadow-red-500/30"
-              icon="scoreboard"
-              onClick={() => navigate(appRoutes.matchUpdateScore(match.id))}
-            >
-              Cập nhật tỉ số
-            </Button>
-          </div>
-        );
-      case 'finished':
-        return (
-          <div
-            className="flex gap-3 mt-4 pt-3 border-t border-gray-100 dark:border-white/5"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Button variant="secondary" className="flex-1 h-9 text-xs" icon="edit" onClick={() => navigate(appRoutes.matchUpdateScore(match.id))}>
-              Sửa kết quả
-            </Button>
-            <Button className="flex-1 h-9 text-xs bg-slate-800 text-white dark:bg-white dark:text-slate-900" icon="verified" onClick={() => showToast('Đã xác nhận kết quả')}>
-              Xác nhận
-            </Button>
-          </div>
-        );
+            Tạo đội bóng ngay
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Action handlers
+  const handleAcceptMatch = async (matchId: string) => {
+    try {
+      await matchActions.acceptMatch(matchId);
+      await Promise.all([
+        refreshTab('pending'),
+        refreshTab('upcoming'),
+      ]);
+      showToast('Đã chấp nhận lời mời');
+    } catch (err: any) {
+      showToast(err.message || 'Không thể chấp nhận lời mời');
     }
+  };
+
+  const handleDeclineMatch = async (matchId: string) => {
+    try {
+      await matchActions.declineMatch(matchId);
+      await refreshTab('pending');
+      showToast('Đã từ chối lời mời');
+    } catch (err: any) {
+      showToast(err.message || 'Không thể từ chối lời mời');
+    }
+  };
+
+  const handleCancelMatch = async (matchId: string) => {
+    try {
+      const reason = prompt('Lý do hủy:');
+      if (reason) {
+        await matchActions.cancelMatch(matchId, { reason });
+        await refreshTab('pending');
+        showToast('Đã hủy lời mời');
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Không thể hủy lời mời');
+    }
+  };
+
+  const handleConfirmMatch = async (matchId: string) => {
+    try {
+      // Navigate to confirm match screen with matchId
+      navigate(appRoutes.matchInvite); // TODO: Change to proper confirm route with matchId
+    } catch (err: any) {
+      showToast(err.message || 'Không thể chốt kèo');
+    }
+  };
+
+  const handleSendRequest = async (matchId: string) => {
+    try {
+      // TODO: Implement send request API call with matchId
+      console.log('Sending request for match:', matchId);
+      showToast('Đã gửi lời mời');
+      await refreshTab('pending');
+    } catch (err: any) {
+      showToast(err.message || 'Không thể gửi lời mời');
+    }
+  };
+
+  const handleEditRequest = async (matchId: string) => {
+    try {
+      // Navigate to edit request screen with matchId
+      console.log('Editing request for match:', matchId);
+      navigate(appRoutes.matchInvite); // TODO: Change to proper edit route with matchId
+    } catch (err: any) {
+      showToast(err.message || 'Không thể sửa lời mời');
+    }
+  };
+
+  const handleFinishMatch = async (matchId: string) => {
+    try {
+      navigate(appRoutes.matchUpdateScore(matchId));
+    } catch (err: any) {
+      showToast(err.message || 'Không thể kết thúc trận đấu');
+    }
+  };
+
+  const handleUpdateScore = async (matchId: string) => {
+    try {
+      navigate(appRoutes.matchUpdateScore(matchId));
+    } catch (err: any) {
+      showToast(err.message || 'Không thể cập nhật tỉ số');
+    }
+  };
+
+  const handleRematch = async (matchId: string) => {
+    try {
+      navigate(appRoutes.matchRematch(matchId));
+    } catch (err: any) {
+      showToast(err.message || 'Không thể mở màn hình tái đấu');
+    }
+  };
+
+  const handleViewDetail = async (matchId: string) => {
+    navigate(appRoutes.matchDetail(matchId));
   };
 
   return (
@@ -342,8 +318,10 @@ const MatchScheduleScreen: React.FC = () => {
           onClick={() => setShowTeamSelector(true)}
           className="flex items-center gap-2 bg-white dark:bg-surface-dark border border-gray-200 dark:border-white/10 px-3 py-1.5 rounded-full shadow-sm cursor-pointer active:scale-95 transition-transform"
         >
-          <TeamAvatar src={currentTeam.logo} size="sm" className="w-6 h-6" />
-          <span className="text-xs font-bold text-slate-900 dark:text-white max-w-[100px] truncate">{currentTeam.name}</span>
+          <TeamAvatar src={currentTeam?.logo || ''} size="sm" className="w-6 h-6" />
+          <span className="text-xs font-bold text-slate-900 dark:text-white max-w-[100px] truncate">
+            {currentTeam?.name || 'Chọn đội'}
+          </span>
           <Icon name="expand_more" className="text-gray-400 text-sm" />
         </div>
       </div>
@@ -354,7 +332,7 @@ const MatchScheduleScreen: React.FC = () => {
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => handleTabChange(tab.id)}
               className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
                 activeTab === tab.id
                   ? 'bg-white dark:bg-background-dark text-primary shadow-sm'
@@ -367,125 +345,164 @@ const MatchScheduleScreen: React.FC = () => {
         </div>
       </div>
 
-      <div className="p-4 space-y-4 flex-1 overflow-y-auto no-scrollbar">
+      {/* Pull-to-refresh indicator */}
+      {pullState.isPulling && (
+        <div
+          className="flex items-center justify-center transition-all duration-150 overflow-hidden"
+          style={{ height: pullState.pullDistance, opacity: pullState.pullDistance / 120 }}
+        >
+          <Icon
+            name="refresh"
+            className={`text-primary ${pullState.shouldRefresh ? 'animate-spin' : ''}`}
+          />
+        </div>
+      )}
+
+      {/* Refresh indicator */}
+      {isRefreshing && !pullState.isPulling && (
+        <div className="flex items-center justify-center py-2">
+          <Icon name="refresh" className="animate-spin text-primary" />
+          <span className="ml-2 text-sm text-gray-500">Đang tải...</span>
+        </div>
+      )}
+
+      <div
+        className="p-4 space-y-4 flex-1 overflow-y-auto no-scrollbar"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
         {/* PENDING TAB */}
         {activeTab === 'pending' && (
           <div className="space-y-4 animate-fade-in">
-            {pendingMatches.map((match) => (
-              <div
-                key={match.id}
-                className="bg-white dark:bg-surface-dark p-4 rounded-xl border border-gray-100 dark:border-white/5 shadow-sm relative overflow-hidden transition-all"
-              >
-                {match.type === 'accepted' && (
-                  <div className="absolute top-0 right-0 w-16 h-16 bg-green-500/5 rounded-bl-full -mr-8 -mt-8" />
-                )}
-
-                <div className="flex items-center justify-between mb-3 relative z-10">
-                  <div className="flex items-center gap-3">
-                    <TeamAvatar src={match.avatar} size="sm" />
-                    <div>
-                      <h4 className="font-bold text-slate-900 dark:text-white">{match.team}</h4>
-                      <div className="mt-1">{renderPendingStatus(match.type)}</div>
-                    </div>
-                  </div>
-                  <button className="text-gray-400">
-                    <Icon name="more_horiz" />
-                  </button>
-                </div>
-
-                {match.message && (
-                  <div className="bg-gray-50 dark:bg-white/5 p-2 rounded-lg mb-3 text-xs text-gray-600 dark:text-gray-300 italic flex gap-2 border border-gray-100 dark:border-white/5">
-                    <Icon name="format_quote" className="text-gray-400 rotate-180 text-sm" />
-                    <span className="flex-1">{match.message}</span>
-                  </div>
-                )}
-
-                <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-text-secondary bg-gray-50 dark:bg-white/5 p-3 rounded-lg border border-gray-100 dark:border-white/5">
-                  <div className="flex items-center gap-1 shrink-0">
-                    <Icon name="calendar_today" size="sm" />
-                    <span className="font-semibold text-slate-900 dark:text-white">
-                      {match.time} • {match.date}
-                    </span>
-                  </div>
-                  <div className="w-px h-4 bg-gray-300 dark:bg-white/10 shrink-0" />
-                  <div className="flex items-center gap-1 min-w-0">
-                    <Icon name="location_on" size="sm" />
-                    <span className="truncate">{match.location}</span>
-                  </div>
-                </div>
-
-                {renderPendingActions(match)}
+            {isLoadingPending ? (
+              <>
+                <SchedulePendingSkeleton />
+                <SchedulePendingSkeleton />
+                <SchedulePendingSkeleton />
+              </>
+            ) : error ? (
+              <div className="flex flex-col items-center justify-center py-10">
+                <Icon name="error" className="text-4xl mb-2 text-red-500" />
+                <p className="text-sm text-red-500">{error}</p>
+                <Button
+                  variant="ghost"
+                  className="mt-2"
+                  onClick={() => refreshTab('pending')}
+                >
+                  Thử lại
+                </Button>
               </div>
-            ))}
+            ) : pendingMatches.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10">
+                <Icon name="inbox" className="text-4xl mb-2 text-gray-400" />
+                <p className="text-sm text-gray-500">Không có lời mời nào</p>
+                <Button
+                  variant="ghost"
+                  className="mt-2 text-primary"
+                  onClick={() => navigate(appRoutes.matchFind)}
+                >
+                  Tìm kèo ngay
+                </Button>
+              </div>
+            ) : (
+              pendingMatches.map((match) => (
+                <PendingMatchCard
+                  key={match.id}
+                  match={match}
+                  onAccept={handleAcceptMatch}
+                  onDecline={handleDeclineMatch}
+                  onCancel={handleCancelMatch}
+                  onConfirm={handleConfirmMatch}
+                  onSendRequest={handleSendRequest}
+                  onEditRequest={handleEditRequest}
+                />
+              ))
+            )}
 
-            {pendingMatches.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-10 text-gray-400 animate-fade-in">
-                <Icon name="inbox" className="text-4xl mb-2 opacity-50" />
-                <p className="text-sm">Hiện không có lời mời nào</p>
+            {/* Infinite scroll sentinel */}
+            {pendingMatches.length > 0 && (
+              <div ref={sentinelRef} className="h-1" />
+            )}
+
+            {/* Loading more indicator */}
+            {isLoadingMore.pending && (
+              <div className="flex justify-center py-4">
+                <Icon name="refresh" className="animate-spin text-primary" />
+              </div>
+            )}
+
+            {/* End of list indicator */}
+            {!hasMore('pending') && pendingMatches.length > 0 && (
+              <div className="text-center text-xs text-gray-400 py-4">
+                Đã tải hết
               </div>
             )}
           </div>
         )}
 
-        {/* LIVE/ACTIVE TAB */}
-        {activeTab === 'live' && (
+        {/* UPCOMING TAB */}
+        {activeTab === 'upcoming' && (
           <div className="space-y-4 animate-fade-in">
-            {activeMatches.map((match) => (
-              <div
-                key={match.id}
-                onClick={() => navigate(appRoutes.matchDetail(match.id))}
-                className={`bg-white dark:bg-surface-dark p-4 rounded-xl border shadow-sm transition-all cursor-pointer hover:border-primary/50 active:scale-[0.99] ${
-                  match.stage === 'live' ? 'border-red-500/30 ring-1 ring-red-500/20' : 'border-gray-100 dark:border-white/5'
-                }`}
-              >
-                <div className="flex justify-between items-start mb-4">
-                  {renderActiveStatus(match.stage)}
-                  <div className="flex items-center gap-1 text-xs font-bold text-gray-500">
-                    <Icon name="location_on" className="text-xs" />
-                    {match.location}
-                  </div>
-                </div>
-
-                {/* Match Content - VS Style */}
-                <div className="flex items-center justify-between">
-                  <div className="flex flex-col items-center gap-2 w-1/3">
-                    <TeamAvatar src={currentTeam.logo} size="sm" />
-                    <span className="text-xs font-bold truncate w-full text-center">{currentTeam.name}</span>
-                  </div>
-
-                  <div className="flex flex-col items-center justify-center w-1/3">
-                    {match.stage === 'upcoming' ? (
-                      <div className="text-center">
-                        <span className="text-2xl font-bold text-slate-900 dark:text-white block">{match.time}</span>
-                        <span className="text-[10px] text-gray-500 uppercase font-bold">{match.date}</span>
-                      </div>
-                    ) : (
-                      <div className="text-center">
-                        <span className={`text-3xl font-extrabold font-mono block ${match.stage === 'live' ? 'text-red-500' : 'text-slate-900 dark:text-white'}`}>
-                          {match.score}
-                        </span>
-                        {match.stage === 'live' && <span className="text-xs text-red-500 font-bold animate-pulse">{match.time}</span>}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col items-center gap-2 w-1/3">
-                    <TeamAvatar src={match.avatar} size="sm" />
-                    <span className="text-xs font-bold truncate w-full text-center">{match.team}</span>
-                  </div>
-                </div>
-
-                {renderActiveActions(match)}
+            {isLoadingUpcoming ? (
+              <>
+                <ScheduleUpcomingSkeleton />
+                <ScheduleUpcomingSkeleton />
+                <ScheduleUpcomingSkeleton />
+              </>
+            ) : error ? (
+              <div className="flex flex-col items-center justify-center py-10">
+                <Icon name="error" className="text-4xl mb-2 text-red-500" />
+                <p className="text-sm text-red-500">{error}</p>
+                <Button
+                  variant="ghost"
+                  className="mt-2"
+                  onClick={() => refreshTab('upcoming')}
+                >
+                  Thử lại
+                </Button>
               </div>
-            ))}
-
-            {activeMatches.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-10 text-gray-400">
-                <Icon name="event_busy" className="text-4xl mb-2 opacity-50" />
-                <p className="text-sm">Không có lịch thi đấu nào</p>
-                <Button variant="ghost" className="mt-2 text-primary" onClick={() => navigate(appRoutes.matchFind)}>
+            ) : upcomingMatches.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10">
+                <Icon name="event_busy" className="text-4xl mb-2 text-gray-400" />
+                <p className="text-sm text-gray-500">Không có lịch thi đấu nào</p>
+                <Button
+                  variant="ghost"
+                  className="mt-2 text-primary"
+                  onClick={() => navigate(appRoutes.matchFind)}
+                >
                   Tìm kèo ngay
                 </Button>
+              </div>
+            ) : (
+              upcomingMatches.map((match) => (
+                <UpcomingMatchCard
+                  key={match.id}
+                  match={match}
+                  myTeam={currentTeam || { id: '', name: '', logo: '' }}
+                  onFinish={handleFinishMatch}
+                  onUpdateScore={handleUpdateScore}
+                  onCancel={handleCancelMatch}
+                />
+              ))
+            )}
+
+            {/* Infinite scroll sentinel */}
+            {upcomingMatches.length > 0 && (
+              <div ref={sentinelRef} className="h-1" />
+            )}
+
+            {/* Loading more indicator */}
+            {isLoadingMore.upcoming && (
+              <div className="flex justify-center py-4">
+                <Icon name="refresh" className="animate-spin text-primary" />
+              </div>
+            )}
+
+            {/* End of list indicator */}
+            {!hasMore('upcoming') && upcomingMatches.length > 0 && (
+              <div className="text-center text-xs text-gray-400 py-4">
+                Đã tải hết
               </div>
             )}
           </div>
@@ -494,88 +511,59 @@ const MatchScheduleScreen: React.FC = () => {
         {/* HISTORY TAB */}
         {activeTab === 'history' && (
           <div className="space-y-4 animate-fade-in">
-            {historyMatches.map((match) => (
-              <div
-                key={match.id}
-                onClick={() => navigate(appRoutes.matchDetail(match.id))}
-                className="bg-white dark:bg-surface-dark p-0 rounded-xl border border-gray-100 dark:border-white/5 shadow-sm overflow-hidden"
-              >
-                {/* Header Status Bar - Colored based on result */}
-                <div
-                  className={`h-1.5 w-full ${match.result === 'W' ? 'bg-green-500' : match.result === 'L' ? 'bg-red-500' : 'bg-gray-400'}`}
-                />
-
-                <div className="p-4">
-                  {/* Top Row: Date & Location */}
-                  <div className="flex justify-between items-center mb-4 text-xs text-gray-500 font-medium">
-                    <div className="flex items-center gap-1">
-                      <Icon name="calendar_today" className="text-xs" />
-                      {match.date}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Icon name="location_on" className="text-xs" />
-                      {match.location}
-                    </div>
-                  </div>
-
-                  {/* Main Content: Team vs Team & Score */}
-                  <div className="flex items-center justify-between mb-4">
-                    {/* My Team */}
-                    <div className="flex flex-col items-center gap-2 w-1/3">
-                      <TeamAvatar src={currentTeam.logo} size="sm" />
-                      <span className="text-xs font-bold text-center truncate w-full">{currentTeam.name}</span>
-                    </div>
-
-                    {/* Score */}
-                    <div className="flex flex-col items-center justify-center w-1/3">
-                      <div className="text-2xl font-black text-slate-900 dark:text-white tracking-widest">{match.score}</div>
-                      <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full mt-1 ${
-                          match.result === 'W'
-                            ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'
-                            : match.result === 'L'
-                              ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
-                              : 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300'
-                        }`}
-                      >
-                        {match.result === 'W' ? 'THẮNG' : match.result === 'L' ? 'THUA' : 'HÒA'}
-                      </span>
-                    </div>
-
-                    {/* Opponent */}
-                    <div className="flex flex-col items-center gap-2 w-1/3">
-                      <TeamAvatar src={match.avatar} size="sm" />
-                      <span className="text-xs font-bold text-center truncate w-full">{match.opponent}</span>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex gap-3 pt-3 border-t border-gray-100 dark:border-white/5">
-                    <Button
-                      variant="secondary"
-                      className="flex-1 h-9 text-xs"
-                      icon="info"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(appRoutes.matchDetail(match.id));
-                      }}
-                    >
-                      Chi tiết
-                    </Button>
-                    <Button
-                      className="flex-1 h-9 text-xs"
-                      icon="replay"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(appRoutes.matchInvite);
-                      }}
-                    >
-                      Đá lại
-                    </Button>
-                  </div>
-                </div>
+            {isLoadingHistory ? (
+              <>
+                <ScheduleHistorySkeleton />
+                <ScheduleHistorySkeleton />
+                <ScheduleHistorySkeleton />
+              </>
+            ) : error ? (
+              <div className="flex flex-col items-center justify-center py-10">
+                <Icon name="error" className="text-4xl mb-2 text-red-500" />
+                <p className="text-sm text-red-500">{error}</p>
+                <Button
+                  variant="ghost"
+                  className="mt-2"
+                  onClick={() => refreshTab('history')}
+                >
+                  Thử lại
+                </Button>
               </div>
-            ))}
+            ) : historyMatches.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10">
+                <Icon name="history" className="text-4xl mb-2 text-gray-400" />
+                <p className="text-sm text-gray-500">Chưa có lịch sử trận đấu</p>
+              </div>
+            ) : (
+              historyMatches.map((match) => (
+                <HistoryMatchCard
+                  key={match.id}
+                  match={match}
+                  myTeam={currentTeam || { id: '', name: '', logo: '' }}
+                  onViewDetail={handleViewDetail}
+                  onRematch={handleRematch}
+                />
+              ))
+            )}
+
+            {/* Infinite scroll sentinel */}
+            {historyMatches.length > 0 && (
+              <div ref={sentinelRef} className="h-1" />
+            )}
+
+            {/* Loading more indicator */}
+            {isLoadingMore.history && (
+              <div className="flex justify-center py-4">
+                <Icon name="refresh" className="animate-spin text-primary" />
+              </div>
+            )}
+
+            {/* End of list indicator */}
+            {!hasMore('history') && historyMatches.length > 0 && (
+              <div className="text-center text-xs text-gray-400 py-4">
+                Đã tải hết
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -584,36 +572,49 @@ const MatchScheduleScreen: React.FC = () => {
       {showTeamSelector && (
         <div className="fixed inset-0 z-50 flex items-end justify-center">
           {/* Backdrop */}
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setShowTeamSelector(false)} />
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in"
+            onClick={() => setShowTeamSelector(false)}
+          />
 
           {/* Sheet */}
-          <div className="relative w-full max-w-md bg-white dark:bg-surface-dark rounded-t-3xl p-6 pb-safe animate-slide-up shadow-2xl">
+          <div className="relative w-full max-w-md bg-white dark:bg-surface-dark rounded-t-3xl p-6 pb-safe-with-nav animate-slide-up shadow-2xl">
             <div className="w-12 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-6" />
 
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Xem lịch thi đấu của</h3>
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-4">
+              Xem lịch thi đấu của
+            </h3>
 
             <div className="space-y-3 max-h-[60vh] overflow-y-auto no-scrollbar">
-              {MY_TEAMS.map((team) => (
+              {myTeams.map((team) => (
                 <button
                   key={team.id}
                   onClick={() => {
-                    setCurrentTeam(team);
+                    setSelectedTeam(team);
                     setShowTeamSelector(false);
                   }}
                   className={`w-full flex items-center gap-4 p-3 rounded-2xl border transition-all active:scale-[0.98] ${
-                    currentTeam.id === team.id
+                    currentTeam?.id === team.id
                       ? 'bg-primary/10 border-primary'
                       : 'bg-gray-50 dark:bg-white/5 border-transparent hover:bg-gray-100 dark:hover:bg-white/10'
                   }`}
                 >
                   <TeamAvatar src={team.logo} />
                   <div className="flex-1 text-left">
-                    <h4 className={`font-bold ${currentTeam.id === team.id ? 'text-primary' : 'text-slate-900 dark:text-white'}`}>
+                    <h4
+                      className={`font-bold ${
+                        currentTeam?.id === team.id
+                          ? 'text-primary'
+                          : 'text-slate-900 dark:text-white'
+                      }`}
+                    >
                       {team.name}
                     </h4>
-                    <p className="text-xs text-gray-500">Quản trị viên</p>
+                    <p className="text-xs text-gray-500">
+                      {team.isCaptain ? 'Quản trị viên' : 'Thành viên'}
+                    </p>
                   </div>
-                  {currentTeam.id === team.id && (
+                  {currentTeam?.id === team.id && (
                     <div className="size-6 bg-primary rounded-full flex items-center justify-center text-black">
                       <Icon name="check" className="text-sm" />
                     </div>
@@ -625,7 +626,7 @@ const MatchScheduleScreen: React.FC = () => {
               <button
                 onClick={() => {
                   setShowTeamSelector(false);
-                  navigate(appRoutes.teamCreate);
+                  navigate(appRoutes.teamsCreate);
                 }}
                 className="w-full flex items-center justify-center gap-2 p-4 rounded-2xl border border-dashed border-gray-300 dark:border-gray-600 text-gray-500 hover:text-primary hover:border-primary transition-colors"
               >
@@ -636,8 +637,6 @@ const MatchScheduleScreen: React.FC = () => {
           </div>
         </div>
       )}
-
-      <BottomNav activeTab="schedule" onTabChange={handleNavTabChange} />
     </div>
   );
 };

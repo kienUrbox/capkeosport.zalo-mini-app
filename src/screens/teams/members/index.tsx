@@ -1,16 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Header, Icon, Button } from '@/components/ui';
+import { Header, Icon, Button, EmptyState, ErrorState } from '@/components/ui';
 import { appRoutes } from '@/utils/navigation';
-
-interface Member {
-  id: string;
-  name: string;
-  role: string;
-  number: string;
-  image: string;
-  isAdmin: boolean;
-}
+import { TeamService } from '@/services/api/team.service';
+import type { TeamMember } from '@/services/api/team.service';
 
 /**
  * TeamMembers Screen
@@ -24,38 +17,40 @@ const TeamMembersScreen: React.FC = () => {
   const navigate = useNavigate();
   const { teamId } = useParams<{ teamId: string }>();
 
-  const [members, setMembers] = useState<Member[]>([
-    {
-      id: '1',
-      name: 'Nguyễn Văn A',
-      role: 'Tiền đạo',
-      number: '10',
-      isAdmin: true,
-      image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAVTbFbEVKyBAT5wyQDrv7lnWXESXkvb8eUj3e1kAsxwVEClkl8R16ZgndkQ5MiXIdQeQyikmJyFpSrs3gy7Nrh05FPLNvuUbee73ajLOhm2zbYP1u1G91fw5tAfKsZcyOiz-XpOxEqIYlOZH1F19lsDCgBqycoEm50-LjpGnmU3tjLRWzTOcS13En2OwxJErDMn8WYetuT0WKhCzhW4r4NVFR4y_ecMILTeqfpytlGSOu72Vbx0sSKpF6dfRg_nc69NMCY_Mtpsy9m',
-    },
-    {
-      id: '2',
-      name: 'Trần Văn B',
-      role: 'Hậu vệ',
-      number: '4',
-      isAdmin: false,
-      image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDljyEJhi2zU-3QBVHfZ8QbZfKnazIoWQZAmqG7G1mNu8s6VsSJGYsnixLJaJTzhPxmh96DLuOiFNI1dhApZXHqobLdDAGMJ8S0abR7anNyvUa1FhvaUAKEa4EKyuvyXFWNuXksQRp__T-86x-LocMMsoVsxRdEV1tW9Ae2gRsreDNFbVDoY4TUev0aKDr6INDrJBmeXcL5K55IKacorRikenjrfUvZkE8bnSGxs3BMP1b6N6AUwZy8zBlI_B4Y6hsK8LoFmzlVF-al',
-    },
-    {
-      id: '3',
-      name: 'Lê Hoàng Nam',
-      role: 'Thủ môn',
-      number: '1',
-      isAdmin: false,
-      image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuA834-l0cKqY_4j-wZgqKqXlF3N5Qk7RjE1M4Xp8S6T2W9V0Z_L5H3Y_c7B6D1F9G2J8K4Lm0N3P5Q7R8S1T9V2W4X6Y0Z8L5K3M1N9P7Q4R2S6T8V0W3X5Y7Z9/avatar.png',
-    },
-  ]);
-
-  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
+  const [members, setMembers] = useState<TeamMember[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
   const [showActionSheet, setShowActionSheet] = useState(false);
   const [showAddMethodSheet, setShowAddMethodSheet] = useState(false);
 
-  const openActionSheet = (e: React.MouseEvent, member: Member) => {
+  useEffect(() => {
+    const fetchMembers = async () => {
+      if (!teamId) return;
+
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        const response = await TeamService.getTeamMembers(teamId);
+
+        if (response.success && response.data) {
+          setMembers(response.data);
+        } else {
+          setError('Không thể tải danh sách thành viên');
+        }
+      } catch (err: unknown) {
+        console.error('Failed to fetch team members:', err);
+        setError(err instanceof Error ? err.message : 'Có lỗi xảy ra');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchMembers();
+  }, [teamId]);
+
+  const openActionSheet = (e: React.MouseEvent, member: TeamMember) => {
     e.stopPropagation();
     setSelectedMember(member);
     setShowActionSheet(true);
@@ -66,62 +61,141 @@ const TeamMembersScreen: React.FC = () => {
     setTimeout(() => setSelectedMember(null), 300);
   };
 
-  const handleDeleteMember = () => {
-    if (selectedMember) {
-      setMembers((prev) => prev.filter((m) => m.id !== selectedMember.id));
-      closeActionSheet();
+  const handleDeleteMember = async () => {
+    if (!selectedMember || !teamId) return;
+
+    try {
+      const response = await TeamService.removeMember(teamId, selectedMember.id);
+      if (response.success) {
+        setMembers((prev) => prev.filter((m) => m.id !== selectedMember.id));
+        closeActionSheet();
+      } else {
+        alert('Không thể xóa thành viên');
+      }
+    } catch (error) {
+      console.error('Failed to remove member:', error);
+      alert('Có lỗi xảy ra');
     }
+  };
+
+  const getRoleLabel = (member: TeamMember) => {
+    // Check position first (from API response)
+    if (member.position) {
+      return member.position;
+    }
+    // Fallback to role
+    switch (member.role) {
+      case 'CAPTAIN':
+        return 'Đội trưởng';
+      case 'admin':
+        return 'Cầu thủ';
+      case 'PLAYER':
+        return 'Cầu thủ';
+      case 'member':
+        return 'Cầu thủ';
+      case 'SUBSTITUTE':
+        return 'Dự bị';
+      default:
+        return 'Thành viên';
+    }
+  };
+
+  const getRoleBadgeLabel = (member: TeamMember) => {
+    // Check admin by role or position
+    if (member.role === 'admin' || member.position === 'Captain') {
+      if (member.role === 'admin') return 'Quản trị viên';
+      return 'Đội trưởng';
+    }
+    if (member.role === 'CAPTAIN') return 'Đội trưởng';
+    return 'Thành viên';
+  };
+
+  const isAdmin = (member: TeamMember) => {
+    return member.role === 'CAPTAIN' ||
+           member.role === 'admin' ||
+           member.position === 'Captain';
   };
 
   return (
     <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark pb-safe">
       <Header title={`Thành viên (${members.length})`} onBack={() => navigate(-1)} />
 
-      {/* Member List */}
-      <div className="p-4 space-y-3 overflow-y-auto pb-24">
-        {members.map((member) => (
-          <div
-            key={member.id}
-            onClick={() => navigate(appRoutes.memberProfile(teamId || '', member.id))}
-            className="flex items-center gap-3 bg-white dark:bg-surface-dark p-3 rounded-xl border border-gray-100 dark:border-white/5 shadow-sm active:scale-[0.99] transition-transform cursor-pointer"
-          >
-            <div className="relative">
-              <div className="size-12 rounded-full overflow-hidden bg-gray-200 dark:bg-white/10">
-                <img src={member.image} alt={member.name} className="w-full h-full object-cover" />
-              </div>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <h4 className="font-bold text-slate-900 dark:text-white text-sm truncate">{member.name}</h4>
-                {member.number && (
-                  <span className="bg-gray-100 dark:bg-white/10 text-[10px] px-1.5 rounded font-mono text-gray-500">
-                    {member.number}
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-xs text-gray-500 dark:text-text-secondary truncate">{member.role}</span>
-                <span className="text-[10px] text-gray-300">•</span>
-                <span
-                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                    member.isAdmin
-                      ? 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-500'
-                      : 'bg-gray-100 dark:bg-white/5 text-gray-500'
-                  }`}
-                >
-                  {member.isAdmin ? 'Quản trị viên' : 'Thành viên'}
-                </span>
-              </div>
-            </div>
-            <button
-              onClick={(e) => openActionSheet(e, member)}
-              className="size-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 active:bg-gray-200"
-            >
-              <Icon name="more_vert" />
-            </button>
+      {/* Loading State */}
+      {isLoading && (
+        <div className="flex-1 flex items-center justify-center p-8">
+          <div className="text-center">
+            <Icon name="refresh" className="animate-spin text-4xl text-primary mb-4 mx-auto" />
+            <p className="text-sm text-gray-500">Đang tải danh sách thành viên...</p>
           </div>
-        ))}
-      </div>
+        </div>
+      )}
+
+      {/* Error State */}
+      {!isLoading && error && (
+        <div className="flex-1 flex items-center justify-center p-4">
+          <ErrorState message={error} onRetry={() => window.location.reload()} />
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!isLoading && !error && members.length === 0 && (
+        <div className="flex-1 flex items-center justify-center p-4">
+          <EmptyState icon="group_off" title="Chưa có thành viên nào" description="Team này chưa có thành viên. Hãy mời thêm thành viên!" />
+        </div>
+      )}
+
+      {/* Members List */}
+      {!isLoading && !error && members.length > 0 && (
+        <div className="p-4 space-y-3 overflow-y-auto pb-24">
+          {members.map((member) => (
+            <div
+              key={member.id}
+              onClick={() => navigate(appRoutes.memberProfile(teamId || '', member.id), { state: { member } })}
+              className="flex items-center gap-3 bg-white dark:bg-surface-dark p-3 rounded-xl border border-gray-100 dark:border-white/5 shadow-sm active:scale-[0.99] transition-transform cursor-pointer"
+            >
+              <div className="relative">
+                <div className="size-12 rounded-full overflow-hidden bg-gray-200 dark:bg-white/10">
+                  {member.user?.avatar ? (
+                    <img src={member.user.avatar} alt={member.user?.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Icon name="person" className="text-gray-400" />
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <h4 className="font-bold text-slate-900 dark:text-white text-sm truncate">
+                    {member.user?.name || 'Thành viên'}
+                  </h4>
+                </div>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-xs text-gray-500 dark:text-text-secondary">
+                    {getRoleLabel(member)}
+                  </span>
+                  <span className="text-[10px] text-gray-300">•</span>
+                  <span
+                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                      isAdmin(member)
+                        ? 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-500'
+                        : 'bg-gray-100 dark:bg-white/5 text-gray-500'
+                    }`}
+                  >
+                    {getRoleBadgeLabel(member)}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={(e) => openActionSheet(e, member)}
+                className="size-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 active:bg-gray-200"
+              >
+                <Icon name="more_vert" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Floating Add Button */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-background-light dark:from-background-dark via-background-light/80 dark:via-background-dark/80 to-transparent z-10 pointer-events-none flex justify-center pb-8">
@@ -145,14 +219,22 @@ const TeamMembersScreen: React.FC = () => {
 
             <div className="flex flex-col items-center mb-6">
               <div className="size-16 rounded-full overflow-hidden mb-3 border-2 border-white dark:border-white/10 shadow-sm">
-                <img src={selectedMember.image} className="w-full h-full object-cover" />
+                {selectedMember.user?.avatar ? (
+                  <img src={selectedMember.user.avatar} className="w-full h-full object-cover" alt={selectedMember.user?.name} />
+                ) : (
+                  <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                    <Icon name="person" className="text-gray-400" />
+                  </div>
+                )}
               </div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white">{selectedMember.name}</h3>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                {selectedMember.user?.name || 'Thành viên'}
+              </h3>
               <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">{selectedMember.role}</span>
+                <span className="text-sm text-gray-500">{getRoleLabel(selectedMember)}</span>
                 <span className="text-xs text-gray-300">•</span>
-                <span className={`text-xs font-bold ${selectedMember.isAdmin ? 'text-yellow-600' : 'text-gray-500'}`}>
-                  {selectedMember.isAdmin ? 'Quản trị viên' : 'Thành viên'}
+                <span className={`text-xs font-bold ${isAdmin(selectedMember) ? 'text-yellow-600' : 'text-gray-500'}`}>
+                  {getRoleBadgeLabel(selectedMember)}
                 </span>
               </div>
             </div>
@@ -160,7 +242,7 @@ const TeamMembersScreen: React.FC = () => {
             <div className="space-y-2">
               <button
                 onClick={() => {
-                  navigate(appRoutes.memberProfile(teamId || '', selectedMember.id));
+                  navigate(appRoutes.memberProfile(teamId || '', selectedMember.id), { state: { member: selectedMember } });
                   closeActionSheet();
                 }}
                 className="w-full flex items-center gap-3 p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
@@ -171,12 +253,12 @@ const TeamMembersScreen: React.FC = () => {
                 <span className="font-semibold text-slate-900 dark:text-white">Xem chi tiết</span>
               </button>
 
-              {!selectedMember.isAdmin && (
+              {!isAdmin(selectedMember) && (
                 <button className="w-full flex items-center gap-3 p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
                   <div className="size-10 rounded-full bg-yellow-500/10 flex items-center justify-center text-yellow-600">
                     <Icon name="security" />
                   </div>
-                  <span className="font-semibold text-slate-900 dark:text-white">Thăng làm quản trị viên</span>
+                  <span className="font-semibold text-slate-900 dark:text-white">Thăng làm đội trưởng</span>
                 </button>
               )}
 

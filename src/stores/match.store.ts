@@ -1,20 +1,42 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import {
+  MatchService,
+  type Match as ApiMatch,
+  MatchStatus as ApiMatchStatus,
+  type ConfirmMatchDto,
+  type FinishMatchDto,
+  type CancelMatchDto,
+  type RematchDto,
+} from '@/services/api/match.service';
 
-// Using simplified types for now
+// Simplified match types for UI
 export type MatchStatus = 'pending' | 'upcoming' | 'live' | 'finished';
+
+// Pagination state for each tab
+export type TabType = 'pending' | 'upcoming' | 'history';
+
+export interface PaginationState {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasMore: boolean;
+}
 
 export interface Match {
   id: string;
   teamA: {
     id: string;
     name: string;
-    logo: string;
+    logo?: string;
+    level?: string;
   };
   teamB: {
     id: string;
     name: string;
-    logo: string;
+    logo?: string;
+    level?: string;
   };
   scoreA?: number;
   scoreB?: number;
@@ -22,8 +44,89 @@ export interface Match {
   date: string;
   location: string;
   status: MatchStatus;
-  type?: 'received' | 'sent' | 'accepted';
+  type?: 'matched' | 'received' | 'sent' | 'accepted';
 }
+
+// Map API match status to UI status
+const mapApiStatusToUiStatus = (apiStatus: ApiMatchStatus): MatchStatus => {
+  switch (apiStatus) {
+    case 'MATCHED':
+    case 'REQUESTED':
+    case 'ACCEPTED':
+      return 'pending';    // Chờ kèo
+    case 'CONFIRMED':
+      return 'upcoming';   // Lịch đấu
+    case 'FINISHED':
+    case 'CANCELLED':
+      return 'finished';   // Lịch sử
+    default:
+      return 'pending';
+  }
+};
+
+// Check if match needs confirmation (accepted but not confirmed)
+const needsConfirmation = (apiMatch: ApiMatch): boolean => {
+  return apiMatch.status === 'ACCEPTED';
+};
+
+// Transform API match to UI match
+const transformApiMatch = (
+  apiMatch: ApiMatch,
+  currentTeamId?: string
+): Match => {
+  // Determine match type based on status and who requested
+  let type: Match['type'];
+
+  switch (apiMatch.status) {
+    case 'MATCHED':
+      // MATCHED status - system matched teams, waiting for someone to send request
+      type = 'matched';
+      break;
+    case 'REQUESTED':
+      // Check if current team sent or received the request
+      if (apiMatch.requestedBy === currentTeamId) {
+        type = 'sent';
+      } else {
+        type = 'received';
+      }
+      break;
+    case 'ACCEPTED':
+      // Match accepted but not confirmed yet - still needs confirmation
+      type = 'accepted';
+      break;
+    case 'CONFIRMED':
+    case 'FINISHED':
+    case 'CANCELLED':
+      // These statuses don't use 'type' - they use 'status' instead
+      type = undefined;
+      break;
+    default:
+      type = undefined;
+  }
+
+  return {
+    id: apiMatch.id,
+    teamA: {
+      id: apiMatch.teamA?.id || apiMatch.teamAId || '',
+      name: apiMatch.teamA?.name || 'Team A',
+      logo: apiMatch.teamA?.logo,
+      level: apiMatch.teamA?.level,
+    },
+    teamB: {
+      id: apiMatch.teamB?.id || apiMatch.teamBId || '',
+      name: apiMatch.teamB?.name || 'Team B',
+      logo: apiMatch.teamB?.logo,
+      level: apiMatch.teamB?.level,
+    },
+    scoreA: apiMatch.score?.teamA,
+    scoreB: apiMatch.score?.teamB,
+    time: apiMatch.time || apiMatch.proposedTime || 'TBD',
+    date: apiMatch.date || apiMatch.proposedDate || 'TBD',
+    location: apiMatch.location?.address || apiMatch.proposedPitch || 'TBD',
+    status: mapApiStatusToUiStatus(apiMatch.status),
+    type,
+  };
+};
 
 interface MatchState {
   // State
@@ -34,6 +137,29 @@ interface MatchState {
   selectedMatch: Match | null;
   isLoading: boolean;
   error: string | null;
+
+  // NEW: Pagination state per tab
+  pagination: {
+    pending: PaginationState;
+    upcoming: PaginationState;
+    history: PaginationState;
+  };
+
+  // NEW: Loading more state per tab
+  isLoadingMore: {
+    pending: boolean;
+    upcoming: boolean;
+    history: boolean;
+  };
+
+  // Track which tabs have been fetched per team
+  _fetchedTabs: {
+    [teamId: string]: {
+      pending?: boolean;
+      upcoming?: boolean;
+      history?: boolean;
+    };
+  };
 
   // Actions
   setPendingMatches: (matches: Match[]) => void;
@@ -47,6 +173,25 @@ interface MatchState {
   clearError: () => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string) => void;
+
+  // NEW: Clear all data (for team change)
+  clearAllData: () => void;
+
+  // NEW: Update pagination state
+  updatePagination: (tab: TabType, pagination: Partial<PaginationState>) => void;
+
+  // API Actions with pagination support
+  fetchUpcomingMatches: (teamId?: string, page?: number, forceRefresh?: boolean) => Promise<void>;
+  fetchPendingMatches: (teamId?: string, page?: number, forceRefresh?: boolean) => Promise<void>;
+  fetchHistoryMatches: (teamId?: string, page?: number, forceRefresh?: boolean) => Promise<void>;
+
+  // Match Action Methods
+  acceptMatch: (matchId: string) => Promise<void>;
+  declineMatch: (matchId: string) => Promise<void>;
+  confirmMatch: (matchId: string, data: ConfirmMatchDto) => Promise<void>;
+  finishMatch: (matchId: string, data: FinishMatchDto) => Promise<void>;
+  cancelMatch: (matchId: string, data: CancelMatchDto) => Promise<void>;
+  rematch: (matchId: string, data: RematchDto) => Promise<void>;
 }
 
 export const useMatchStore = create<MatchState>()(
@@ -60,6 +205,17 @@ export const useMatchStore = create<MatchState>()(
       selectedMatch: null,
       isLoading: false,
       error: null,
+      pagination: {
+        pending: { page: 1, limit: 20, total: 0, totalPages: 0, hasMore: true },
+        upcoming: { page: 1, limit: 20, total: 0, totalPages: 0, hasMore: true },
+        history: { page: 1, limit: 20, total: 0, totalPages: 0, hasMore: true },
+      },
+      isLoadingMore: {
+        pending: false,
+        upcoming: false,
+        history: false,
+      },
+      _fetchedTabs: {},
 
       // Actions
       setPendingMatches: (matches) => set({ pendingMatches: matches }),
@@ -71,6 +227,25 @@ export const useMatchStore = create<MatchState>()(
       setHistoryMatches: (matches) => set({ historyMatches: matches }),
 
       setSelectedMatch: (match) => set({ selectedMatch: match }),
+
+      clearAllData: () => set({
+        pendingMatches: [],
+        upcomingMatches: [],
+        historyMatches: [],
+        _fetchedTabs: {},
+        pagination: {
+          pending: { page: 1, limit: 20, total: 0, totalPages: 0, hasMore: true },
+          upcoming: { page: 1, limit: 20, total: 0, totalPages: 0, hasMore: true },
+          history: { page: 1, limit: 20, total: 0, totalPages: 0, hasMore: true },
+        },
+      }),
+
+      updatePagination: (tab, paginationData) => set((state) => ({
+        pagination: {
+          ...state.pagination,
+          [tab]: { ...state.pagination[tab], ...paginationData },
+        },
+      })),
 
       addMatch: (type, match) =>
         set((state) => ({
@@ -112,6 +287,334 @@ export const useMatchStore = create<MatchState>()(
       setLoading: (loading) => set({ isLoading: loading }),
 
       setError: (error) => set({ error }),
+
+      // API Actions with pagination support
+      fetchUpcomingMatches: async (teamId?: string, page: number = 1, forceRefresh: boolean = false) => {
+        try {
+          const currentState = get();
+
+          // Guard: Skip if already loading (for pagination)
+          if (page === 1 && currentState.isLoading) {
+            console.log('[MatchStore] Skipping fetchUpcomingMatches - already loading');
+            return;
+          }
+
+          // Guard: Skip if already loading more (for pagination)
+          if (page > 1 && currentState.isLoadingMore.upcoming) {
+            console.log('[MatchStore] Skipping fetchUpcomingMatches - already loading more');
+            return;
+          }
+
+          // Guard: Skip if we already have data for this teamId (only for page 1, not forceRefresh)
+          if (!forceRefresh && page === 1) {
+            const fetchedState = currentState._fetchedTabs[teamId || '']?.upcoming;
+            if (fetchedState && currentState.upcomingMatches.length > 0) {
+              console.log('[MatchStore] Skipping fetchUpcomingMatches - already has data for team:', teamId);
+              return;
+            }
+          }
+
+          // Set loading state
+          if (page === 1) {
+            set({ isLoading: true, error: null });
+          } else {
+            set((state) => ({ isLoadingMore: { ...state.isLoadingMore, upcoming: true } }));
+          }
+
+          const response = await MatchService.getMatches({
+            statuses: ['CONFIRMED'], // Lịch đấu
+            teamId,
+            page,
+            limit: 20
+          });
+
+          if (response.success && response.data) {
+            const matches = Array.isArray(response.data.matches) ? response.data.matches : [];
+            const transformedMatches = matches.map((m) => transformApiMatch(m, teamId));
+
+            // Update state
+            set((state) => ({
+              upcomingMatches: page === 1 || forceRefresh
+                ? transformedMatches
+                : [...state.upcomingMatches, ...transformedMatches],
+              _fetchedTabs: teamId
+                ? {
+                    ...state._fetchedTabs,
+                    [teamId]: { ...state._fetchedTabs[teamId || ''], upcoming: true },
+                  }
+                : state._fetchedTabs,
+              pagination: {
+                ...state.pagination,
+                upcoming: {
+                  page: response.data!.pagination?.page || page,
+                  limit: response.data!.pagination?.limit || 20,
+                  total: response.data!.pagination?.total || 0,
+                  totalPages: response.data!.pagination?.totalPages || 1,
+                  hasMore: (response.data!.pagination?.page || page) < (response.data!.pagination?.totalPages || 1),
+                },
+              },
+              error: null,
+            }));
+
+            console.log('[MatchStore] Successfully fetched upcoming matches (page', page, '):', transformedMatches.length);
+          }
+        } catch (error: any) {
+          console.error('[MatchStore] Fetch upcoming matches error:', error);
+          set({ error: error.message || 'Không thể tải trận đấu sắp tới' });
+        } finally {
+          if (page === 1) {
+            set({ isLoading: false });
+          } else {
+            set((state) => ({ isLoadingMore: { ...state.isLoadingMore, upcoming: false } }));
+          }
+        }
+      },
+
+      fetchPendingMatches: async (teamId?: string, page: number = 1, forceRefresh: boolean = false) => {
+        try {
+          const currentState = get();
+
+          // Guard: Skip if already loading (for pagination)
+          if (page === 1 && currentState.isLoading) {
+            console.log('[MatchStore] Skipping fetchPendingMatches - already loading');
+            return;
+          }
+
+          // Guard: Skip if already loading more (for pagination)
+          if (page > 1 && currentState.isLoadingMore.pending) {
+            console.log('[MatchStore] Skipping fetchPendingMatches - already loading more');
+            return;
+          }
+
+          // Guard: Skip if we already have data for this teamId (only for page 1, not forceRefresh)
+          if (!forceRefresh && page === 1) {
+            const fetchedState = currentState._fetchedTabs[teamId || '']?.pending;
+            if (fetchedState && currentState.pendingMatches.length > 0) {
+              console.log('[MatchStore] Skipping fetchPendingMatches - already has data for team:', teamId);
+              return;
+            }
+          }
+
+          // Set loading state
+          if (page === 1) {
+            set({ isLoading: true, error: null });
+          } else {
+            set((state) => ({ isLoadingMore: { ...state.isLoadingMore, pending: true } }));
+          }
+
+          const response = await MatchService.getMatches({
+            statuses: ['MATCHED', 'REQUESTED', 'ACCEPTED'], // Chờ kèo
+            teamId,
+            page,
+            limit: 20
+          });
+
+          if (response.success && response.data) {
+            const matches = Array.isArray(response.data.matches) ? response.data.matches : [];
+            const transformedMatches = matches.map((m) => transformApiMatch(m, teamId));
+
+            // Update state
+            set((state) => ({
+              pendingMatches: page === 1 || forceRefresh
+                ? transformedMatches
+                : [...state.pendingMatches, ...transformedMatches],
+              _fetchedTabs: teamId
+                ? {
+                    ...state._fetchedTabs,
+                    [teamId]: { ...state._fetchedTabs[teamId || ''], pending: true },
+                  }
+                : state._fetchedTabs,
+              pagination: {
+                ...state.pagination,
+                pending: {
+                  page: response.data!.pagination?.page || page,
+                  limit: response.data!.pagination?.limit || 20,
+                  total: response.data!.pagination?.total || 0,
+                  totalPages: response.data!.pagination?.totalPages || 1,
+                  hasMore: (response.data!.pagination?.page || page) < (response.data!.pagination?.totalPages || 1),
+                },
+              },
+              error: null,
+            }));
+
+            console.log('[MatchStore] Successfully fetched pending matches (page', page, '):', transformedMatches.length);
+          }
+        } catch (error: any) {
+          console.error('[MatchStore] Fetch pending matches error:', error);
+          set({ error: error.message || 'Không thể tải lời mời trận đấu' });
+        } finally {
+          if (page === 1) {
+            set({ isLoading: false });
+          } else {
+            set((state) => ({ isLoadingMore: { ...state.isLoadingMore, pending: false } }));
+          }
+        }
+      },
+
+      fetchHistoryMatches: async (teamId?: string, page: number = 1, forceRefresh: boolean = false) => {
+        try {
+          const currentState = get();
+
+          // Guard: Skip if already loading (for pagination)
+          if (page === 1 && currentState.isLoading) {
+            console.log('[MatchStore] Skipping fetchHistoryMatches - already loading');
+            return;
+          }
+
+          // Guard: Skip if already loading more (for pagination)
+          if (page > 1 && currentState.isLoadingMore.history) {
+            console.log('[MatchStore] Skipping fetchHistoryMatches - already loading more');
+            return;
+          }
+
+          // Guard: Skip if we already have data for this teamId (only for page 1, not forceRefresh)
+          if (!forceRefresh && page === 1) {
+            const fetchedState = currentState._fetchedTabs[teamId || '']?.history;
+            if (fetchedState && currentState.historyMatches.length > 0) {
+              console.log('[MatchStore] Skipping fetchHistoryMatches - already has data for team:', teamId);
+              return;
+            }
+          }
+
+          // Set loading state
+          if (page === 1) {
+            set({ isLoading: true, error: null });
+          } else {
+            set((state) => ({ isLoadingMore: { ...state.isLoadingMore, history: true } }));
+          }
+
+          const response = await MatchService.getMatches({
+            statuses: ['FINISHED', 'CANCELLED'], // BOTH statuses
+            teamId,
+            page,
+            limit: 20
+          });
+
+          if (response.success && response.data) {
+            const matches = Array.isArray(response.data.matches) ? response.data.matches : [];
+            const transformedMatches = matches.map((m) => transformApiMatch(m, teamId));
+
+            // Update state
+            set((state) => ({
+              historyMatches: page === 1 || forceRefresh
+                ? transformedMatches
+                : [...state.historyMatches, ...transformedMatches],
+              _fetchedTabs: teamId
+                ? {
+                    ...state._fetchedTabs,
+                    [teamId]: { ...state._fetchedTabs[teamId || ''], history: true },
+                  }
+                : state._fetchedTabs,
+              pagination: {
+                ...state.pagination,
+                history: {
+                  page: response.data!.pagination?.page || page,
+                  limit: response.data!.pagination?.limit || 20,
+                  total: response.data!.pagination?.total || 0,
+                  totalPages: response.data!.pagination?.totalPages || 1,
+                  hasMore: (response.data!.pagination?.page || page) < (response.data!.pagination?.totalPages || 1),
+                },
+              },
+              error: null,
+            }));
+
+            console.log('[MatchStore] Successfully fetched history matches (page', page, '):', transformedMatches.length);
+          }
+        } catch (error: any) {
+          console.error('[MatchStore] Fetch history matches error:', error);
+          set({ error: error.message || 'Không thể tải lịch sử trận đấu' });
+        } finally {
+          if (page === 1) {
+            set({ isLoading: false });
+          } else {
+            set((state) => ({ isLoadingMore: { ...state.isLoadingMore, history: false } }));
+          }
+        }
+      },
+
+      // Match Action Methods
+      acceptMatch: async (matchId: string) => {
+        try {
+          const response = await MatchService.acceptMatchRequest(matchId);
+          if (response.success) {
+            // Remove from pending, will be refetched
+            set((state) => ({
+              pendingMatches: state.pendingMatches.filter((m) => m.id !== matchId),
+            }));
+          }
+        } catch (error: any) {
+          throw error;
+        }
+      },
+
+      declineMatch: async (matchId: string) => {
+        try {
+          const response = await MatchService.declineMatchRequest(matchId);
+          if (response.success) {
+            set((state) => ({
+              pendingMatches: state.pendingMatches.filter((m) => m.id !== matchId),
+            }));
+          }
+        } catch (error: any) {
+          throw error;
+        }
+      },
+
+      confirmMatch: async (matchId: string, data: ConfirmMatchDto) => {
+        try {
+          const response = await MatchService.confirmMatch(matchId, data);
+          if (response.success) {
+            // Match stays in upcoming but with CONFIRMED status
+            // Will be updated on refresh
+          }
+        } catch (error: any) {
+          throw error;
+        }
+      },
+
+      finishMatch: async (matchId: string, data: FinishMatchDto) => {
+        try {
+          const response = await MatchService.finishMatch(matchId, data);
+          if (response.success) {
+            // Move from upcoming to history
+            set((state) => ({
+              upcomingMatches: state.upcomingMatches.filter((m) => m.id !== matchId),
+            }));
+          }
+        } catch (error: any) {
+          throw error;
+        }
+      },
+
+      cancelMatch: async (matchId: string, data: CancelMatchDto) => {
+        try {
+          const response = await MatchService.cancelMatch(matchId, data);
+          if (response.success) {
+            // Move to history tab
+            set((state) => ({
+              pendingMatches: state.pendingMatches.filter((m) => m.id !== matchId),
+              upcomingMatches: state.upcomingMatches.filter((m) => m.id !== matchId),
+            }));
+          }
+        } catch (error: any) {
+          throw error;
+        }
+      },
+
+      rematch: async (matchId: string, data: RematchDto) => {
+        try {
+          const response = await MatchService.rematch(matchId, data);
+          if (response.success && response.data) {
+            // Add new match to pending
+            const newMatch = transformApiMatch(response.data);
+            set((state) => ({
+              pendingMatches: [...state.pendingMatches, newMatch],
+            }));
+          }
+        } catch (error: any) {
+          throw error;
+        }
+      },
     }),
     {
       name: 'match-storage',
@@ -134,6 +637,11 @@ export const useHistoryMatches = () => useMatchStore((state) => state.historyMat
 
 export const useSelectedMatch = () => useMatchStore((state) => state.selectedMatch);
 
+// NEW: Pagination selectors
+export const usePagination = () => useMatchStore((state) => state.pagination);
+
+export const useIsLoadingMore = () => useMatchStore((state) => state.isLoadingMore);
+
 export const useMatchActions = () => {
   const store = useMatchStore();
   return {
@@ -148,6 +656,17 @@ export const useMatchActions = () => {
     clearError: store.clearError,
     setLoading: store.setLoading,
     setError: store.setError,
+    clearAllData: store.clearAllData,
+    updatePagination: store.updatePagination,
+    fetchUpcomingMatches: store.fetchUpcomingMatches,
+    fetchPendingMatches: store.fetchPendingMatches,
+    fetchHistoryMatches: store.fetchHistoryMatches,
+    acceptMatch: store.acceptMatch,
+    declineMatch: store.declineMatch,
+    confirmMatch: store.confirmMatch,
+    finishMatch: store.finishMatch,
+    cancelMatch: store.cancelMatch,
+    rematch: store.rematch,
   };
 };
 

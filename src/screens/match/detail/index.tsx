@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Header, Icon } from '@/components/ui';
 import { Button } from '@/components/ui/Button';
+import { appRoutes } from '@/utils/navigation';
+import { MatchService } from '@/services/api/match.service';
 
 /**
  * MatchDetail Screen
@@ -11,6 +13,37 @@ import { Button } from '@/components/ui/Button';
 const MatchDetail: React.FC = () => {
   const navigate = useNavigate();
   const { matchId } = useParams<{ matchId: string }>();
+
+  const [attendanceData, setAttendanceData] = useState<{
+    confirmed: number;
+    total: number;
+  } | null>(null);
+
+  // Fetch attendance summary
+  useEffect(() => {
+    const fetchAttendanceSummary = async () => {
+      if (!matchId) return;
+
+      try {
+        const response = await MatchService.getMatchAttendance(matchId);
+        if (response.success && response.data) {
+          // Use teamA's summary (or teamB if teamA is not available)
+          const teamData = response.data.teamA || response.data.teamB;
+          if (teamData) {
+            setAttendanceData({
+              confirmed: teamData.summary.confirmed,
+              total: teamData.summary.total,
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch attendance:', error);
+        // Silently fail - attendance count is optional
+      }
+    };
+
+    fetchAttendanceSummary();
+  }, [matchId]);
 
   return (
     <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-white pb-32">
@@ -114,8 +147,40 @@ const MatchDetail: React.FC = () => {
       {/* Fixed Bottom Actions */}
       <div className="fixed bottom-0 left-0 right-0 z-40 bg-background-light dark:bg-background-dark p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] border-t border-gray-200 dark:border-gray-800">
         <div className="flex flex-col gap-3 max-w-lg mx-auto">
-          <Button fullWidth icon="chat" className="bg-primary text-black">Mở Zalo chat</Button>
-          <Button fullWidth icon="edit_note" className="bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500" disabled>Cập nhật kết quả</Button>
+          {/* Attendance count badge */}
+          {attendanceData && (
+            <div className="bg-primary/10 border border-primary/20 rounded-lg px-3 py-2 flex items-center justify-center gap-2">
+              <Icon name="how_to_reg" className="text-primary text-sm" />
+              <span className="text-sm font-medium text-primary">
+                {attendanceData.confirmed}/{attendanceData.total} đã điểm danh
+              </span>
+            </div>
+          )}
+          <div className="flex gap-3">
+            <Button
+              fullWidth
+              icon="how_to_reg"
+              className="flex-1"
+              onClick={() => navigate(appRoutes.matchAttendance(matchId || ''))}
+            >
+              Điểm danh
+            </Button>
+            <Button
+              fullWidth
+              icon="chat"
+              className="flex-1"
+            >
+              Mở Zalo chat
+            </Button>
+          </div>
+          <Button
+            fullWidth
+            icon="edit_note"
+            className="bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500"
+            disabled
+          >
+            Cập nhật kết quả
+          </Button>
         </div>
       </div>
     </div>

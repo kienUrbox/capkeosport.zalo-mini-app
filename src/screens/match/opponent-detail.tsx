@@ -16,7 +16,7 @@ const OpponentDetail: React.FC = () => {
   return (
     <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark pb-24 animate-fade-in">
       {/* Custom Header with transparent background initially */}
-      <div className="absolute top-0 left-0 right-0 z-50 p-4 flex justify-between items-center text-white">
+      <div className="absolute top-0 left-0 right-0 z-50 p-4 flex justify-between items-center text-white safe-area-top">
         <button onClick={() => navigate(-1)} className="size-10 flex items-center justify-center rounded-full bg-black/30 backdrop-blur-md hover:bg-black/50 transition-colors">
           <Icon name="arrow_back" />
         </button>

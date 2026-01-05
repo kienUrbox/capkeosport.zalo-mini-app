@@ -4,7 +4,7 @@ import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://api.capkeosport.com/api/v1';
 
 // Import centralized types
-import { ApiResponse } from '@/types/api.types';
+import { ApiResponse, User, AuthTokens } from '@/types/api.types';
 
 // Create axios instance with default configuration
 const apiClient: AxiosInstance = axios.create({
@@ -15,23 +15,67 @@ const apiClient: AxiosInstance = axios.create({
   },
 });
 
+// Helper to get token from zustand storage
+const getAccessToken = (): string | null => {
+  // Read from zustand persist storage
+  try {
+    const zustandStorage = localStorage.getItem('auth-storage');
+    console.log({zustandStorage});
+    
+    if (zustandStorage) {
+      const parsed = JSON.parse(zustandStorage);
+      const token = parsed?.state?.tokens?.accessToken;
+      if (token) return token;
+    }
+  } catch (e) {
+    console.warn('Failed to read token from zustand storage:', e);
+  }
+
+  return null;
+};
+
+// Helper to get refresh token from zustand storage
+const getRefreshToken = (): string | null => {
+  try {
+    const zustandStorage = localStorage.getItem('auth-storage');
+    if (zustandStorage) {
+      const parsed = JSON.parse(zustandStorage);
+      const token = parsed?.state?.tokens?.refreshToken;
+      if (token) return token;
+    }
+  } catch (e) {
+    console.warn('Failed to read refresh token from zustand storage:', e);
+  }
+
+  return null;
+};
+
+// Helper to update tokens and user in zustand storage
+const updateTokens = (newTokens: AuthTokens, newUser?: User): void => {
+  try {
+    const zustandStorage = localStorage.getItem('auth-storage');
+    if (zustandStorage) {
+      const parsed = JSON.parse(zustandStorage);
+      parsed.state.tokens = newTokens;
+      if (newUser) {
+        parsed.state.user = newUser;
+      }
+      localStorage.setItem('auth-storage', JSON.stringify(parsed));
+    }
+  } catch (e) {
+    console.warn('Failed to update zustand storage:', e);
+  }
+};
+
 // Request interceptor to add auth token
 apiClient.interceptors.request.use(
   (config) => {
-    // Add auth token if available
-    const token = localStorage.getItem('access_token');
+    // Add auth token from zustand persist storage
+    const token = getAccessToken();
+
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-
-    // Add request ID for tracking
-    // config.headers['X-Request-ID'] = generateRequestId();
-
-    // Add client version
-    // config.headers['X-Client-Version'] = '1.0.0';
-
-    // Add platform info
-    // config.headers['X-Platform'] = 'zalo_mini_app';
 
     // Log requests in development
     if (import.meta.env.DEV) {
@@ -39,7 +83,6 @@ apiClient.interceptors.request.use(
         method: config.method?.toUpperCase(),
         url: config.url,
         hasAuth: !!token,
-        requestId: config.headers['X-Request-ID']
       });
     }
 
@@ -50,11 +93,6 @@ apiClient.interceptors.request.use(
     return Promise.reject(error);
   }
 );
-
-// Helper function to generate request ID
-function generateRequestId(): string {
-  return `req_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-}
 
 // Flag to prevent multiple refresh attempts
 let isRefreshing = false;
@@ -82,8 +120,6 @@ apiClient.interceptors.response.use(
         status: response.status,
         url: response.config.url,
         method: response.config.method?.toUpperCase(),
-        requestId: response.config.headers['X-Request-ID'],
-        duration: Date.now() - parseInt(response.config.headers['X-Request-ID']?.split('_')[1] || '0')
       });
     }
     return response;
@@ -97,7 +133,6 @@ apiClient.interceptors.response.use(
         status: error.response?.status,
         url: originalRequest?.url,
         method: originalRequest?.method?.toUpperCase(),
-        requestId: originalRequest?.headers?.['X-Request-ID'],
         message: error.response?.data?.message || error.message
       });
     }
@@ -125,13 +160,12 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true;
       isRefreshing = true;
 
-      const refreshToken = localStorage.getItem('refresh_token');
+      // Get refresh token from zustand storage
+      const refreshToken = getRefreshToken();
 
       if (!refreshToken) {
         // No refresh token, logout and redirect to login
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        localStorage.removeItem('user_data');
+        localStorage.removeItem('auth-storage');
         window.location.href = '/login';
         return Promise.reject(error);
       }
@@ -149,13 +183,11 @@ apiClient.interceptors.response.use(
         );
 
         if (response.data.success && response.data.data) {
-          const newTokens = response.data.data;
+          // Response structure: { success: true, data: { user, tokens } }
+          const { user, tokens: newTokens } = response.data.data;
 
-          // Save new tokens
-          localStorage.setItem('access_token', newTokens.accessToken);
-          if (newTokens.refreshToken) {
-            localStorage.setItem('refresh_token', newTokens.refreshToken);
-          }
+          // Update zustand storage with both user and tokens
+          updateTokens(newTokens);
 
           // Update original request with new token
           originalRequest.headers.Authorization = `Bearer ${newTokens.accessToken}`;
@@ -169,9 +201,7 @@ apiClient.interceptors.response.use(
       } catch (refreshError) {
         // Refresh failed, logout and redirect
         processQueue(refreshError, null);
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        localStorage.removeItem('user_data');
+        localStorage.removeItem('auth-storage');
         window.location.href = '/login';
         return Promise.reject(refreshError);
       } finally {

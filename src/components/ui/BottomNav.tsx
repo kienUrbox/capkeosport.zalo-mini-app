@@ -38,7 +38,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
 }) => {
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50">
-      <div className="flex items-stretch justify-around h-[72px] bg-white dark:bg-surface-dark border-t border-gray-200 dark:border-white/5 pt-1 safe-area-bottom">
+      <div className="flex items-stretch justify-around h-[72px] bg-white dark:bg-surface-dark border-t border-gray-200 dark:border-white/5 safe-area-bottom pt-4">
         {tabs.map((tab) => {
           if (tab.isFab) {
             return (
@@ -59,9 +59,8 @@ export const BottomNav: React.FC<BottomNavProps> = ({
             <button
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
-              className={`flex flex-col items-center justify-center flex-1 max-w-[80px] h-full gap-0.5 px-1 ${
-                isActive ? 'text-primary' : 'text-gray-400 dark:text-gray-500'
-              }`}
+              className={`flex flex-col items-center justify-center flex-1 max-w-[80px] h-full gap-0.5 px-1 ${isActive ? 'text-primary' : 'text-gray-400 dark:text-gray-500'
+                }`}
             >
               <Icon name={tab.icon} filled={isActive} className="text-[22px]" />
               <span className="text-[10px] font-medium leading-tight whitespace-nowrap">{tab.label}</span>

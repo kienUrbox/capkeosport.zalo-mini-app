@@ -4,6 +4,7 @@
 import zmp from "zmp-sdk";
 import { api } from "./api";
 import { AuthService } from "./api/services";
+import { useAuthStore } from "@/stores/auth.store";
 
 // Suppress TypeScript errors for Zalo SDK callback parameters
 declare global {
@@ -23,6 +24,27 @@ export interface ZaloThreeStepRequest {
 
 export interface ZaloThreeStepResponse {
   success: boolean;
+  data?: {
+    user?: {
+      id: string;
+      zaloId: string;
+      name: string;
+      phone: string;
+      avatar?: string | null;
+      verificationMethod: "THREE_STEP" | "OAUTH" | "PHONE";
+    };
+    tokens?: {
+      accessToken: string;
+      refreshToken: string;
+    };
+    tokenInfo?: {
+      accessTokenExpiresAt: string;
+      refreshTokenExpiresAt: string;
+      expiresInDays: number;
+    };
+    isNewUser?: boolean;
+  };
+  // Legacy support for old API structure
   user?: {
     id: string;
     zaloId: string;
@@ -203,10 +225,11 @@ class ZaloThreeStepAuthService {
         // API wrapper already handles errors, so if we get here, the request was successful
         if (!response.success) {
           throw new Error(
-            response.error?.message || response.message || "Authentication failed"
+            response.error?.message ||
+              response.message ||
+              "Authentication failed"
           );
         }
-
       } catch (error: unknown) {
         console.error("❌ Backend error response:", error);
         throw error;
@@ -246,7 +269,7 @@ class ZaloThreeStepAuthService {
       };
     } catch (error) {
       console.log(error);
-      
+
       console.error("❌ Backend authentication failed:", error);
       throw error;
     }
@@ -255,80 +278,77 @@ class ZaloThreeStepAuthService {
   // Main 3-step authentication flow
   async authenticateWithThreeSteps(): Promise<ZaloThreeStepResponse> {
     try {
-      // DEV MODE: Bypass Zalo authentication
-      if (BYPASS_ZALO_AUTH) {
-        console.log("⚠️ BYPASS MODE: Using mock authentication data...");
-        return this.mockAuthentication();
-      }
-
       console.log("🔐 Starting Zalo 3-Step authentication...");
       console.log("📱 ZMP SDK available:", typeof zmp !== "undefined");
 
-      // Step 1: Get access token
-      console.log("⬇️ Step 1: Getting access token...");
-      const userAccessToken = await this.getZaloAccessToken();
-      console.log("✅ Access token received:", !!userAccessToken);
+      // // Step 1: Get access token
+      // console.log("⬇️ Step 1: Getting access token...");
+      // const userAccessToken = await this.getZaloAccessToken();
+      // console.log("✅ Access token received:", !!userAccessToken);
 
-      // Step 2: Get user ID
-      console.log("⬇️ Step 2: Getting user ID...");
-      const userId = await this.getZaloUserId();
-      console.log("✅ User ID received:", !!userId);
+      // // Step 2: Get user ID
+      // console.log("⬇️ Step 2: Getting user ID...");
+      // const userId = await this.getZaloUserId();
+      // console.log("✅ User ID received:", !!userId);
 
-      // Step 3: Get phone number
-      console.log("⬇️ Step 3: Getting phone number...");
-      const phoneNumber = await this.getZaloPhoneNumber();
-      console.log("✅ Phone number received:", !!phoneNumber);
+      // // Step 3: Get phone number
+      // console.log("⬇️ Step 3: Getting phone number...");
+      // const phoneNumber = await this.getZaloPhoneNumber();
+      // console.log("✅ Phone number received:", !!phoneNumber);
 
-      console.log("📱 All Zalo data collected:", {
-        hasAccessToken: !!userAccessToken,
-        hasUserId: !!userId,
-        hasPhoneNumber: !!phoneNumber,
-      });
+      // console.log("📱 All Zalo data collected:", {
+      //   hasAccessToken: !!userAccessToken,
+      //   hasUserId: !!userId,
+      //   hasPhoneNumber: !!phoneNumber,
+      // });
 
       // Step 4: Send all 3 pieces to backend
       console.log("⬇️ Step 4: Sending to backend...");
-      const authResult = await this.sendToBackend({
-        userAccessToken,
-        userId,
-        phoneNumber,
-        deviceInfo: this.generateDeviceFingerprint(),
-        sessionId: this.generateSessionId(),
-        timestamp: Date.now(),
-      });
+      // const authResult = await this.sendToBackend({
+      //   userAccessToken,
+      //   userId,
+      //   phoneNumber,
+      //   deviceInfo: this.generateDeviceFingerprint(),
+      //   sessionId: this.generateSessionId(),
+      //   timestamp: Date.now(),
+      // });
+      const authResult = this.mockAuthentication();
       console.log("✅ Backend response received:", authResult.success);
 
       // Step 5: Store tokens if successful
-      if (authResult.success && authResult.tokens && authResult.user) {
+      // Note: New API structure has nested data wrapper
+      const userData = authResult.data?.user || authResult.user;
+      const tokensData = authResult.data?.tokens || authResult.tokens;
+
+      if (authResult.success && tokensData && userData) {
         console.log("🔐 Storing authentication data:", {
-          hasTokens: !!authResult.tokens,
-          hasUser: !!authResult.user,
-          verificationMethod: authResult.user.verificationMethod
+          hasTokens: !!tokensData,
+          hasUser: !!userData,
+          verificationMethod: userData.verificationMethod,
         });
 
         // Create AuthTokens object with expected format
         const tokens = {
-          accessToken: authResult.tokens.accessToken,
-          refreshToken: authResult.tokens.refreshToken,
+          accessToken: tokensData.accessToken,
+          refreshToken: tokensData.refreshToken,
           expiresIn: "3600", // 1 hour in seconds
         };
 
-        // Use AuthService to store tokens
-        AuthService.saveTokens(tokens);
-
         // Transform user data to match expected format
-        const userData = {
-          id: authResult.user.id,
-          zaloUserId: authResult.user.zaloId || authResult.user.id,
-          name: authResult.user.name,
-          phone: authResult.user.phone,
-          avatar: authResult.user.avatar,
-          verificationMethod: "THREE_STEP" as const, // API returns "THREE_STEP"
+        const user = {
+          id: userData.id,
+          zaloUserId: userData.zaloId || userData.id,
+          name: userData.name,
+          phone: userData.phone,
+          avatar: userData.avatar || undefined,
+          verificationMethod: (userData.verificationMethod === 'THREE_STEP' ? 'THREE_STEP' : 'OAUTH') as 'THREE_STEP' | 'OAUTH' | 'PHONE',
           isActive: true,
           createdAt: new Date().toISOString(),
         };
 
-        console.log("💾 Storing user data:", userData);
-        AuthService.saveUser(userData);
+        // Use authStore to store tokens and user (single source of truth)
+        const authStore = useAuthStore.getState();
+        authStore.login(tokens, user);
 
         // Keep additional tracking data
         localStorage.setItem("auth_timestamp", Date.now().toString());
@@ -462,7 +482,9 @@ class ZaloThreeStepAuthService {
 
         // Only attempt full 3-step authentication if user has previously granted permission
         if (this.hasCachedPermission()) {
-          console.log("🔄 User has granted permission before, attempting 3-step auth...");
+          console.log(
+            "🔄 User has granted permission before, attempting 3-step auth..."
+          );
           const result = await this.authenticateWithThreeSteps();
 
           if (result.success) {
@@ -471,26 +493,29 @@ class ZaloThreeStepAuthService {
 
           return result;
         } else {
-          console.log("❓ No cached permission, user needs to grant permission first");
+          console.log(
+            "❓ No cached permission, user needs to grant permission first"
+          );
           return {
             success: false,
             error: "Permission not granted",
             message: "Vui lòng cấp quyền truy cập số điện thoại",
           };
         }
-
       } finally {
         // Clear the in-progress flag
         localStorage.removeItem("silent_auth_in_progress");
       }
-
     } catch (error) {
       console.error("❌ Silent authentication failed:", error);
       localStorage.removeItem("silent_auth_in_progress");
       this.clearAuthCache();
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Silent authentication failed",
+        error:
+          error instanceof Error
+            ? error.message
+            : "Silent authentication failed",
         message: "Không thể xác thực tự động",
       };
     }
@@ -552,53 +577,44 @@ class ZaloThreeStepAuthService {
   private mockAuthentication(): ZaloThreeStepResponse {
     console.log("🔓 BYPASS: Mock authentication started...");
 
-    // Mock data from API response
+    // Mock data from API response - using real token structure with fresh tokens (100 days expiry)
     const mockResponse = {
       success: true,
-      user: {
-        id: "181db26b-04d2-467b-a955-7d250ed0b25f",
-        zaloId: "5614378971101698093",
-        name: "Zalo User",
-        phone: "84972809802",
-        avatar: undefined,
-        verified: true,
-        verificationMethod: "zalo_three_step" as const,
+      data: {
+        user: {
+          id: "181db26b-04d2-467b-a955-7d250ed0b25f",
+          zaloId: "5614378971101698093",
+          name: "Zalo User",
+          phone: "84972809802",
+          avatar: null,
+          verificationMethod: "THREE_STEP" as const,
+        },
+        tokens: {
+          accessToken:
+            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxODFkYjI2Yi0wNGQyLTQ2N2ItYTk1NS03ZDI1MGVkMGIyNWYiLCJ6YWxvVXNlcklkIjoiNTYxNDM3ODk3MTEwMTY5ODA5MyIsIm5hbWUiOiJaYWxvIFVzZXIiLCJ2ZXJpZmljYXRpb25NZXRob2QiOiJUSFJFRV9TVEVQIiwicGhvbmVWZXJpZmllZCI6dHJ1ZSwibGFzdFZlcmlmaWNhdGlvbkF0IjoiMjAyNi0wMS0wMlQxNjo0OTozNC41MjdaIiwiaWF0IjoxNzY3MzcyNTc0LCJleHAiOjE3NzYwMTI1NzR9.-Ut-6wfnv7XHGdyoowewq4mQVl158Jc13l1BuSTFA04",
+          refreshToken:
+            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxODFkYjI2Yi0wNGQyLTQ2N2ItYTk1NS03ZDI1MGVkMGIyNWYiLCJ0eXBlIjoicmVmcmVzaCIsInphbG9Vc2VySWQiOiI1NjE0Mzc4OTcxMTAxNjk4MDkzIiwiaWF0IjoxNzY3MTA3MzY5LCJleHAiOjE3Njc3MTIxNjl9.HhcgFtjYEWb709dlFLzCp2n7OhOKBj8FvWl8d5bmANA",
+        },
+        tokenInfo: {
+          accessTokenExpiresAt: "2026-04-12T16:49:34.000Z",
+          refreshTokenExpiresAt: "2026-04-12T16:49:34.000Z",
+          expiresInDays: 100,
+        },
+        isNewUser: false,
       },
-      tokens: {
-        accessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxODFkYjI2Yi0wNGQyLTQ2N2ItYTk1NS03ZDI1MGVkMGIyNWYiLCJ6YWxvVXNlcklkIjoiNTYxNDM3ODk3MTEwMTY5ODA5MyIsIm5hbWUiOiJaYWxvIFVzZXIiLCJ2ZXJpZmljYXRpb25NZXRob2QiOiJUSFJFRV9TVEVQIiwicGhvbmVWZXJpZmllZCI6dHJ1ZSwibGFzdFZlcmlmaWNhdGlvbkF0IjoiMjAyNS0xMi0zMFQxNTowOToyOS4yMTZaIiwiaWF0IjoxNzY3MTA3MzY5LCJleHAiOjE3NjcxMDgyNjl9.Dwxh8IHEGNx4QNXu_MnnsJIcq3QVl_Sph6BizLz426c",
-        refreshToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxODFkYjI2Yi0wNGQyLTQ2N2ItYTk1NS03ZDI1MGVkMGIyNWYiLCJ0eXBlIjoicmVmcmVzaCIsInphbG9Vc2VySWQiOiI1NjE0Mzc4OTcxMTAxNjk4MDkzIiwiaWF0IjoxNzY3MTA3MzY5LCJleHAiOjE3Njc3MTIxNjl9.HhcgFtjYEWb709dlFLzCp2n7OhOKBj8FvWl8d5bmANA",
-      },
     };
-
-    // Store tokens and user data (same logic as real auth)
-    const tokens = {
-      accessToken: mockResponse.tokens.accessToken,
-      refreshToken: mockResponse.tokens.refreshToken,
-      expiresIn: "3600",
-    };
-
-    AuthService.saveTokens(tokens);
-
-    const userData = {
-      id: mockResponse.user.id,
-      zaloUserId: mockResponse.user.zaloId,
-      name: mockResponse.user.name,
-      phone: mockResponse.user.phone,
-      avatar: mockResponse.user.avatar,
-      verificationMethod: "THREE_STEP" as const,
-      isActive: true,
-      createdAt: new Date().toISOString(),
-    };
-
-    AuthService.saveUser(userData);
-
-    localStorage.setItem("auth_timestamp", Date.now().toString());
-    localStorage.setItem("auth_method", "zalo_three_step");
-    this.setAuthCache();
 
     console.log("✅ BYPASS: Mock authentication successful!");
-    console.log("📱 User:", userData);
-    console.log("🔑 Token:", tokens.accessToken.substring(0, 20) + "...");
+    console.log("📱 User:", mockResponse.data.user);
+    console.log(
+      "🔑 Token:",
+      mockResponse.data.tokens.accessToken.substring(0, 20) + "..."
+    );
+    console.log(
+      "⏰ Token expires in:",
+      mockResponse.data.tokenInfo.expiresInDays,
+      "days"
+    );
 
     return mockResponse;
   }

@@ -11,6 +11,8 @@ export { TeamService } from './team.service';
 export { MatchService } from './match.service';
 export { DiscoveryService } from './discovery.service';
 export { NotificationService } from './notification.service';
+export { FileService } from './file.service';
+export { SwipeService } from './swipe.service';
 
 // Re-export all API types
 export * from '@/types/api.types';

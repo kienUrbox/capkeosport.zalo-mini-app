@@ -1,14 +1,19 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { MainLayout } from './components/ui';
 
-// Screens - Existing
+// Screens
 import LoginScreen from './screens/login';
-
-// Screens - Core (implemented)
 import OnboardingScreen from './screens/onboarding';
-import DashboardScreen from './screens/dashboard';
-import ProfileScreen from './screens/profile';
+
+// Tab screens (use MainLayout with BottomNav)
+import DashboardScreen from './screens/home';
 import TeamsScreen from './screens/teams';
+import ProfileScreen from './screens/profile';
+import MatchScheduleScreen from './screens/match/schedule';
+
+// Other screens (no BottomNav)
+import FindMatchScreen from './screens/match/find';
 import CreateTeamScreen from './screens/teams/create';
 import TeamDetailScreen from './screens/teams/detail';
 import TeamMembersScreen from './screens/teams/members';
@@ -16,16 +21,19 @@ import EditTeamScreen from './screens/teams/edit';
 import AddMemberScreen from './screens/teams/add-member';
 import MemberProfileScreen from './screens/teams/member-profile';
 import ShareTeamScreen from './screens/teams/share';
-import MatchScheduleScreen from './screens/match/schedule';
-import FindMatchScreen from './screens/match/find';
 import MatchDetailScreen from './screens/match/detail';
 import MatchFoundScreen from './screens/match/found';
 import UpdateScoreScreen from './screens/match/update-score';
+import RematchScreen from './screens/match/rematch';
 import InviteMatchScreen from './screens/match/invite';
 import OpponentDetailScreen from './screens/match/opponent-detail';
 import MatchHistoryScreen from './screens/match/history';
+import MatchAttendanceScreen from './screens/match/attendance';
 import NotificationsScreen from './screens/notifications';
 import EditProfileScreen from './screens/profile/edit';
+import SwipeHistoryScreen from './screens/swipe';
+import ReceivedSwipesScreen from './screens/swipe/received';
+import SwipeStatsScreen from './screens/swipe/stats';
 
 // Simple 404 component
 const NotFound = () => (
@@ -69,22 +77,29 @@ export const router = createBrowserRouter([
     ),
   },
 
-  // Protected routes - Main App
+  // Protected routes - Main App with MainLayout (BottomNav)
   {
-    path: '/dashboard',
+    path: '/',
     element: (
       <ProtectedRoute>
-        <DashboardScreen />
+        <MainLayout />
       </ProtectedRoute>
     ),
+    children: [
+      // Tab routes (with BottomNav)
+      { path: 'dashboard', element: <DashboardScreen /> },
+      { path: 'teams', element: <TeamsScreen /> },
+      { path: 'profile', element: <ProfileScreen /> },
+      { path: 'match/schedule', element: <MatchScheduleScreen /> },
+    ],
   },
 
-  // Profile routes
+  // Other protected routes (without BottomNav)
   {
-    path: '/profile',
+    path: '/match/find',
     element: (
       <ProtectedRoute>
-        <ProfileScreen />
+        <FindMatchScreen />
       </ProtectedRoute>
     ),
   },
@@ -93,16 +108,6 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <EditProfileScreen />
-      </ProtectedRoute>
-    ),
-  },
-
-  // Team routes
-  {
-    path: '/teams',
-    element: (
-      <ProtectedRoute>
-        <TeamsScreen />
       </ProtectedRoute>
     ),
   },
@@ -162,29 +167,11 @@ export const router = createBrowserRouter([
       </ProtectedRoute>
     ),
   },
-
-  // Match routes
-  {
-    path: '/match/find',
-    element: (
-      <ProtectedRoute>
-        <FindMatchScreen />
-      </ProtectedRoute>
-    ),
-  },
   {
     path: '/match/found',
     element: (
       <ProtectedRoute>
         <MatchFoundScreen />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/match/schedule',
-    element: (
-      <ProtectedRoute>
-        <MatchScheduleScreen />
       </ProtectedRoute>
     ),
   },
@@ -197,10 +184,26 @@ export const router = createBrowserRouter([
     ),
   },
   {
+    path: '/match/:matchId/attendance',
+    element: (
+      <ProtectedRoute>
+        <MatchAttendanceScreen />
+      </ProtectedRoute>
+    ),
+  },
+  {
     path: '/match/:matchId/update-score',
     element: (
       <ProtectedRoute>
         <UpdateScoreScreen />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/match/:matchId/rematch',
+    element: (
+      <ProtectedRoute>
+        <RematchScreen />
       </ProtectedRoute>
     ),
   },
@@ -228,13 +231,35 @@ export const router = createBrowserRouter([
       </ProtectedRoute>
     ),
   },
-
-  // Notifications
   {
     path: '/notifications',
     element: (
       <ProtectedRoute>
         <NotificationsScreen />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/swipe/history',
+    element: (
+      <ProtectedRoute>
+        <SwipeHistoryScreen />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/swipe/received',
+    element: (
+      <ProtectedRoute>
+        <ReceivedSwipesScreen />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/swipe/stats',
+    element: (
+      <ProtectedRoute>
+        <SwipeStatsScreen />
       </ProtectedRoute>
     ),
   },

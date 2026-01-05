@@ -6,6 +6,7 @@ import {
   ZaloLoginDto,
   ZaloThreeStepDto,
   RefreshTokenDto,
+  RefreshTokenResponse,
   UpdateProfileDto,
   ApiResponse,
 } from '@/types/api.types';
@@ -31,11 +32,13 @@ export class AuthService {
 
   /**
    * Refresh access token
+   * POST /auth/refresh
+   * Returns: { success: true, data: { user, tokens } }
    */
   static async refreshToken(
     data: RefreshTokenDto
-  ): Promise<ApiResponse<AuthTokens>> {
-    return api.post<AuthTokens>("/auth/refresh", data);
+  ): Promise<ApiResponse<RefreshTokenResponse>> {
+    return api.post<RefreshTokenResponse>("/auth/refresh", data);
   }
 
   /**
@@ -109,6 +112,7 @@ export class AuthService {
 
   /**
    * Auto refresh token before expiry
+   * Returns: { success: true, data: { user, tokens } }
    */
   static async autoRefreshToken(): Promise<boolean> {
     const refreshToken = this.getRefreshToken();
@@ -119,7 +123,10 @@ export class AuthService {
     try {
       const response = await this.refreshToken({ refreshToken });
       if (response.success && response.data) {
-        this.saveTokens(response.data);
+        // Response contains both user and tokens
+        const { user, tokens } = response.data;
+        this.saveTokens(tokens);
+        this.saveUser(user);
         return true;
       }
       return false;

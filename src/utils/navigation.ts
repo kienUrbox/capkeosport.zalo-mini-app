@@ -32,13 +32,20 @@ export const appRoutes = {
   matchFound: '/match/found',
   matchSchedule: '/match/schedule',
   matchDetail: (id: string) => `/match/${id}`,
+  matchAttendance: (id: string) => `/match/${id}/attendance`,
   matchUpdateScore: (id: string) => `/match/${id}/update-score`,
+  matchRematch: (id: string) => `/match/${id}/rematch`,
   matchInvite: '/match/invite',
   opponentDetail: (id: string) => `/match/opponent/${id}`,
   matchHistory: '/match/history',
 
   // Notifications
   notifications: '/notifications',
+
+  // Swipes
+  swipeHistory: '/swipe/history',
+  swipeReceived: '/swipe/received',
+  swipeStats: '/swipe/stats',
 } as const;
 
 export type AppRoute = typeof appRoutes;

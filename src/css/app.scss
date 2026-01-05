@@ -137,9 +137,10 @@ body {
   padding-bottom: env(safe-area-inset-bottom, 0);
 }
 
-/* Safe area top cho header */
+/* Safe area top cho header - cộng thêm padding base */
 .safe-area-top {
-  padding-top: env(safe-area-inset-top, 0);
+  padding-top: calc(env(safe-area-inset-top, 0px) + 12px);
+  padding-bottom: 16px;
 }
 
 /* Padding bottom cho content để tránh bị bottom nav che */

@@ -108,7 +108,7 @@ export const SECTION = {
 // Header Component
 export const HEADER = {
   height: 'h-14',         // 56px - standard header height
-  padding: 'px-4 py-3',   // horizontal 16px, vertical 12px
+  padding: 'px-4',       // horizontal 16px (top/bottom handled by safe-area-top CSS)
   titleSize: FONT_SIZES.lg,    // 20px
   iconSize: ICON_SIZES.lg,     // 20px
   iconButtonSize: 'size-9',    // 36px - clickable area
@@ -296,3 +296,83 @@ export const FC_COLORS = {
   borderDark: '#2a3b32',
   textSecondary: '#9db9ab',
 } as const
+
+// ============== TEAM CONSTANTS ==============
+/**
+ * Pitch Types - Loại sân bóng
+ * API format: ["Sân 5", "Sân 7", "Sân 11"]
+ * UI format: ["5", "7", "11"]
+ */
+export const PITCH_TYPES = {
+  FIVE: 'Sân 5',
+  SEVEN: 'Sân 7',
+  ELEVEN: 'Sân 11',
+} as const
+
+export const PITCH_TYPE_VALUES = [PITCH_TYPES.FIVE, PITCH_TYPES.SEVEN, PITCH_TYPES.ELEVEN] as const;
+
+// UI values (without "Sân " prefix) for easier comparison
+export const PITCH_TYPE_UI_VALUES = ['5', '7', '11'] as const;
+
+/**
+ * Team Levels - Trình độ đội bóng
+ */
+export const TEAM_LEVELS = [
+  'Mới chơi',
+  'Trung bình',
+  'Nghiệp dư',
+  'Bán chuyên',
+  'Chuyên nghiệp',
+] as const;
+
+/**
+ * Team Gender - Giới tính đội bóng
+ * API accepts both Vietnamese format and enum format
+ */
+export const TEAM_GENDER = {
+  MALE: 'Nam',
+  FEMALE: 'Nữ',
+  MIXED: 'Mixed',
+} as const;
+
+/**
+ * Convert pitch type from API format to UI format
+ * @param pitch - API format like ["Sân 5", "Sân 7", "Sân 11"]
+ * @returns UI format like ["5", "7", "11"]
+ */
+export const formatPitchFromApi = (pitch: string[]): string[] => {
+  return pitch.map(p => p.replace('Sân ', '').trim());
+};
+
+/**
+ * Convert pitch type from UI format to API format
+ * @param pitch - UI format like ["5", "7", "11"]
+ * @returns API format like ["Sân 5", "Sân 7", "Sân 11"]
+ */
+export const formatPitchForApi = (pitch: string[]): string[] => {
+  return pitch.map(p => `Sân ${p}`);
+};
+
+/**
+ * Convert gender from API format to display format
+ * API returns: "Nam", "Nữ", "Mixed" (already in correct format)
+ * Legacy enum support: "MALE", "FEMALE", "MIXED"
+ */
+export const formatGenderFromApi = (gender: string): string => {
+  if (gender === 'MALE') return TEAM_GENDER.MALE;
+  if (gender === 'FEMALE') return TEAM_GENDER.FEMALE;
+  if (gender === 'MIXED') return TEAM_GENDER.MIXED;
+  // Already in correct format
+  if (gender === 'Nam' || gender === 'Nữ' || gender === 'Mixed') return gender;
+  return TEAM_GENDER.MALE;
+};
+
+/**
+ * Convert gender from display format to API format
+ * API expects: "Nam", "Nữ", "Mixed"
+ */
+export const formatGenderForApi = (gender: string): 'Nam' | 'Nữ' | 'Mixed' => {
+  if (gender === 'Nam') return TEAM_GENDER.MALE;
+  if (gender === 'Nữ') return TEAM_GENDER.FEMALE;
+  return TEAM_GENDER.MIXED;
+};

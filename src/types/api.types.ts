@@ -5,6 +5,12 @@ export interface BaseEntity {
   updatedAt?: string;
 }
 
+// User Preferences
+export interface UserPreferences {
+  notification: boolean;
+  language: string;
+}
+
 // User & Authentication Types
 export interface User {
   id: string;
@@ -13,8 +19,10 @@ export interface User {
   avatar?: string;
   phone: string;
   email?: string;
+  status?: 'active' | 'suspended';
+  preferences?: UserPreferences;
   verificationMethod?: 'OAUTH' | 'THREE_STEP' | 'PHONE';
-  isActive: boolean;
+  isActive?: boolean; // Deprecated: use status instead
   createdAt: string;
   updatedAt?: string;
 }
@@ -51,6 +59,11 @@ export interface RefreshTokenDto {
   refreshToken: string;
 }
 
+export interface RefreshTokenResponse {
+  user: User;
+  tokens: AuthTokens;
+}
+
 export interface UpdateProfileDto {
   name?: string;
   avatar?: string;
@@ -68,9 +81,11 @@ export interface Team extends BaseEntity {
   stats?: TeamStats;
   avatar?: string;
   logo?: string;
-  banners?: string[];
+  banner?: string;
+  pitch?: string[]; // Preferred pitch types e.g., ["Sân 7", "Sân 11"]
   isActive: boolean;
   isArchived: boolean;
+  status?: 'active' | 'archived';
   createdBy: string;
   members?: TeamMember[];
   membersCount?: number;
@@ -85,7 +100,7 @@ export interface TeamMember {
   userId: string;
   teamId: string;
   role: TeamRole;
-  user: User;
+  user?: User; // Optional for list views
   joinedAt: string;
   isActive: boolean;
 }
@@ -98,9 +113,9 @@ export interface TeamStats {
 }
 
 export interface Location {
-  lat: number;
-  lng: number;
-  address: string;
+  lat: number; // -90 to 90
+  lng: number; // -180 to 180
+  address: string; // min 5 chars
   district?: string;
   city?: string;
 }
@@ -117,16 +132,18 @@ export enum TeamRole {
   SUBSTITUTE = 'SUBSTITUTE'
 }
 
-// Team DTOs
+// Team DTOs - Matches API documentation
 export interface CreateTeamDto {
-  name: string;
+  name: string; // 3-100 chars, required
   description?: string;
-  gender: Gender;
-  level: string;
-  location: Location;
+  gender: Gender | string; // MALE | FEMALE | MIXED | 'Nam' | 'Nữ' | 'Mixed', required
+  level: string; // 2-50 chars, required
+  location: Location; // required
   stats?: TeamStats;
-  avatar?: string;
-  logo?: string;
+  avatar?: string; // URL
+  logo?: string; // URL
+  banner?: string; // URL
+  pitch?: string[]; // Preferred pitch types e.g., ["Sân 7", "Sân 11"]
 }
 
 export interface UpdateTeamDto {
@@ -138,6 +155,8 @@ export interface UpdateTeamDto {
   stats?: TeamStats;
   avatar?: string;
   logo?: string;
+  banner?: string;
+  pitch?: string[];
   isActive?: boolean;
 }
 
@@ -166,14 +185,12 @@ export interface Match extends BaseEntity {
 }
 
 export enum MatchStatus {
-  MATCHED = 'MATCHED',
-  PENDING = 'PENDING',
-  CAPPING = 'CAPPING',
-  CONFIRMING = 'CONFIRMING',
-  CONFIRMED = 'CONFIRMED',
-  UPCOMING = 'UPCOMING',
-  FINISHED = 'FINISHED',
-  CANCELLED = 'CANCELLED'
+  MATCHED = 'MATCHED',      // Chờ kèo
+  REQUESTED = 'REQUESTED',  // Chờ kèo
+  ACCEPTED = 'ACCEPTED',    // Lịch đấu
+  CONFIRMED = 'CONFIRMED',  // Lịch đấu
+  FINISHED = 'FINISHED',    // Lịch sử
+  CANCELLED = 'CANCELLED'   // Lịch sử
 }
 
 export interface MatchSuggestion {
@@ -208,6 +225,50 @@ export interface MatchResult {
   confirmedBy: string[];
 }
 
+// Attendance Types
+export enum AttendanceStatus {
+  PENDING = 'PENDING',
+  CONFIRMED = 'CONFIRMED',
+  DECLINED = 'DECLINED'
+}
+
+export interface Attendee extends BaseEntity {
+  id: string;
+  userId: string;
+  teamId: string;
+  status: AttendanceStatus;
+  responseTime?: string;
+  reason?: string;
+  fullName: string;
+  avatar?: string;
+  phone?: string;
+}
+
+export interface TeamAttendance {
+  teamId: string;
+  attendance: Attendee[];
+  summary: AttendanceSummary;
+}
+
+export interface AttendanceSummary {
+  total: number;
+  confirmed: number;
+  declined: number;
+  pending: number;
+  confirmedPercentage: number;
+}
+
+export interface MatchAttendance {
+  matchId: string;
+  teamA: TeamAttendance;
+  teamB: TeamAttendance;
+}
+
+export interface UpdateAttendanceDto {
+  status: AttendanceStatus;
+  reason?: string;
+}
+
 // Swipe Types
 export interface Swipe extends BaseEntity {
   swiperTeamId: string;
@@ -234,7 +295,7 @@ export interface SwipeMetadata {
 export interface CreateSwipeDto {
   swiperTeamId: string;
   targetTeamId: string;
-  action: SwipeAction;
+  action: 'like' | 'pass';  // API expects lowercase values
   swipeMetadata?: SwipeMetadata;
 }
 
@@ -242,6 +303,69 @@ export interface SwipeResponse {
   swipe: Swipe;
   isMatch: boolean;
   newMatch?: Match;
+}
+
+// Swipe History with undo capability
+export interface SwipeHistoryItem extends Swipe {
+  canUndo: boolean;
+  timeSinceSwipe: number;
+}
+
+// Received swipes (who liked my team)
+export interface ReceivedSwipe {
+  id: string;
+  swiperTeamId: string;
+  swiperTeam: Team;
+  swipedAt: string;
+  isMatch: boolean;
+  matchId?: string;
+}
+
+// Swipe eligibility check response
+export interface SwipeCheckResponse {
+  canSwipe: boolean;
+  reason?: string;
+}
+
+// Undo swipe response
+export interface UndoSwipeResponse {
+  success: boolean;
+  message?: string;
+}
+
+// Extended analytics
+export interface SwipeAnalytics {
+  totalLikesGiven: number;
+  totalPassesGiven: number;
+  totalLikesReceived: number;
+  totalMatches: number;
+  averageResponseTime: number;
+  mostSwipedDay: string;
+  mostSwipedTime: string;
+  recentActivity: Swipe[];
+}
+
+// Paginated responses
+export interface SwipeHistoryResponse {
+  swipes: SwipeHistoryItem[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export interface ReceivedSwipesResponse {
+  receivedSwipes: ReceivedSwipe[];
+  total: number;
+  unreadCount: number;
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
 export interface SwipeStats {

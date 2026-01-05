@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button, Icon } from '@/components/ui';
 import { appRoutes } from '@/utils/navigation';
 import { FONT_SIZES, SPACE_Y, SPACING, ICON_SIZES, PADDING, SECTION } from '@/constants/design';
+import { zaloThreeStepAuthService } from '@/services/zalo-three-step-auth';
 
 interface OnboardingStep {
   id: number;
@@ -52,6 +53,7 @@ const steps: OnboardingStep[] = [
 const OnboardingScreen: React.FC = () => {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleNext = () => {
     if (currentStep < steps.length - 1) {
@@ -63,6 +65,27 @@ const OnboardingScreen: React.FC = () => {
 
   const handleFinish = () => {
     navigate(appRoutes.dashboard);
+  };
+
+  const handleZaloLogin = async () => {
+    setIsLoading(true);
+    try {
+      const result = await zaloThreeStepAuthService.authenticateWithThreeSteps();
+
+      if (result.success) {
+        // Authentication already stored by authenticateWithThreeSteps()
+        // Just navigate to dashboard
+        navigate(appRoutes.dashboard);
+      } else {
+        console.error('Login failed:', result.error);
+        alert(result.error || 'Đăng nhập thất bại');
+      }
+    } catch (error) {
+      console.error('Zalo login error:', error);
+      alert('Có lỗi xảy ra, vui lòng thử lại');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const content = steps[currentStep];
@@ -139,13 +162,35 @@ const OnboardingScreen: React.FC = () => {
           </div>
         </div>
 
+        {/* Zalo Login Button */}
+        <button
+          onClick={handleZaloLogin}
+          disabled={isLoading}
+          className="w-full flex items-center justify-center gap-3 bg-[#0068FF] hover:bg-[#0056CC] text-white h-14 rounded-xl font-bold text-base shadow-lg transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed mb-3"
+        >
+          {isLoading ? (
+            <>
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              <span>Đang đăng nhập...</span>
+            </>
+          ) : (
+            <>
+              <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm2.59-11.41L12 10l-2.59 1.41L8 11l2.59-1.41L12 8l1.41 1.59L16 11l-2.59 1.41L12 14l-1.41-1.59L8 13l2.59-1.41L12 10z"/>
+              </svg>
+              <span>Đăng nhập bằng Zalo</span>
+            </>
+          )}
+        </button>
+
         <Button
           fullWidth
           onClick={handleNext}
           className="h-14 text-lg shadow-xl shadow-primary/20"
+          variant="secondary"
           icon={currentStep === steps.length - 1 ? 'rocket_launch' : 'arrow_forward'}
         >
-          {currentStep === steps.length - 1 ? 'Khám phá ngay' : 'Tiếp tục'}
+          {currentStep === steps.length - 1 ? 'Khám phá ngay' : 'Bỏ qua'}
         </Button>
       </div>
 

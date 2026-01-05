@@ -34,35 +34,48 @@ export const useAuthStore = create<AuthState>()(
 
       // Actions
       login: (tokens: AuthTokens, user: User) => {
-        AuthService.saveTokens(tokens);
-        AuthService.saveUser(user);
-
         set({
           tokens,
           user,
           isAuthenticated: true,
           error: null,
         });
+
+        // Immediately save to localStorage for API interceptor
+        // This ensures token is available right away without waiting for persist
+        try {
+          const currentState = {
+            state: { tokens, user, isAuthenticated: true, error: null },
+            version: 0,
+          };
+          localStorage.setItem('auth-storage', JSON.stringify(currentState));
+          console.log('💾 Token saved to localStorage immediately');
+        } catch (e) {
+          console.error('Failed to save to localStorage:', e);
+        }
       },
 
       logout: () => {
-        AuthService.clearTokens();
-        AuthService.clearUser();
-
         set({
           user: null,
           tokens: null,
           isAuthenticated: false,
           error: null,
         });
+
+        // Immediately remove from localStorage
+        try {
+          localStorage.removeItem('auth-storage');
+          console.log('💾 Token removed from localStorage');
+        } catch (e) {
+          console.error('Failed to remove from localStorage:', e);
+        }
       },
 
       updateUser: (userData: Partial<User>) => {
         const currentUser = get().user;
         if (currentUser) {
-          const updatedUser = { ...currentUser, ...userData };
-          AuthService.saveUser(updatedUser);
-          set({ user: updatedUser });
+          set({ user: { ...currentUser, ...userData } });
         }
       },
 
@@ -80,10 +93,11 @@ export const useAuthStore = create<AuthState>()(
           });
 
           if (response.success && response.data) {
-            const newTokens = response.data;
-            AuthService.saveTokens(newTokens);
+            // Response contains both user and tokens
+            const { user, tokens: newTokens } = response.data;
 
             set({
+              user,
               tokens: newTokens,
               error: null,
             });
@@ -121,7 +135,6 @@ export const useAuthStore = create<AuthState>()(
               isAuthenticated: true,
               error: null,
             });
-            AuthService.saveUser(response.data);
           } else {
             throw new Error('Invalid user session');
           }
@@ -140,7 +153,6 @@ export const useAuthStore = create<AuthState>()(
                   isAuthenticated: true,
                   error: null,
                 });
-                AuthService.saveUser(response.data);
               }
             } catch (retryError) {
               console.error('Retry auth check failed:', retryError);
