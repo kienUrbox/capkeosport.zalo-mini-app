@@ -1,7 +1,7 @@
 import React from 'react';
 
 export interface TeamAvatarProps {
-  src: string;
+  src?: string;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
 }
@@ -33,11 +33,17 @@ export const TeamAvatar: React.FC<TeamAvatarProps> = ({
     <div
       className={`${sizes[size]} rounded-full bg-surface-dark border-2 border-gray-200 dark:border-white/10 p-0.5 overflow-hidden ${className}`}
     >
-      <img
-        src={src}
-        alt="Team"
-        className="w-full h-full object-cover rounded-full"
-      />
+      {src ? (
+        <img
+          src={src}
+          alt="Team"
+          className="w-full h-full object-cover rounded-full"
+        />
+      ) : (
+        <div className="w-full h-full bg-gradient-to-br from-primary to-green-600 flex items-center justify-center">
+          <span className="text-white font-bold text-lg">T</span>
+        </div>
+      )}
     </div>
   );
 };

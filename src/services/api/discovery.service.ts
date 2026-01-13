@@ -33,6 +33,8 @@ export interface DiscoveredTeam {
   logo: string;
   level: string;
   gender: string;
+  description?: string;
+  pitch?: string[]; // Preferred pitch types e.g., ["Sân 7", "Sân 11"]
   stats: TeamStats;
   location: TeamLocation;
   distance: number;

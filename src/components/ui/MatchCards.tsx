@@ -8,6 +8,8 @@ import type { Match } from '@/stores/match.store';
 
 interface PendingMatchCardProps {
   match: Match;
+  isAdmin?: boolean;
+  canEditRequest?: boolean;
   onAccept?: (id: string) => void;
   onDecline?: (id: string) => void;
   onCancel?: (id: string) => void;
@@ -18,6 +20,8 @@ interface PendingMatchCardProps {
 
 export const PendingMatchCard: React.FC<PendingMatchCardProps> = ({
   match,
+  isAdmin = true,
+  canEditRequest = false,
   onAccept,
   onDecline,
   onCancel,
@@ -59,6 +63,18 @@ export const PendingMatchCard: React.FC<PendingMatchCardProps> = ({
   };
 
   const renderActions = () => {
+    // Members (non-admin) cannot perform any actions
+    if (!isAdmin) {
+      return (
+        <div className="flex items-center justify-center gap-2 mt-3">
+          <Icon name="info" size="sm" className="text-gray-500" />
+          <span className="text-xs text-gray-500 dark:text-gray-400">
+            Chỉ quản trị viên được thực hiện thao tác
+          </span>
+        </div>
+      );
+    }
+
     switch (match.type) {
       case 'matched':
         return (
@@ -101,6 +117,22 @@ export const PendingMatchCard: React.FC<PendingMatchCardProps> = ({
           </div>
         );
       case 'sent':
+        // Nếu không có quyền edit, chỉ hiện button "Hủy lời mời"
+        if (!canEditRequest) {
+          return (
+            <div className="flex gap-3 mt-3" onClick={(e) => e.stopPropagation()}>
+              <Button
+                variant="secondary"
+                className="flex-1 h-10 text-xs border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/30 dark:text-red-400 dark:hover:bg-red-900/10"
+                icon="undo"
+                onClick={() => onCancel?.(match.id)}
+              >
+                Hủy lời mời
+              </Button>
+            </div>
+          );
+        }
+        // Có quyền edit - hiện cả 2 buttons
         return (
           <div className="flex gap-3 mt-3" onClick={(e) => e.stopPropagation()}>
             <Button
@@ -181,19 +213,28 @@ export const PendingMatchCard: React.FC<PendingMatchCardProps> = ({
         </button>
       </div>
 
-      <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-text-secondary bg-gray-50 dark:bg-white/5 p-3 rounded-lg border border-gray-100 dark:border-white/5">
-        <div className="flex items-center gap-1 shrink-0">
-          <Icon name="calendar_today" size="sm" />
-          <span className="font-semibold text-slate-900 dark:text-white">
-            {match.time} • {match.date}
+      {match.type === 'matched' ? (
+        <div className="flex items-center gap-2 text-sm text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/10 p-3 rounded-lg border border-purple-200 dark:border-purple-500/20">
+          <Icon name="info" size="sm" className="shrink-0" />
+          <span className="text-xs font-medium">
+            Đã hợp cạ thành công! Hãy gửi lời mời với đầy đủ thông tin thời gian, địa điểm để chốt kèo.
           </span>
         </div>
-        <div className="w-px h-4 bg-gray-300 dark:bg-white/10 shrink-0" />
-        <div className="flex items-center gap-1 min-w-0">
-          <Icon name="location_on" size="sm" />
-          <span className="truncate">{match.location}</span>
+      ) : (
+        <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-text-secondary bg-gray-50 dark:bg-white/5 p-3 rounded-lg border border-gray-100 dark:border-white/5">
+          <div className="flex items-center gap-1 shrink-0">
+            <Icon name="calendar_today" size="sm" />
+            <span className="font-semibold text-slate-900 dark:text-white">
+              {match.time} • {match.date}
+            </span>
+          </div>
+          <div className="w-px h-4 bg-gray-300 dark:bg-white/10 shrink-0" />
+          <div className="flex items-center gap-1 min-w-0">
+            <Icon name="location_on" size="sm" />
+            <span className="truncate">{match.location}</span>
+          </div>
         </div>
-      </div>
+      )}
 
       {renderActions()}
     </div>
@@ -205,6 +246,7 @@ export const PendingMatchCard: React.FC<PendingMatchCardProps> = ({
 interface UpcomingMatchCardProps {
   match: Match;
   myTeam: { id: string; name: string; logo?: string };
+  isAdmin?: boolean;
   onFinish?: (id: string) => void;
   onUpdateScore?: (id: string) => void;
   onCancel?: (id: string) => void;
@@ -213,20 +255,18 @@ interface UpcomingMatchCardProps {
 export const UpcomingMatchCard: React.FC<UpcomingMatchCardProps> = ({
   match,
   myTeam,
+  isAdmin = true,
   onFinish,
   onUpdateScore,
   onCancel,
 }) => {
   const navigate = useNavigate();
 
-  // Determine match stage based on date/time
-  const getMatchStage = (): 'upcoming' | 'live' | 'finished' => {
-    // For now, assume all upcoming matches are 'upcoming'
-    // In real implementation, check date/time to determine if live
-    return 'upcoming';
-  };
-
-  const stage = getMatchStage();
+  // Use match status to determine stage (status is now calculated by the store)
+  const stage: 'upcoming' | 'live' | 'finished' =
+    match.status === 'live' ? 'live' :
+      match.status === 'finished' ? 'finished' :
+        'upcoming';
 
   const renderStatus = () => {
     switch (stage) {
@@ -256,6 +296,18 @@ export const UpcomingMatchCard: React.FC<UpcomingMatchCardProps> = ({
   };
 
   const renderActions = () => {
+    // Members (non-admin) cannot perform any actions
+    if (!isAdmin) {
+      return (
+        <div className="flex items-center justify-center gap-2 mt-4 pt-3 border-t border-gray-100 dark:border-white/5">
+          <Icon name="info" size="sm" className="text-gray-500" />
+          <span className="text-xs text-gray-500 dark:text-gray-400">
+            Chỉ quản trị viên được thực hiện thao tác
+          </span>
+        </div>
+      );
+    }
+
     switch (stage) {
       case 'upcoming':
         return (
@@ -331,11 +383,10 @@ export const UpcomingMatchCard: React.FC<UpcomingMatchCardProps> = ({
   return (
     <div
       onClick={() => navigate(appRoutes.matchDetail(match.id))}
-      className={`bg-white dark:bg-surface-dark p-4 rounded-xl border shadow-sm transition-all cursor-pointer hover:border-primary/50 active:scale-[0.99] ${
-        stage === 'live'
+      className={`bg-white dark:bg-surface-dark p-4 rounded-xl border shadow-sm transition-all cursor-pointer hover:border-primary/50 active:scale-[0.99] ${stage === 'live'
           ? 'border-red-500/30 ring-1 ring-red-500/20'
           : 'border-gray-100 dark:border-white/5'
-      }`}
+        }`}
     >
       <div className="flex justify-between items-start mb-4">
         {renderStatus()}
@@ -367,11 +418,10 @@ export const UpcomingMatchCard: React.FC<UpcomingMatchCardProps> = ({
           ) : (
             <div className="text-center">
               <span
-                className={`text-3xl font-extrabold font-mono block ${
-                  stage === 'live'
+                className={`text-3xl font-extrabold font-mono block ${stage === 'live'
                     ? 'text-red-500'
                     : 'text-slate-900 dark:text-white'
-                }`}
+                  }`}
               >
                 {match.scoreA !== undefined && match.scoreB !== undefined
                   ? `${match.scoreA} - ${match.scoreB}`
@@ -404,6 +454,7 @@ export const UpcomingMatchCard: React.FC<UpcomingMatchCardProps> = ({
 interface HistoryMatchCardProps {
   match: Match;
   myTeam: { id: string; name: string; logo?: string };
+  isAdmin?: boolean;
   onViewDetail?: (id: string) => void;
   onRematch?: (id: string) => void;
 }
@@ -411,6 +462,7 @@ interface HistoryMatchCardProps {
 export const HistoryMatchCard: React.FC<HistoryMatchCardProps> = ({
   match,
   myTeam,
+  isAdmin = true,
   onViewDetail,
   onRematch,
 }) => {
@@ -523,21 +575,33 @@ export const HistoryMatchCard: React.FC<HistoryMatchCardProps> = ({
           className="flex gap-3 pt-3 border-t border-gray-100 dark:border-white/5"
           onClick={(e) => e.stopPropagation()}
         >
-          <Button
-            variant="secondary"
-            className="flex-1 h-9 text-xs"
-            icon="info"
-            onClick={() => onViewDetail?.(match.id)}
-          >
-            Chi tiết
-          </Button>
-          <Button
-            className="flex-1 h-9 text-xs"
-            icon="replay"
-            onClick={() => onRematch?.(match.id)}
-          >
-            Đá lại
-          </Button>
+          {/* Members (non-admin) cannot perform any actions */}
+          {!isAdmin ? (
+            <div className="flex items-center justify-center gap-2 w-full">
+              <Icon name="info" size="sm" className="text-gray-500" />
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                Chỉ quản trị viên được thực hiện thao tác
+              </span>
+            </div>
+          ) : (
+            <>
+              <Button
+                variant="secondary"
+                className="flex-1 h-9 text-xs"
+                icon="info"
+                onClick={() => onViewDetail?.(match.id)}
+              >
+                Chi tiết
+              </Button>
+              <Button
+                className="flex-1 h-9 text-xs"
+                icon="replay"
+                onClick={() => onRematch?.(match.id)}
+              >
+                Đá lại
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </div>

@@ -11,9 +11,20 @@ import {
   ApiResponse,
 } from '@/types/api.types';
 
+/**
+ * Auth Service
+ *
+ * NOTE: This service now only provides API methods.
+ * All state management and token handling should be done through auth.store.ts
+ *
+ * For localStorage helpers (saveTokens, getAccessToken, etc.), use:
+ * - useAuthStore() hooks for reactive access
+ * - getTokens(), updateTokens() helpers for non-reactive access
+ */
 export class AuthService {
   /**
    * Login with Zalo OAuth
+   * POST /auth/zalo-login
    */
   static async zaloLogin(
     data: ZaloLoginDto
@@ -23,6 +34,7 @@ export class AuthService {
 
   /**
    * Enhanced Zalo 3-step verification
+   * POST /auth/zalo-three-step-verify
    */
   static async zaloThreeStepVerify(
     data: ZaloThreeStepDto
@@ -43,6 +55,7 @@ export class AuthService {
 
   /**
    * Logout user
+   * POST /auth/logout
    */
   static async logout(): Promise<ApiResponse<void>> {
     return api.post<void>("/auth/logout");
@@ -50,6 +63,7 @@ export class AuthService {
 
   /**
    * Get current user profile
+   * GET /auth/profile
    */
   static async getProfile(): Promise<ApiResponse<User>> {
     return api.get<User>("/auth/profile");
@@ -57,6 +71,7 @@ export class AuthService {
 
   /**
    * Update user profile
+   * PUT /auth/profile
    */
   static async updateProfile(
     data: UpdateProfileDto
@@ -66,55 +81,119 @@ export class AuthService {
 
   /**
    * Health check for Zalo 3-step verification
+   * GET /auth/zalo-three-step
    */
   static async healthCheck(): Promise<ApiResponse<any>> {
     return api.get<any>("/auth/zalo-three-step");
   }
 
-  // Local storage helpers
+  // ========== DEPRECATED: Use auth.store.ts instead ==========
+
+  /**
+   * @deprecated Use useAuthStore or getTokens() from auth.store.ts instead
+   */
   static saveTokens(tokens: AuthTokens): void {
-    localStorage.setItem("access_token", tokens.accessToken);
-    localStorage.setItem("refresh_token", tokens.refreshToken);
-  }
-
-  static getAccessToken(): string | null {
-    return localStorage.getItem("access_token");
-  }
-
-  static getRefreshToken(): string | null {
-    return localStorage.getItem("refresh_token");
-  }
-
-  static clearTokens(): void {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
-  }
-
-  static saveUser(user: User): void {
-    localStorage.setItem("user_data", JSON.stringify(user));
-  }
-
-  static getUser(): User | null {
-    const userData = localStorage.getItem("user_data");
-    return userData ? JSON.parse(userData) : null;
-  }
-
-  static clearUser(): void {
-    localStorage.removeItem("user_data");
+    console.warn('AuthService.saveTokens is deprecated. Use auth.store.ts instead.');
   }
 
   /**
-   * Check if user is authenticated
+   * @deprecated Use useAuthStore or getTokens() from auth.store.ts instead
+   */
+  static getAccessToken(): string | null {
+    console.warn('AuthService.getAccessToken is deprecated. Use auth.store.ts instead.');
+    // Fallback to zustand storage for compatibility
+    try {
+      const zustandStorage = localStorage.getItem('auth-storage');
+      if (zustandStorage) {
+        const parsed = JSON.parse(zustandStorage);
+        return parsed?.state?.tokens?.accessToken || null;
+      }
+    } catch (e) {
+      console.warn('Failed to read token from zustand storage:', e);
+    }
+    return null;
+  }
+
+  /**
+   * @deprecated Use useAuthStore or getTokens() from auth.store.ts instead
+   */
+  static getRefreshToken(): string | null {
+    console.warn('AuthService.getRefreshToken is deprecated. Use auth.store.ts instead.');
+    // Fallback to zustand storage for compatibility
+    try {
+      const zustandStorage = localStorage.getItem('auth-storage');
+      if (zustandStorage) {
+        const parsed = JSON.parse(zustandStorage);
+        return parsed?.state?.tokens?.refreshToken || null;
+      }
+    } catch (e) {
+      console.warn('Failed to read refresh token from zustand storage:', e);
+    }
+    return null;
+  }
+
+  /**
+   * @deprecated Use auth.store.ts logout action instead
+   */
+  static clearTokens(): void {
+    console.warn('AuthService.clearTokens is deprecated. Use auth.store.ts instead.');
+  }
+
+  /**
+   * @deprecated Use useUser() from auth.store.ts instead
+   */
+  static saveUser(user: User): void {
+    console.warn('AuthService.saveUser is deprecated. Use auth.store.ts instead.');
+  }
+
+  /**
+   * @deprecated Use useUser() from auth.store.ts instead
+   */
+  static getUser(): User | null {
+    console.warn('AuthService.getUser is deprecated. Use auth.store.ts instead.');
+    // Fallback to zustand storage for compatibility
+    try {
+      const zustandStorage = localStorage.getItem('auth-storage');
+      if (zustandStorage) {
+        const parsed = JSON.parse(zustandStorage);
+        return parsed?.state?.user || null;
+      }
+    } catch (e) {
+      console.warn('Failed to read user from zustand storage:', e);
+    }
+    return null;
+  }
+
+  /**
+   * @deprecated Use auth.store.ts instead
+   */
+  static clearUser(): void {
+    console.warn('AuthService.clearUser is deprecated. Use auth.store.ts instead.');
+  }
+
+  /**
+   * @deprecated Use useIsAuthenticated() or hasValidAuth() from auth.store.ts instead
    */
   static isAuthenticated(): boolean {
-    return !!this.getAccessToken();
+    console.warn('AuthService.isAuthenticated is deprecated. Use auth.store.ts instead.');
+    // Fallback to zustand storage for compatibility
+    try {
+      const zustandStorage = localStorage.getItem('auth-storage');
+      if (zustandStorage) {
+        const parsed = JSON.parse(zustandStorage);
+        return !!parsed?.state?.tokens?.accessToken;
+      }
+    } catch (e) {
+      console.warn('Failed to check auth from zustand storage:', e);
+    }
+    return false;
   }
 
   /**
-   * Auto refresh token before expiry
-   * Returns: { success: true, data: { user, tokens } }
+   * @deprecated Use auth.store.ts refreshTokens action instead
    */
   static async autoRefreshToken(): Promise<boolean> {
+    console.warn('AuthService.autoRefreshToken is deprecated. Use auth.store.ts instead.');
     const refreshToken = this.getRefreshToken();
     if (!refreshToken) {
       return false;
@@ -122,18 +201,9 @@ export class AuthService {
 
     try {
       const response = await this.refreshToken({ refreshToken });
-      if (response.success && response.data) {
-        // Response contains both user and tokens
-        const { user, tokens } = response.data;
-        this.saveTokens(tokens);
-        this.saveUser(user);
-        return true;
-      }
-      return false;
+      return response.success;
     } catch (error) {
       console.error("Auto refresh token failed:", error);
-      this.clearTokens();
-      this.clearUser();
       return false;
     }
   }

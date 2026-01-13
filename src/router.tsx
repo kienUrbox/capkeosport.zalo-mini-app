@@ -3,6 +3,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { MainLayout } from './components/ui';
 
 // Screens
+import LaunchingScreen from './screens/launching';
 import LoginScreen from './screens/login';
 import OnboardingScreen from './screens/onboarding';
 
@@ -35,6 +36,10 @@ import SwipeHistoryScreen from './screens/swipe';
 import ReceivedSwipesScreen from './screens/swipe/received';
 import SwipeStatsScreen from './screens/swipe/stats';
 
+// Team Invitation Screens
+import MyInvitesScreen from './screens/invites/received';
+import SentInvitesScreen from './screens/teams/sent-invites';
+
 // Simple 404 component
 const NotFound = () => (
   <div
@@ -61,8 +66,11 @@ const NotFound = () => (
 );
 
 export const router = createBrowserRouter([
-  // Default redirect to dashboard after auth
-  { path: '/', element: <Navigate to="/dashboard" replace /> },
+  // Default redirect to launching screen
+  { path: '/', element: <Navigate to="/launching" replace /> },
+
+  // Launching screen - first screen of the app
+  { path: '/launching', element: <LaunchingScreen /> },
 
   // Public routes
   { path: '/login', element: <LoginScreen /> },
@@ -168,6 +176,22 @@ export const router = createBrowserRouter([
     ),
   },
   {
+    path: '/teams/:teamId/invites/sent',
+    element: (
+      <ProtectedRoute>
+        <SentInvitesScreen />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/invites/received',
+    element: (
+      <ProtectedRoute>
+        <MyInvitesScreen />
+      </ProtectedRoute>
+    ),
+  },
+  {
     path: '/match/found',
     element: (
       <ProtectedRoute>
@@ -236,6 +260,14 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <NotificationsScreen />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/my-invites',
+    element: (
+      <ProtectedRoute>
+        <Navigate to="/notifications" replace />
       </ProtectedRoute>
     ),
   },

@@ -44,8 +44,10 @@ export interface Match {
   proposedTime?: string;
   proposedPitch?: string;
   requestedBy?: string;
+  requestedByTeam?: string;
   requestedAt?: string;
   acceptedBy?: string;
+  acceptedByTeam?: string;
   acceptedAt?: string;
   createdAt?: string;
   notes?: string;
@@ -73,6 +75,14 @@ export interface SendMatchRequestDto {
   proposedDate: string;
   proposedTime: string;
   proposedPitch: string;
+  notes?: string;
+}
+
+export interface UpdateMatchRequestDto {
+  proposedDate?: string;
+  proposedTime?: string;
+  proposedPitch?: string;
+  notes?: string;
 }
 
 export interface ConfirmMatchDto {
@@ -176,12 +186,30 @@ export const MatchService = {
   },
 
   /**
+   * Send invitation for a match
+   * POST /api/v1/matches/:id/invite
+   * Used when inviting opponent team to schedule a matched game
+   */
+  sendInvitation: async (matchId: string, data: { message?: string }) => {
+    return api.post<{ match: Match; message: string }>(`/matches/${matchId}/invite`, data);
+  },
+
+  /**
    * Send match request
    * POST /api/v1/matches/:id/request
    * Transition: MATCHED → REQUESTED
    */
   sendMatchRequest: async (matchId: string, data: SendMatchRequestDto) => {
     return api.post<Match>(`/matches/${matchId}/request`, data);
+  },
+
+  /**
+   * Update match request
+   * PATCH /api/v1/matches/:id/request
+   * Only team who sent the request can update
+   */
+  updateMatchRequest: async (matchId: string, data: UpdateMatchRequestDto) => {
+    return api.patch<Match>(`/matches/${matchId}/request`, data);
   },
 
   /**

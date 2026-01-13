@@ -13,6 +13,8 @@ export { DiscoveryService } from './discovery.service';
 export { NotificationService } from './notification.service';
 export { FileService } from './file.service';
 export { SwipeService } from './swipe.service';
+export { default as PhoneInviteService } from './phone-invite.service';
+export { default as TeamInviteService } from './team-invite.service';
 
 // Re-export all API types
 export * from '@/types/api.types';

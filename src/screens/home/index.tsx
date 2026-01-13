@@ -1,10 +1,12 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Icon, TeamAvatar, InvitationSkeleton, MatchCardSkeleton, NoMatches, DashboardError } from '@/components/ui';
 import { appRoutes } from '@/utils/navigation';
 import { useHomeData } from '@/hooks/useHomeData';
 import { useUser } from '@/stores/auth.store';
 import { useUpcomingMatches } from '@/stores/match.store';
+import PhoneInviteService from '@/services/api/phone-invite.service';
+import { PhoneInvite } from '@/types/api.types';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import { vi } from 'date-fns/locale';
 
@@ -79,15 +81,26 @@ const DashboardScreen: React.FC = () => {
     return <DashboardError error={error} onRetry={refresh} />;
   }
 
-  const handleRejectInvite = (id: string) => {
-    // TODO: Implement reject invitation API call
-    // For now, just remove from local state
-    console.log('Reject invitation:', id);
+  const handleRejectInvite = async (id: string) => {
+    try {
+      await PhoneInviteService.respondInvite(id, 'decline');
+      // Refresh data after responding
+      refresh();
+    } catch (err) {
+      console.error('Reject invitation error:', err);
+    }
   };
 
-  const handleAcceptInvite = (id: string) => {
-    // TODO: Implement accept invitation API call
-    console.log('Accept invitation:', id);
+  const handleAcceptInvite = async (id: string) => {
+    try {
+      const response = await PhoneInviteService.respondInvite(id, 'accept');
+      if (response.success && response.data?.team) {
+        // Navigate to team detail after accepting
+        navigate(appRoutes.teamDetail(response.data.team.id));
+      }
+    } catch (err) {
+      console.error('Accept invitation error:', err);
+    }
   };
 
   // Format time ago for invitations
@@ -174,7 +187,7 @@ const DashboardScreen: React.FC = () => {
                 </h3>
               </div>
               <button
-                onClick={() => navigate(appRoutes.notifications)}
+                onClick={() => navigate(appRoutes.myInvites)}
                 className="text-xs font-semibold text-primary py-1 px-3 rounded-full hover:bg-primary/10 transition-colors"
               >
                 Xem tất cả
@@ -184,62 +197,72 @@ const DashboardScreen: React.FC = () => {
             {isLoadingInvitations ? (
               <InvitationSkeleton />
             ) : (
-              pendingInvitations.map((invite) => (
-              <div
-                key={invite.id}
-                className="bg-white dark:bg-surface-dark border-l-4 border-primary rounded-r-2xl p-4 shadow-md flex flex-col gap-3 relative overflow-hidden mb-3"
-              >
-                <div className="flex items-center gap-3">
-                  {invite.data?.teamLogo ? (
-                    <TeamAvatar
-                      src={invite.data.teamLogo}
-                      size="md"
-                    />
-                  ) : (
-                    <div className="h-14 w-14 rounded-full bg-gradient-to-br from-primary to-green-600 flex items-center justify-center text-white font-bold text-lg border-2 border-white dark:border-white/10">
-                      {invite.data?.teamName?.charAt(0).toUpperCase() || 'T'}
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-gray-500 mb-0.5">
-                      <span className="font-bold text-slate-900 dark:text-white">
-                        {invite.data?.inviterName || 'Người dùng'}
-                      </span>{' '}
-                      đã mời bạn vào:
-                    </p>
-                    <h4 className="text-lg font-bold text-slate-900 dark:text-white leading-none">
-                      {invite.data?.teamName || 'Đội bóng'}
-                    </h4>
-                    <p className="text-[10px] text-gray-400 mt-1">
-                      {invite.createdAt && formatTimeAgo(invite.createdAt)}
-                    </p>
-                  </div>
-                </div>
+              pendingInvitations.map((invite) => {
+                // Handle both PhoneInvite and legacy Notification types
+                const isPhoneInvite = 'teamName' in invite && 'inviterName' in invite;
+                const teamLogo = isPhoneInvite ? (invite as unknown as PhoneInvite).teamLogo : (invite as { data?: { teamLogo?: string } }).data?.teamLogo;
+                const teamName = isPhoneInvite ? (invite as unknown as PhoneInvite).teamName : (invite as { data?: { teamName?: string } }).data?.teamName;
+                const inviterName = isPhoneInvite ? (invite as unknown as PhoneInvite).inviterName : (invite as { data?: { inviterName?: string } }).data?.inviterName;
+                const teamId = isPhoneInvite ? (invite as unknown as PhoneInvite).teamId : (invite as { data?: { teamId?: string } }).data?.teamId;
+                const createdAt = isPhoneInvite ? (invite as unknown as PhoneInvite).createdAt : (invite as { createdAt?: string }).createdAt;
 
-                <div className="flex gap-2 mt-1">
-                  <Button
-                    className="h-9 flex-1 text-xs"
-                    onClick={() => handleAcceptInvite(invite.id)}
+                return (
+                  <div
+                    key={invite.id}
+                    className="bg-white dark:bg-surface-dark border-l-4 border-primary rounded-r-2xl p-4 shadow-md flex flex-col gap-3 relative overflow-hidden mb-3"
                   >
-                    Chấp nhận
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    className="h-9 flex-1 text-xs bg-gray-50 dark:bg-white/5"
-                    onClick={() => handleRejectInvite(invite.id)}
-                  >
-                    Từ chối
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="h-9 w-9 p-0 rounded-full"
-                    onClick={() => navigate(appRoutes.teamDetail(invite.data?.teamId || ''))}
-                  >
-                    <Icon name="visibility" />
-                  </Button>
-                </div>
-              </div>
-            ))
+                    <div className="flex items-center gap-3">
+                      {teamLogo ? (
+                        <TeamAvatar
+                          src={teamLogo}
+                          size="md"
+                        />
+                      ) : (
+                        <div className="h-14 w-14 rounded-full bg-gradient-to-br from-primary to-green-600 flex items-center justify-center text-white font-bold text-lg border-2 border-white dark:border-white/10">
+                          {teamName?.charAt(0).toUpperCase() || 'T'}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-gray-500 mb-0.5">
+                          <span className="font-bold text-slate-900 dark:text-white">
+                            {inviterName || 'Người dùng'}
+                          </span>{' '}
+                          đã mời bạn vào:
+                        </p>
+                        <h4 className="text-lg font-bold text-slate-900 dark:text-white leading-none">
+                          {teamName || 'Đội bóng'}
+                        </h4>
+                        <p className="text-[10px] text-gray-400 mt-1">
+                          {createdAt && formatTimeAgo(createdAt)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 mt-1">
+                      <Button
+                        className="h-9 flex-1 text-xs"
+                        onClick={() => handleAcceptInvite(invite.id)}
+                      >
+                        Chấp nhận
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        className="h-9 flex-1 text-xs bg-gray-50 dark:bg-white/5"
+                        onClick={() => handleRejectInvite(invite.id)}
+                      >
+                        Từ chối
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        className="h-9 w-9 p-0 rounded-full"
+                        onClick={() => navigate(appRoutes.teamDetail(teamId || ''))}
+                      >
+                        <Icon name="visibility" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })
             )}
           </section>
         )}
@@ -247,7 +270,7 @@ const DashboardScreen: React.FC = () => {
         {/* Main Actions */}
         <section className="px-5 flex flex-col gap-4">
           <button
-            onClick={() => navigate(appRoutes.matchFind)}
+            onClick={() => navigate(appRoutes.matchFind, { state: { openTeamSelector: true } })}
             className="relative w-full group overflow-hidden rounded-2xl bg-primary text-[#102219] shadow-[0_8px_20px_rgba(17,212,115,0.25)] transition-all hover:shadow-[0_12px_24px_rgba(17,212,115,0.35)] active:scale-[0.98] text-left"
           >
             <div className="absolute -right-6 -bottom-6 opacity-10 rotate-12 transition-transform group-hover:rotate-6 group-hover:scale-110">

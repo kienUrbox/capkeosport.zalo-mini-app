@@ -26,6 +26,7 @@ export const appRoutes = {
   memberProfile: (teamId: string, memberId: string) =>
     `/teams/${teamId}/members/${memberId}`,
   teamShare: (id: string) => `/teams/${id}/share`,
+  teamInvitesSent: (teamId: string) => `/teams/${teamId}/invites/sent`,
 
   // Matches
   matchFind: '/match/find',
@@ -41,6 +42,8 @@ export const appRoutes = {
 
   // Notifications
   notifications: '/notifications',
+  myInvites: '/my-invites',
+  invitesReceived: '/invites/received',
 
   // Swipes
   swipeHistory: '/swipe/history',

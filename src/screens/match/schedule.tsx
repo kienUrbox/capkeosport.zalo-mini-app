@@ -10,10 +10,12 @@ import {
   SchedulePendingSkeleton,
   ScheduleUpcomingSkeleton,
   ScheduleHistorySkeleton,
+  InviteMatchModal,
+  MatchRequestModal,
 } from '@/components/ui';
 import { appRoutes } from '@/utils/navigation';
 import { useScheduleData } from '@/hooks/useScheduleData';
-import { useMyTeams, useSelectedTeam, useTeamActions, useTeamStore } from '@/stores/team.store';
+import { useMyTeams, useSelectedTeam, useTeamActions, useTeamStore, type UserRole } from '@/stores/team.store';
 import { useMatchActions } from '@/stores/match.store';
 import type { TabType } from '@/stores/match.store';
 
@@ -27,11 +29,18 @@ import type { TabType } from '@/stores/match.store';
  * - Lazy loading: Only fetch data when tab is activated
  * - Infinite scroll: Load more pages when scrolling to bottom
  * - Pull-to-refresh: Pull down to refresh current tab
+ *
+ * Role-based permissions:
+ * - Admin/Captain: Can perform all actions (send/accept/decline/confirm/finish/cancel)
+ * - Member: Can only view matches, no actions
  */
 const MatchScheduleScreen: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabType>('pending');
   const [showTeamSelector, setShowTeamSelector] = useState(false);
+  const [inviteModalMatchId, setInviteModalMatchId] = useState<string | null>(null);
+  const [requestModalMatchId, setRequestModalMatchId] = useState<string | null>(null);
+  const [requestMode, setRequestMode] = useState<'send' | 'edit'>('send');
 
   // Pull-to-refresh state
   const [pullState, setPullState] = useState({
@@ -45,6 +54,16 @@ const MatchScheduleScreen: React.FC = () => {
   const teamStore = useTeamStore();
   const currentTeam = useSelectedTeam();
   const { setSelectedTeam, fetchMyTeams } = useTeamActions();
+
+  // Check if user has admin/captain permissions
+  const hasAdminPermission = (userRole?: UserRole): boolean => {
+    return userRole === 'admin' || userRole === 'captain';
+  };
+
+  // Check if current team can edit the request (only team who sent can edit)
+  const canEditRequest = (match: { requestedByTeam?: string }): boolean => {
+    return match.requestedByTeam === currentTeam?.id;
+  };
 
   const {
     pendingMatches,
@@ -238,47 +257,58 @@ const MatchScheduleScreen: React.FC = () => {
     }
   };
 
-  const handleCancelMatch = async (matchId: string) => {
-    try {
-      const reason = prompt('Lý do hủy:');
-      if (reason) {
-        await matchActions.cancelMatch(matchId, { reason });
-        await refreshTab('pending');
-        showToast('Đã hủy lời mời');
-      }
-    } catch (err: any) {
-      showToast(err.message || 'Không thể hủy lời mời');
+  const handleCancelMatch = (matchId: string) => {
+    // For now, use simple prompt - can be replaced with a proper modal later
+    const reason = prompt('Lý do hủy:');
+    if (reason) {
+      matchActions.cancelMatch(matchId, { reason })
+        .then(() => {
+          refreshTab('pending');
+          showToast('Đã hủy lời mời');
+        })
+        .catch((err: any) => {
+          showToast(err.message || 'Không thể hủy lời mời');
+        });
     }
   };
 
   const handleConfirmMatch = async (matchId: string) => {
     try {
-      // Navigate to confirm match screen with matchId
-      navigate(appRoutes.matchInvite); // TODO: Change to proper confirm route with matchId
+      // Open invite modal to confirm/edit match details
+      setInviteModalMatchId(matchId);
     } catch (err: any) {
       showToast(err.message || 'Không thể chốt kèo');
     }
   };
 
-  const handleSendRequest = async (matchId: string) => {
-    try {
-      // TODO: Implement send request API call with matchId
-      console.log('Sending request for match:', matchId);
-      showToast('Đã gửi lời mời');
-      await refreshTab('pending');
-    } catch (err: any) {
-      showToast(err.message || 'Không thể gửi lời mời');
-    }
+  const handleSendRequest = (matchId: string) => {
+    setRequestMode('send');
+    setRequestModalMatchId(matchId);
   };
 
-  const handleEditRequest = async (matchId: string) => {
-    try {
-      // Navigate to edit request screen with matchId
-      console.log('Editing request for match:', matchId);
-      navigate(appRoutes.matchInvite); // TODO: Change to proper edit route with matchId
-    } catch (err: any) {
-      showToast(err.message || 'Không thể sửa lời mời');
-    }
+  const handleCloseInviteModal = () => {
+    setInviteModalMatchId(null);
+  };
+
+  const handleInviteSuccess = async () => {
+    setInviteModalMatchId(null);
+    await Promise.all([refreshTab('pending'), refreshTab('upcoming')]);
+    showToast('Đã gửi lời mời');
+  };
+
+  const handleEditRequest = (matchId: string) => {
+    setRequestMode('edit');
+    setRequestModalMatchId(matchId);
+  };
+
+  const handleCloseRequestModal = () => {
+    setRequestModalMatchId(null);
+  };
+
+  const handleRequestSuccess = async () => {
+    setRequestModalMatchId(null);
+    await refreshTab('pending');
+    showToast(requestMode === 'send' ? 'Đã gửi lời mời' : 'Đã cập nhật lời mời');
   };
 
   const handleFinishMatch = async (matchId: string) => {
@@ -410,6 +440,8 @@ const MatchScheduleScreen: React.FC = () => {
                 <PendingMatchCard
                   key={match.id}
                   match={match}
+                  isAdmin={hasAdminPermission(currentTeam?.userRole)}
+                  canEditRequest={canEditRequest(match)}
                   onAccept={handleAcceptMatch}
                   onDecline={handleDeclineMatch}
                   onCancel={handleCancelMatch}
@@ -480,6 +512,7 @@ const MatchScheduleScreen: React.FC = () => {
                   key={match.id}
                   match={match}
                   myTeam={currentTeam || { id: '', name: '', logo: '' }}
+                  isAdmin={hasAdminPermission(currentTeam?.userRole)}
                   onFinish={handleFinishMatch}
                   onUpdateScore={handleUpdateScore}
                   onCancel={handleCancelMatch}
@@ -540,6 +573,7 @@ const MatchScheduleScreen: React.FC = () => {
                   key={match.id}
                   match={match}
                   myTeam={currentTeam || { id: '', name: '', logo: '' }}
+                  isAdmin={hasAdminPermission(currentTeam?.userRole)}
                   onViewDetail={handleViewDetail}
                   onRematch={handleRematch}
                 />
@@ -611,7 +645,8 @@ const MatchScheduleScreen: React.FC = () => {
                       {team.name}
                     </h4>
                     <p className="text-xs text-gray-500">
-                      {team.isCaptain ? 'Quản trị viên' : 'Thành viên'}
+                      {team.userRole === 'admin' ? 'Quản trị viên' :
+                       team.userRole === 'captain' ? 'Đội trưởng' : 'Thành viên'}
                     </p>
                   </div>
                   {currentTeam?.id === team.id && (
@@ -637,6 +672,38 @@ const MatchScheduleScreen: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Invite Match Modal */}
+      {inviteModalMatchId && (
+        <InviteMatchModal
+          isOpen={!!inviteModalMatchId}
+          matchId={inviteModalMatchId}
+          myTeam={currentTeam || { id: '', name: '', logo: '' }}
+          onClose={handleCloseInviteModal}
+          onSuccess={handleInviteSuccess}
+        />
+      )}
+
+      {/* Match Request Modal */}
+      {requestModalMatchId && (() => {
+        const match = pendingMatches.find(m => m.id === requestModalMatchId);
+        return match ? (
+          <MatchRequestModal
+            isOpen={!!requestModalMatchId}
+            mode={requestMode}
+            matchId={requestModalMatchId}
+            myTeam={currentTeam || { id: '', name: '', logo: '' }}
+            opponentTeam={match.teamB || { id: '', name: '' }}
+            initialData={requestMode === 'edit' ? {
+              proposedDate: match.date,
+              proposedTime: match.time,
+              proposedPitch: match.location,
+            } : undefined}
+            onClose={handleCloseRequestModal}
+            onSuccess={handleRequestSuccess}
+          />
+        ) : null;
+      })()}
     </div>
   );
 };

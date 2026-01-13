@@ -604,3 +604,115 @@ export enum ErrorCode {
   FILE_TOO_LARGE = 'FILE_TOO_LARGE',
   INVALID_FILE_TYPE = 'INVALID_FILE_TYPE'
 }
+
+// Phone Invite Types - Phone-based team invitations
+export interface PhoneInvite extends BaseEntity {
+  teamId: string;
+  teamName: string;
+  teamLogo?: string;
+  inviterName: string;
+  inviterPhone: string;
+  inviterUserId: string;
+  invitedPhone: string;
+  status: 'pending' | 'accepted' | 'declined' | 'expired' | 'cancelled';
+  message?: string;
+  createdAt: string;
+  expiresAt?: string;
+  respondedAt?: string;
+}
+
+export interface SendPhoneInviteDto {
+  teamId: string;
+  phone: string;
+  message?: string;
+}
+
+export interface RespondPhoneInviteDto {
+  action: 'accept' | 'decline';
+}
+
+// ============================================================
+// TEAM INVITATION TYPES (Updated API)
+// ============================================================
+
+// QR Code Invite Types
+export interface InviteTokenResponse {
+  token: string;
+  deepLink: string;
+  expiresAt: string;
+  teamId: string;
+  maxUses: number;
+}
+
+export interface CreateInviteTokenDto {
+  expiryMinutes?: number; // 5-60, default 15
+  role?: 'member' | 'captain';
+}
+
+// Phone Invite Types (Updated)
+export interface PhoneInviteResponse {
+  inviteId: string;
+  phone: string;
+  userExists: boolean;
+  expiresAt: string;
+  team: {
+    id: string;
+    name: string;
+    logo?: string;
+    level?: string;
+    gender?: string;
+  };
+  notificationCreated: boolean;
+}
+
+export interface InviteByPhoneDto {
+  phone: string;
+  role?: 'member' | 'captain';
+  position?: string;
+  jerseyNumber?: number;
+  customMessage?: string;
+}
+
+// Invite Status Types
+export type InviteStatus = 'pending' | 'accepted' | 'declined' | 'expired' | 'cancelled';
+
+export interface TeamInvite {
+  id: string;
+  teamId: string;
+  teamName: string;
+  teamLogo?: string;
+  teamLevel?: string;
+  teamGender?: string;
+  inviterName: string;
+  inviterPhone?: string;
+  inviterUserId: string;
+  invitedPhone?: string;
+  invitedUserId?: string;
+  status: InviteStatus;
+  role?: string;
+  position?: string;
+  jerseyNumber?: number;
+  customMessage?: string;
+  createdAt: string;
+  expiresAt?: string;
+  respondedAt?: string;
+}
+
+export interface RespondInviteDto {
+  inviteId: string;
+  action: 'accept' | 'decline';
+  declineMessage?: string;
+}
+
+export interface RespondInviteResponse {
+  team?: Team;
+  message?: string;
+}
+
+export interface PaginatedInvites {
+  invites: TeamInvite[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}

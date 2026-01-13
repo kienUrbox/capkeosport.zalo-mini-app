@@ -1,9 +1,11 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Icon, TeamAvatar, MatchBadge, FindMatchSkeleton, FilterBottomSheet, MatchModal } from '@/components/ui';
+import { Icon, TeamAvatar, FindMatchSkeleton, FilterBottomSheet, MatchModal, InviteMatchModal, Button } from '@/components/ui';
 import { appRoutes } from '@/utils/navigation';
 import { useDiscovery } from '@/hooks/useDiscovery';
-import { useMyTeams, useSelectedTeam, useTeamActions } from '@/stores/team.store';
+import { useMyTeams, useSelectedTeam, useTeamActions, useTeamStore } from '@/stores/team.store';
+import { useDiscoveryStore } from '@/stores/discovery.store';
+import type { Team } from '@/types/api.types';
 
 /**
  * FindMatch Screen
@@ -32,17 +34,24 @@ const FindMatchScreen: React.FC = () => {
     handleSwipe,
     refresh,
     closeMatchModal,
-    goToMatchDetail,
   } = useDiscovery();
+
+  // Get filters from discovery store
+  const filters = useDiscoveryStore((state) => state.filters);
 
   // Team selection
   const myTeams = useMyTeams();
   const selectedTeam = useSelectedTeam();
   const { setSelectedTeam } = useTeamActions();
 
+
+  // Filter teams where user is admin
+  const adminTeams = myTeams.filter(team => team.userRole === 'admin');
+
   // UI states
   const [showTeamSelector, setShowTeamSelector] = useState(false);
   const [showFilterSheet, setShowFilterSheet] = useState(false);
+  const [inviteModalMatchId, setInviteModalMatchId] = useState<string | null>(null);
 
   // Swipe Logic
   const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
@@ -51,9 +60,53 @@ const FindMatchScreen: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
+  // Flow state tracking
+  const flowState = useMemo(() => {
+    // Case 1: No teams at all
+    if (myTeams.length === 0) {
+      return 'no-teams';
+    }
+    // Case 2: Has teams but no admin teams
+    if (adminTeams.length === 0) {
+      return 'has-teams-not-admin';
+    }
+    // Case 3: Has exactly 1 admin team
+    if (adminTeams.length === 1) {
+      return 'single-admin-team';
+    }
+    // Case 4: Has multiple admin teams
+    return 'multiple-admin-teams';
+  }, [myTeams.length, adminTeams.length]);
+
+  // Show team selector for multiple admin teams - only when no team is selected yet
+  useEffect(() => {
+    // Only auto-show selector if user has multiple admin teams AND hasn't selected any team yet
+    if (flowState === 'multiple-admin-teams' && !selectedTeam) {
+      // Auto-select first admin team
+      console.log('[FindMatch] Auto-selecting first admin team');
+      setSelectedTeam(adminTeams[0]);
+      // Don't show selector automatically - let user discover with auto-selected team first
+      // User can still open selector by clicking header or "Chọn đội khác" button
+    }
+  }, [flowState, selectedTeam, adminTeams, setSelectedTeam]);
+
+  // Handle view match - open invite modal instead of navigating
+  const handleViewMatch = (matchId: string) => {
+    setInviteModalMatchId(matchId);
+  };
+
+  const handleCloseInviteModal = () => {
+    setInviteModalMatchId(null);
+  };
+
+  const handleInviteSuccess = async () => {
+    setInviteModalMatchId(null);
+    await refresh();
+  };
+
   // Handle team change
   const handleTeamChange = (teamId: string) => {
-    const team = myTeams.find((t) => t.id === teamId);
+    const team = adminTeams.find((t) => t.id === teamId);
     if (team) {
       setSelectedTeam(team);
       setShowTeamSelector(false);
@@ -64,7 +117,11 @@ const FindMatchScreen: React.FC = () => {
 
   // Swipe action handlers
   const removeCard = async (direction: 'left' | 'right') => {
-    if (!currentTeam) return;
+    // Block swipe if user is not admin
+    if (!currentTeam || selectedTeam?.userRole !== 'admin') {
+      // Shake animation feedback
+      return;
+    }
 
     setSwipeDirection(direction);
 
@@ -95,6 +152,15 @@ const FindMatchScreen: React.FC = () => {
     if (!dragStart) return;
     setIsDragging(false);
 
+    // Block swipe if user is not admin
+    const isAdmin = selectedTeam?.userRole === 'admin';
+    if (!isAdmin) {
+      // Reset if not admin - don't allow swipe
+      setDragDelta({ x: 0, y: 0 });
+      setDragStart(null);
+      return;
+    }
+
     // Threshold to trigger swipe
     if (dragDelta.x > 120) {
       removeCard('right');
@@ -110,7 +176,14 @@ const FindMatchScreen: React.FC = () => {
   const handleClickCard = () => {
     // Only navigate if it was a click (not a drag)
     if (currentTeam && Math.abs(dragDelta.x) < 5 && Math.abs(dragDelta.y) < 5) {
-      navigate(appRoutes.opponentDetail(currentTeam.id));
+      navigate(appRoutes.opponentDetail(currentTeam?.id), {
+        state: {
+          sortBy: filters.sortBy,
+          compatibilityScore: Math.round((currentTeam.compatibilityScore || 0) * 100),
+          qualityScore: Math.round((currentTeam.qualityScore || 0) * 100),
+          activityScore: Math.round((currentTeam.activityScore || 0) * 100),
+        }
+      });
     }
   };
 
@@ -157,8 +230,19 @@ const FindMatchScreen: React.FC = () => {
     return `${km.toFixed(1)}km`;
   };
 
-  // Loading state
-  if (isLoading && !currentTeam) {
+  // Get loading state from team store
+  const { isLoading: isTeamsLoading } = useTeamStore();
+
+  // Loading state - check team store first, then discovery
+  if (isTeamsLoading) {
+    console.log('[FindMatch] Loading skeleton: isTeamsLoading =', isTeamsLoading);
+    return <FindMatchSkeleton />;
+  }
+
+  // Loading state - only show skeleton if discovery is loading AND we don't have current team yet
+  // Don't show skeleton when refreshing (isRefreshing) - use overlay instead
+  if (isLoading && !currentTeam && !isRefreshing) {
+    console.log('[FindMatch] Loading skeleton: isLoading =', isLoading, ', currentTeam =', currentTeam, ', isRefreshing =', isRefreshing);
     return <FindMatchSkeleton />;
   }
 
@@ -180,23 +264,35 @@ const FindMatchScreen: React.FC = () => {
       </div>
     );
   }
-  
-  // Empty state - no more teams
-  if (!hasMoreCards && !isLoading) {
+
+  // Empty state - no more teams (only if we've fetched data with admin team and got no results)
+  const hasFetchedWithAdminTeam = selectedTeam?.userRole === 'admin' && !isLoading && !isRefreshing;
+  if (!hasMoreCards && hasFetchedWithAdminTeam && allTeams.length === 0) {
     return (
       <>
         <div className="flex flex-col h-screen bg-background-light dark:bg-background-dark items-center justify-center p-6 text-center">
-          <div className="size-24 rounded-full bg-gray-100 dark:bg-white/5 flex items-center justify-center mb-4 animate-bounce">
-            <Icon name="sentiment_satisfied" className="text-4xl text-gray-400" />
+          <div className="flex flex-col items-center text-center max-w-[280px] gap-4">
+            <div className="w-20 h-20 rounded-full bg-surface-light dark:bg-surface-dark flex items-center justify-center mb-2">
+              <Icon name="search_off" className="text-text-secondary text-4xl" />
+            </div>
+            <div>
+              <p className="text-slate-900 dark:text-white text-xl font-bold">Hết kèo phù hợp</p>
+              <p className="text-text-secondary text-sm mt-2 leading-relaxed">
+                Hãy thử mở rộng bán kính tìm kiếm hoặc điều chỉnh bộ lọc trình độ.
+              </p>
+            </div>
           </div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Hết đội rồi!</h2>
-          <p className="text-gray-500 mb-6 max-w-sm">
-            Bạn đã xem hết các đội phù hợp. Thử điều chỉnh bộ lọc để tìm thêm đội nhé.
-          </p>
-          <div className="flex flex-col gap-3">
+
+          <div className="flex flex-col gap-3 mt-6">
+            <button
+              onClick={() => setShowTeamSelector(true)}
+              className="px-6 py-3 rounded-xl bg-primary text-background-dark font-bold shadow-lg"
+            >
+              Chọn đội khác
+            </button>
             <button
               onClick={() => setShowFilterSheet(true)}
-              className="px-6 py-3 rounded-xl bg-primary text-background-dark font-bold shadow-lg"
+              className="px-6 py-3 rounded-xl bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 font-bold"
             >
               Điều chỉnh bộ lọc
             </button>
@@ -216,16 +312,165 @@ const FindMatchScreen: React.FC = () => {
           onApply={refresh}
         />
 
+        {/* Team Selector - for switching teams when no more matches */}
+        {showTeamSelector && (
+          <div className="fixed inset-0 z-50 flex items-end justify-center">
+            {/* Backdrop */}
+            <div
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in"
+              onClick={() => setShowTeamSelector(false)}
+            />
+
+            {/* Sheet */}
+            <div className="relative w-full max-w-md bg-white dark:bg-surface-dark rounded-t-3xl p-6 pb-safe animate-slide-up shadow-2xl">
+              <div className="w-12 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-6" />
+
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Chọn đội đi "cáp kèo"</h3>
+
+              <div className="space-y-3 max-h-[60vh] overflow-y-auto no-scrollbar">
+                {adminTeams.map((team) => (
+                  <button
+                    key={team.id}
+                    onClick={() => handleTeamChange(team.id)}
+                    className={`w-full flex items-center gap-4 p-3 rounded-2xl border transition-all active:scale-[0.98] ${selectedTeam?.id === team.id
+                      ? 'bg-primary/10 border-primary'
+                      : 'bg-gray-50 dark:bg-white/5 border-transparent hover:bg-gray-100 dark:hover:bg-white/10'
+                      }`}
+                  >
+                    <TeamAvatar src={team.logo} />
+                    <div className="flex-1 text-left">
+                      <h4 className={`font-bold ${selectedTeam?.id === team.id ? 'text-primary' : 'text-slate-900 dark:text-white'}`}>
+                        {team.name}
+                      </h4>
+                      <p className="text-xs text-gray-500">Quản trị viên</p>
+                    </div>
+                    {selectedTeam?.id === team.id && (
+                      <div className="size-6 bg-primary rounded-full flex items-center justify-center text-black">
+                        <Icon name="check" className="text-sm" />
+                      </div>
+                    )}
+                  </button>
+                ))}
+
+                {/* Add new team option */}
+                <button
+                  onClick={() => {
+                    setShowTeamSelector(false);
+                    navigate(appRoutes.teamsCreate);
+                  }}
+                  className="w-full flex items-center justify-center gap-2 p-4 rounded-2xl border border-dashed border-gray-300 dark:border-gray-600 text-gray-500 hover:text-primary hover:border-primary transition-colors"
+                >
+                  <Icon name="add" />
+                  <span className="font-medium">Tạo đội mới</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Match Modal - must be rendered outside overflow-hidden container */}
         <MatchModal
           isOpen={!!matchedTeam}
           matchedTeam={matchedTeam}
           myTeamLogo={selectedTeam?.logo}
           myTeamName={selectedTeam?.name}
-          onViewMatch={goToMatchDetail}
+          onViewMatch={handleViewMatch}
           onKeepSwiping={closeMatchModal}
         />
+
+        {/* Invite Match Modal */}
+        {inviteModalMatchId && selectedTeam && (
+          <InviteMatchModal
+            isOpen={!!inviteModalMatchId}
+            matchId={inviteModalMatchId}
+            myTeam={{ id: selectedTeam.id, name: selectedTeam.name, logo: selectedTeam.logo }}
+            onClose={handleCloseInviteModal}
+            onSuccess={handleInviteSuccess}
+          />
+        )}
       </>
+    );
+  }
+
+  // Empty state - no teams at all
+  if (flowState === 'no-teams') {
+    return (
+      <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark pb-safe-with-nav">
+        {/* Header */}
+        <div className="pt-12 pb-2 px-4 flex items-center">
+          <button
+            onClick={() => navigate(appRoutes.dashboard)}
+            className="size-10 flex items-center justify-center rounded-full bg-white/10 backdrop-blur-md hover:bg-white/20 transition-colors mr-4"
+          >
+            <Icon name="arrow_back" />
+          </button>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white">Tìm kèo</h1>
+        </div>
+
+        {/* Empty State */}
+        <div className="flex flex-col items-center justify-center flex-1 p-6">
+          <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-6">
+            <Icon name="groups" className="text-primary text-5xl" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
+            Chưa có đội bóng
+          </h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 text-center mb-6 max-w-sm">
+            Bạn cần tạo đội để tìm kèo đấu. Hãy tạo đội mới của bạn và bắt đầu kết nối với các đội bóng khác.
+          </p>
+          <Button
+            icon="add"
+            onClick={() => navigate(appRoutes.teamsCreate)}
+          >
+            Tạo đội ngay
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Empty state - has teams but not admin of any
+  if (flowState === 'has-teams-not-admin') {
+    return (
+      <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark pb-safe-with-nav">
+        {/* Header */}
+        <div className="pt-12 pb-2 px-4 flex items-center">
+          <button
+            onClick={() => navigate(appRoutes.dashboard)}
+            className="size-10 flex items-center justify-center rounded-full bg-white/10 backdrop-blur-md hover:bg-white/20 transition-colors mr-4"
+          >
+            <Icon name="arrow_back" />
+          </button>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white">Tìm kèo</h1>
+        </div>
+
+        {/* Empty State */}
+        <div className="flex flex-col items-center justify-center flex-1 p-6">
+          <div className="w-24 h-24 rounded-full bg-amber-500/10 flex items-center justify-center mb-6">
+            <Icon name="admin_panel_settings" className="text-amber-500 text-5xl" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
+            Cần quyền quản trị viên
+          </h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 text-center mb-6 max-w-sm">
+            Bạn đang tham gia {myTeams.length} đội nhưng chưa là quản trị viên của đội nào. Hãy tạo đội mới hoặc liên hệ quản trị viên để được cấp quyền tìm kèo.
+          </p>
+          <div className="flex flex-col gap-3 w-full max-w-xs">
+            <Button
+              icon="add"
+              onClick={() => navigate(appRoutes.teamsCreate)}
+            >
+              Tạo đội mới
+            </Button>
+            <button
+              onClick={() => navigate(appRoutes.teams)}
+              className="px-6 py-3 rounded-xl bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 font-bold"
+            >
+              Xem đội của tôi
+            </button>
+          </div>
+        </div>
+      </div>
     );
   }
 
@@ -237,236 +482,367 @@ const FindMatchScreen: React.FC = () => {
 
         {/* Refreshing indicator */}
         {isRefreshing && (
-          <div className="fixed top-0 left-0 right-0 z-50 bg-primary/10 py-2 text-center text-xs text-primary font-medium safe-area-top">
+          <div className="fixed top-4 left-0 right-0 z-50 bg-primary/10 py-2 text-center text-xs text-primary font-medium safe-area-top">
             Đang làm mới...
           </div>
         )}
 
-      {/* Header */}
-      <div className="relative z-50 pt-4 px-4 flex justify-between items-center safe-area-top">
-        <button
-          onClick={() => navigate(appRoutes.dashboard)}
-          className="size-10 flex items-center justify-center rounded-full bg-white/10 backdrop-blur-md hover:bg-white/20 transition-colors"
-        >
-          <Icon name="arrow_back" />
-        </button>
-
-        {/* Team Selector Trigger */}
-        {selectedTeam && (
+        {/* Header */}
+        <div className="relative z-50 pt-12 pb-2 px-4 flex justify-center shrink-0">
+          {/* Team Selector Trigger - Always show */}
           <div
             onClick={() => setShowTeamSelector(true)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/80 backdrop-blur-md border border-white/10 cursor-pointer hover:scale-105 transition-transform active:scale-95 mx-2"
+            className="flex items-center gap-2 bg-surface-light/80 dark:bg-surface-dark/80 backdrop-blur-md pl-4 pr-5 py-2 rounded-full shadow-lg border border-white/5 cursor-pointer hover:bg-surface-light hover:dark:bg-surface-dark transition-colors group"
           >
-            <div className="relative flex h-2 w-2 shrink-0">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
+            <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center group-hover:bg-primary/30 transition-colors">
+              <Icon name="groups" className="text-primary text-[16px]" />
             </div>
-            <p className="text-white text-xs font-bold truncate">
-              <span className="text-primary">{selectedTeam.name}</span>
+            <p className="text-slate-900 dark:text-white text-sm font-medium leading-normal">
+              {selectedTeam ? (
+                <>
+                  Đội của bạn: <span className="text-primary font-bold">{selectedTeam.name}</span>
+                </>
+              ) : (
+                <span className="text-primary font-bold">Chọn đội để tìm kèo</span>
+              )}
             </p>
-            <Icon name="expand_more" className="text-sm text-gray-400 shrink-0" />
+            <Icon name="expand_more" className="text-text-secondary text-[16px] ml-1" />
+          </div>
+
+          {/* Back Button - Absolute positioned left */}
+          <button
+            onClick={() => navigate(appRoutes.dashboard)}
+            className="absolute left-4 top-1/2 -translate-y-1/2 size-10 flex items-center justify-center rounded-full bg-white/10 backdrop-blur-md hover:bg-white/20 transition-colors"
+          >
+            <Icon name="arrow_back" />
+          </button>
+
+          {/* Filter Button - Absolute positioned right */}
+          <button
+            onClick={() => {
+              setShowFilterSheet(true);
+            }}
+            className="absolute right-4 top-1/2 -translate-y-1/2 size-10 flex items-center justify-center rounded-full bg-white/10 backdrop-blur-md hover:bg-white/20 transition-colors"
+          >
+            <Icon name="tune" />
+          </button>
+        </div>
+
+        {/* Card Stack Area */}
+        <div className="flex-1 relative w-full flex flex-col items-center justify-center p-4 z-10 overflow-visible">
+          {/* Decorative Stack Layers (To give depth feel) */}
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 -translate-y-1/2 -translate-y-2 w-[82%] h-[calc(100%-24px)] bg-surface-light/40 dark:bg-surface-dark/40 rounded-[2.5rem] border border-white/5 z-0 pointer-events-none"></div>
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -translate-y-1 w-[82%] h-[calc(100%-24px)] bg-surface-light/70 dark:bg-surface-dark/70 rounded-[2.5rem] border border-white/5 z-10 shadow-lg backdrop-blur-sm pointer-events-none"></div>
+
+          {/* Refreshing skeleton overlay */}
+          {isRefreshing && currentTeam && (
+            <div className="absolute w-full max-w-[360px] h-[72vh] max-h-[660px] bg-surface-light/90 dark:bg-surface-dark/90 rounded-[2.5rem] z-50 flex flex-col items-center justify-center backdrop-blur-sm animate-fade-in">
+              <div className="flex flex-col items-center gap-4">
+                <div className="w-16 h-16 rounded-full border-4 border-primary/30 border-t-primary animate-spin" />
+                <p className="text-sm font-medium text-slate-900 dark:text-white">Đang tìm kèo mới...</p>
+                <p className="text-xs text-gray-500">Đang áp dụng bộ lọc</p>
+              </div>
+            </div>
+          )}
+
+          {Array.from({ length: Math.min(2, allTeams.length - currentIndex) }).map((_, index) => {
+            const team = allTeams[currentIndex + index];
+            if (!team) return null;
+
+            return (
+              <div
+                key={team.id}
+                ref={index === 0 ? cardRef : null}
+                style={getCardStyle(index)}
+                className="absolute w-full max-w-[360px] h-[72vh] max-h-[660px] bg-surface-light dark:bg-surface-dark rounded-[2.5rem] shadow-card flex flex-col overflow-hidden border border-gray-200 dark:border-white/10 group cursor-grab active:cursor-grabbing select-none"
+                onTouchStart={index === 0 ? handleTouchStart : undefined}
+                onTouchMove={index === 0 ? handleTouchMove : undefined}
+                onTouchEnd={index === 0 ? handleTouchEnd : undefined}
+                onMouseDown={index === 0 ? handleTouchStart : undefined}
+                onMouseMove={index === 0 ? handleTouchMove : undefined}
+                onMouseUp={index === 0 ? handleTouchEnd : undefined}
+                onMouseLeave={index === 0 ? handleTouchEnd : undefined}
+              >
+                {/* Swipe Overlay Indicators */}
+                {index === 0 && (
+                  <>
+                    <div
+                      className="absolute top-8 left-8 z-30 border-4 border-green-500 rounded-lg px-4 py-1 transform -rotate-12 pointer-events-none transition-opacity"
+                      style={{ opacity: likeOpacity }}
+                    >
+                      <span className="text-4xl font-black text-green-500 uppercase tracking-widest">LIKE</span>
+                    </div>
+                    <div
+                      className="absolute top-8 right-8 z-30 border-4 border-red-500 rounded-lg px-4 py-1 transform rotate-12 pointer-events-none transition-opacity"
+                      style={{ opacity: nopeOpacity }}
+                    >
+                      <span className="text-4xl font-black text-red-500 uppercase tracking-widest">NOPE</span>
+                    </div>
+                  </>
+                )}
+
+                {/* Image */}
+                <div className="relative h-[35%] w-full bg-surface-light overflow-hidden shrink-0">
+                  {team.logo ? (
+                    <div
+                      className="absolute inset-0 bg-cover bg-center"
+                      style={{ backgroundImage: `url('${team.logo}')` }}
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-primary to-green-600 flex items-center justify-center">
+                      <span className="text-white text-6xl font-bold">{team.name?.charAt(0) || 'T'}</span>
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-surface-light/60 dark:bg-surface-dark/60 backdrop-blur-[2px]" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-surface-light dark:from-surface-dark via-transparent to-transparent" />
+
+                  {/* Compatibility Badge - Top Left - Using qualityScore */}
+                  <div className="absolute top-4 left-4 flex flex-col gap-1 items-start">
+                    <div className="px-3 py-1 bg-primary/20 backdrop-blur-md border border-primary/30 rounded-lg flex items-center gap-1.5">
+                      <div className="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
+                      <span className="text-slate-900 dark:text-white text-xs font-bold uppercase tracking-wide">
+                        {Math.round((team.qualityScore || 0) * 100)}% Hợp cạ
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 flex flex-col pt-16 px-6 pb-6 items-center text-center bg-surface-light dark:bg-surface-dark w-full" onClick={handleClickCard}>
+                  {/* Circular Team Logo - Centered at top-[22%] */}
+                  <div className="absolute top-[22%] left-1/2 -translate-x-1/2 z-10">
+                    <div className="w-28 h-28 rounded-full p-1.5 bg-surface-light dark:bg-surface-dark shadow-2xl">
+                      <div className="w-full h-full rounded-full overflow-hidden bg-surface-light border border-gray-200 dark:border-white/10 relative">
+                        {team.logo ? (
+                          <img src={team.logo} className="w-full h-full object-cover" alt="logo" />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-br from-primary to-green-600 flex items-center justify-center text-white font-bold text-2xl">
+                            {team.name?.charAt(0) || 'T'}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Team name + verified badge - CENTER */}
+                  <div className="flex flex-col items-center gap-1 mb-2">
+                    <h2 className="text-slate-900 dark:text-white text-2xl font-display font-bold tracking-tight flex items-center gap-2">
+                      {team.name}
+                      {(team.qualityScore || 0) >= 0.8 && (
+                        <Icon name="verified" className="text-primary text-[22px]" />
+                      )}
+                    </h2>
+                    <div className="flex items-center gap-1.5">
+                      {/* Online status - green dot for active within 1 hour */}
+                      {team.lastActive && (() => {
+                        const now = Date.now();
+                        const lastActiveTime = new Date(team.lastActive).getTime();
+                        const hoursDiff = (now - lastActiveTime) / (1000 * 60 * 60);
+                        const isToday = new Date(team.lastActive).toDateString() === new Date().toDateString();
+
+                        if (hoursDiff < 1) {
+                          return (
+                            <div className="flex items-center gap-1">
+                              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
+                              <span className="text-emerald-400 text-xs font-medium">Đang hoạt động</span>
+                            </div>
+                          );
+                        } else if (isToday) {
+                          return (
+                            <span className="text-text-secondary text-xs font-medium">
+                              Hoạt động {new Date(team.lastActive).toLocaleDateString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          );
+                        }
+                        return null;
+                      })()}
+                    </div>
+                    <span className="text-text-secondary text-sm font-medium">
+                      {team.location?.address || '...'}
+                    </span>
+                  </div>
+
+                  {/* Badges: Level + Members */}
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="px-3 py-1 rounded-lg bg-primary/10 border border-primary/20 flex items-center gap-1.5">
+                      <Icon name="military_tech" className="text-primary text-[16px]" />
+                      <span className="text-primary text-xs font-bold uppercase tracking-wide">{team.level || '-'}</span>
+                    </div>
+                    <div className="px-3 py-1 rounded-lg bg-white/5 border border-white/10 flex items-center gap-1.5">
+                      <Icon name="groups" className="text-text-secondary text-[16px]" />
+                      <span className="text-text-secondary text-xs font-bold">{team.membersCount || 0} Thành viên</span>
+                    </div>
+                  </div>
+
+                  {/* Description - max 2 lines, or show joined date if empty */}
+                  <p className="text-gray-400 text-sm leading-relaxed line-clamp-2 px-2 mb-6">
+                    {team.description
+                      ? team.description
+                      : `Tham gia CapKeoSport từ ${new Date((team as unknown as Team).createdAt || '').toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })}`}
+                  </p>
+
+                  {/* Stats Grid với Progress Bars - 3 cols */}
+                  <div className="w-full grid grid-cols-3 gap-3 mb-auto">
+                    {team.stats?.attack && (
+                      <div className="bg-surface-light/50 dark:bg-surface-dark/50 rounded-2xl p-3 flex flex-col items-center gap-1 border border-gray-200 dark:border-white/5 shadow-inner-light">
+                        <span className="text-[10px] text-text-secondary uppercase font-bold tracking-wider">Tấn công</span>
+                        <span className="text-lg font-bold text-slate-900 dark:text-white">{team.stats.attack}</span>
+                        <div className="w-full h-1.5 bg-white/10 rounded-full mt-1 overflow-hidden">
+                          <div className="h-full bg-emerald-400 rounded-full" style={{ width: `${team.stats.attack}%` }}></div>
+                        </div>
+                      </div>
+                    )}
+                    {team.stats?.defense && (
+                      <div className="bg-surface-light/50 dark:bg-surface-dark/50 rounded-2xl p-3 flex flex-col items-center gap-1 border border-gray-200 dark:border-white/5 shadow-inner-light">
+                        <span className="text-[10px] text-text-secondary uppercase font-bold tracking-wider">Phòng thủ</span>
+                        <span className="text-lg font-bold text-slate-900 dark:text-white">{team.stats.defense}</span>
+                        <div className="w-full h-1.5 bg-white/10 rounded-full mt-1 overflow-hidden">
+                          <div className="h-full bg-blue-400 rounded-full" style={{ width: `${team.stats.defense}%` }}></div>
+                        </div>
+                      </div>
+                    )}
+                    {team.stats?.technique && (
+                      <div className="bg-surface-light/50 dark:bg-surface-dark/50 rounded-2xl p-3 flex flex-col items-center gap-1 border border-gray-200 dark:border-white/5 shadow-inner-light">
+                        <span className="text-[10px] text-text-secondary uppercase font-bold tracking-wider">Kỹ thuật</span>
+                        <span className="text-lg font-bold text-slate-900 dark:text-white">{team.stats.technique}</span>
+                        <div className="w-full h-1.5 bg-white/10 rounded-full mt-1 overflow-hidden">
+                          <div className="h-full bg-purple-400 rounded-full" style={{ width: `${team.stats.technique}%` }}></div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Info Grid - 2 cols: Sân bóng, Cách xa */}
+                  <div className="w-full grid grid-cols-2 gap-3 mt-4">
+                    <div className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-surface-light dark:bg-surface-dark border border-gray-200 dark:border-white/5">
+                      <Icon name="sports_soccer" className="text-primary text-[20px]" />
+                      <div className="flex flex-col items-start">
+                        <span className="text-[10px] text-text-secondary uppercase font-bold">Sân bóng</span>
+                        <span className="text-sm font-bold text-slate-900 dark:text-white">{team.pitch?.join(' & ') || 'Sân 5 & 7'}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-surface-light dark:bg-surface-dark border border-gray-200 dark:border-white/5">
+                      <Icon name="near_me" className="text-primary text-[20px]" />
+                      <div className="flex flex-col items-start">
+                        <span className="text-[10px] text-text-secondary uppercase font-bold">Cách xa</span>
+                        <span className="text-sm font-bold text-slate-900 dark:text-white">{formatDistance(team.distance)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Swipe Actions */}
+        <div className="relative z-20 w-full flex items-center justify-center gap-10 pb-12 pt-4 px-6 shrink-0">
+          {/* Close button */}
+          <button
+            onClick={() => removeCard('left')}
+            disabled={!currentTeam || selectedTeam?.userRole !== 'admin'}
+            className="group flex items-center justify-center w-[72px] h-[72px] rounded-full bg-surface-light dark:bg-surface-dark text-text-secondary shadow-lg border border-gray-200 dark:border-white/5 hover:bg-gray-200 dark:hover:bg-surface-light hover:text-slate-900 dark:hover:text-white transition-all duration-300 active:scale-90 disabled:opacity-50"
+          >
+            <Icon name="close" className="text-[32px] group-hover:rotate-12 transition-transform duration-300" />
+          </button>
+
+          {/* Favorite button */}
+          <button
+            onClick={() => removeCard('right')}
+            disabled={!currentTeam || selectedTeam?.userRole !== 'admin'}
+            className="group flex items-center justify-center w-[84px] h-[84px] rounded-full bg-primary text-background-dark shadow-glow shadow-primary/40 hover:shadow-primary/60 hover:scale-105 transition-all duration-300 active:scale-95 border-4 border-background-light dark:border-background-dark disabled:opacity-50"
+          >
+            <Icon name="favorite" className="text-[40px] filled group-hover:scale-110 transition-transform duration-200" />
+          </button>
+        </div>
+
+        {/* Admin-only blocker for non-admin users */}
+        {selectedTeam && selectedTeam.userRole !== 'admin' && (
+          <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+            <div className="bg-white dark:bg-surface-dark rounded-3xl p-6 mx-6 max-w-sm shadow-2xl text-center animate-fade-in">
+              <div className="w-16 h-16 rounded-full bg-amber-500/10 flex items-center justify-center mx-auto mb-4">
+                <Icon name="admin_panel_settings" className="text-amber-500 text-3xl" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">
+                Cần quyền quản trị viên
+              </h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 leading-relaxed">
+                Bạn không phải là quản trị viên của đội <span className="font-semibold text-slate-900 dark:text-white">{selectedTeam.name}</span>. Chỉ quản trị viên mới có thể tìm kèo đấu.
+              </p>
+              <Button
+                icon="groups"
+                onClick={() => setShowTeamSelector(true)}
+                className="w-full"
+              >
+                Chọn đội khác
+              </Button>
+            </div>
           </div>
         )}
 
-        {/* Filter Button */}
-        <button
-          onClick={() => {
-            setShowFilterSheet(true);
-          }}
-          className="size-10 flex items-center justify-center rounded-full bg-white/10 backdrop-blur-md hover:bg-white/20 transition-colors"
-        >
-          <Icon name="tune" />
-        </button>
-      </div>
-
-      {/* Card Stack Area */}
-      <div className="flex-1 flex items-center justify-center p-4 z-10 relative mt-4">
-        {Array.from({ length: Math.min(2, allTeams.length - currentIndex) }).map((_, index) => {
-          const team = allTeams[currentIndex + index];
-          if (!team) return null;
-
-          return (
+        {/* Team Selector Bottom Sheet */}
+        {showTeamSelector && (
+          <div className="fixed inset-0 z-50 flex items-end justify-center">
+            {/* Backdrop */}
             <div
-              key={team.id}
-              ref={index === 0 ? cardRef : null}
-              style={getCardStyle(index)}
-              className="absolute w-full max-w-sm aspect-[3/4] max-h-[65vh] bg-white dark:bg-surface-dark rounded-3xl shadow-2xl border border-gray-200 dark:border-white/10 overflow-hidden flex flex-col group cursor-grab active:cursor-grabbing select-none"
-              onTouchStart={index === 0 ? handleTouchStart : undefined}
-              onTouchMove={index === 0 ? handleTouchMove : undefined}
-              onTouchEnd={index === 0 ? handleTouchEnd : undefined}
-              onMouseDown={index === 0 ? handleTouchStart : undefined}
-              onMouseMove={index === 0 ? handleTouchMove : undefined}
-              onMouseUp={index === 0 ? handleTouchEnd : undefined}
-              onMouseLeave={index === 0 ? handleTouchEnd : undefined}
-            >
-              {/* Swipe Overlay Indicators */}
-              {index === 0 && (
-                <>
-                  <div
-                    className="absolute top-8 left-8 z-30 border-4 border-green-500 rounded-lg px-4 py-1 transform -rotate-12 pointer-events-none transition-opacity"
-                    style={{ opacity: likeOpacity }}
-                  >
-                    <span className="text-4xl font-black text-green-500 uppercase tracking-widest">LIKE</span>
-                  </div>
-                  <div
-                    className="absolute top-8 right-8 z-30 border-4 border-red-500 rounded-lg px-4 py-1 transform rotate-12 pointer-events-none transition-opacity"
-                    style={{ opacity: nopeOpacity }}
-                  >
-                    <span className="text-4xl font-black text-red-500 uppercase tracking-widest">NOPE</span>
-                  </div>
-                </>
-              )}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in"
+              onClick={() => setShowTeamSelector(false)}
+            />
 
-              {/* Image */}
-              <div className="relative h-[55%] w-full pointer-events-none">
-                {team.logo ? (
-                  <img src={team.logo} alt={team.name} className="w-full h-full object-cover" />
+            {/* Sheet */}
+            <div className="relative w-full max-w-md bg-white dark:bg-surface-dark rounded-t-3xl p-6 pb-safe animate-slide-up shadow-2xl">
+              <div className="w-12 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-6" />
+
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Chọn đội đi "cáp kèo"</h3>
+
+              <div className="space-y-3 max-h-[60vh] overflow-y-auto no-scrollbar">
+                {adminTeams.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
+                    <Icon name="admin_panel_settings" className="text-4xl text-gray-400 mb-3" />
+                    <p className="text-sm text-gray-500 mb-1">Bạn chưa là quản trị viên của đội nào</p>
+                    <p className="text-xs text-gray-400">Hãy tạo đội mới hoặc liên hệ quản trị viên để cấp quyền</p>
+                  </div>
                 ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-primary to-green-600 flex items-center justify-center">
-                    <span className="text-white text-6xl font-bold">{team.name?.charAt(0) || 'T'}</span>
-                  </div>
+                  adminTeams.map((team) => (
+                    <button
+                      key={team.id}
+                      onClick={() => handleTeamChange(team.id)}
+                      className={`w-full flex items-center gap-4 p-3 rounded-2xl border transition-all active:scale-[0.98] ${selectedTeam?.id === team.id
+                        ? 'bg-primary/10 border-primary'
+                        : 'bg-gray-50 dark:bg-white/5 border-transparent hover:bg-gray-100 dark:hover:bg-white/10'
+                        }`}
+                    >
+                      <TeamAvatar src={team.logo} />
+                      <div className="flex-1 text-left">
+                        <h4 className={`font-bold ${selectedTeam?.id === team.id ? 'text-primary' : 'text-slate-900 dark:text-white'}`}>
+                          {team.name}
+                        </h4>
+                        <p className="text-xs text-gray-500">Quản trị viên</p>
+                      </div>
+                      {selectedTeam?.id === team.id && (
+                        <div className="size-6 bg-primary rounded-full flex items-center justify-center text-black">
+                          <Icon name="check" className="text-sm" />
+                        </div>
+                      )}
+                    </button>
+                  ))
                 )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
 
-                <div className="absolute top-4 right-4 flex flex-col gap-1 items-end">
-                  <MatchBadge type="match" value={Math.round((team.qualityScore || 0) * 100)} />
-                </div>
-              </div>
-
-              {/* Content */}
-              <div className="flex-1 px-5 pb-5 flex flex-col items-center -mt-16 relative z-20" onClick={handleClickCard}>
-                {/* Logo */}
-                <div className="size-16 rounded-full border-4 border-white dark:border-surface-dark bg-surface-dark p-0.5 shadow-lg mb-1">
-                  {team.logo ? (
-                    <img src={team.logo} className="w-full h-full rounded-full object-cover" alt="logo" />
-                  ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-primary to-green-600 flex items-center justify-center text-white font-bold text-xl">
-                      {team.name?.charAt(0) || 'T'}
-                    </div>
-                  )}
-                </div>
-
-                <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-1 flex items-center gap-2">
-                  {team.name}
-                  <Icon name="info" className="text-gray-400 text-lg" />
-                </h2>
-
-                <div className="flex items-center gap-2 text-xs font-medium text-gray-400 mb-4">
-                  <div className="flex items-center gap-1">
-                    <Icon name="location_on" className="text-sm" /> {formatDistance(team.distance)}
-                  </div>
-                  <span>•</span>
-                  <div className="flex items-center gap-1">{team.level}</div>
-                </div>
-
-                {/* Members */}
-                <div className="flex items-center justify-center gap-4 mb-4 w-full text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-white/5 py-2 rounded-xl border border-gray-100 dark:border-white/5">
-                  <div className="flex items-center gap-1.5">
-                    <Icon name="groups" className="text-gray-400" />
-                    <span className="font-semibold">{team.membersCount || '-'} thành viên</span>
-                  </div>
-                </div>
-
-                {/* Stats Grid */}
-                <div className="grid grid-cols-3 gap-2 w-full">
-                  <div className="flex flex-col items-center p-2 bg-red-50 dark:bg-red-900/10 rounded-xl border border-red-100 dark:border-red-900/20">
-                    <Icon name="flash_on" className="text-red-500 text-lg mb-1" />
-                    <span className="text-sm font-bold text-slate-900 dark:text-white">{team.stats?.attack || '-'}</span>
-                  </div>
-                  <div className="flex flex-col items-center p-2 bg-blue-50 dark:bg-blue-900/10 rounded-xl border border-blue-100 dark:border-blue-900/20">
-                    <Icon name="shield" className="text-blue-500 text-lg mb-1" />
-                    <span className="text-sm font-bold text-slate-900 dark:text-white">{team.stats?.defense || '-'}</span>
-                  </div>
-                  <div className="flex flex-col items-center p-2 bg-green-50 dark:bg-green-900/10 rounded-xl border border-green-100 dark:border-green-900/20">
-                    <Icon name="sports_soccer" className="text-green-500 text-lg mb-1" />
-                    <span className="text-sm font-bold text-slate-900 dark:text-white">{team.stats?.technique || '-'}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Swipe Actions */}
-      <div className="pb-8 pt-2 px-4 flex items-center justify-center gap-8 z-20">
-        <button
-          onClick={() => removeCard('left')}
-          disabled={!currentTeam}
-          className="size-16 rounded-full bg-surface-dark border border-white/10 shadow-lg flex items-center justify-center text-red-500 hover:scale-110 active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Icon name="close" className="text-3xl" />
-        </button>
-
-        <button className="size-12 rounded-full bg-surface-dark border border-white/10 shadow-lg flex items-center justify-center text-blue-400 hover:scale-110 active:scale-95 transition-transform">
-          <Icon name="star" className="text-2xl" />
-        </button>
-
-        <button
-          onClick={() => removeCard('right')}
-          disabled={!currentTeam}
-          className="size-16 rounded-full bg-primary shadow-glow flex items-center justify-center text-black hover:scale-110 active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Icon name="favorite" className="text-4xl" filled />
-        </button>
-      </div>
-
-      {/* Team Selector Bottom Sheet */}
-      {showTeamSelector && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center">
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in"
-            onClick={() => setShowTeamSelector(false)}
-          />
-
-          {/* Sheet */}
-          <div className="relative w-full max-w-md bg-white dark:bg-surface-dark rounded-t-3xl p-6 pb-safe animate-slide-up shadow-2xl">
-            <div className="w-12 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-6" />
-
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Chọn đội đi "cáp kèo"</h3>
-
-            <div className="space-y-3 max-h-[60vh] overflow-y-auto no-scrollbar">
-              {myTeams.map((team) => (
+                {/* Add new team option */}
                 <button
-                  key={team.id}
-                  onClick={() => handleTeamChange(team.id)}
-                  className={`w-full flex items-center gap-4 p-3 rounded-2xl border transition-all active:scale-[0.98] ${
-                    selectedTeam?.id === team.id
-                      ? 'bg-primary/10 border-primary'
-                      : 'bg-gray-50 dark:bg-white/5 border-transparent hover:bg-gray-100 dark:hover:bg-white/10'
-                  }`}
+                  onClick={() => {
+                    setShowTeamSelector(false);
+                    navigate(appRoutes.teamsCreate);
+                  }}
+                  className="w-full flex items-center justify-center gap-2 p-4 rounded-2xl border border-dashed border-gray-300 dark:border-gray-600 text-gray-500 hover:text-primary hover:border-primary transition-colors"
                 >
-                  <TeamAvatar src={team.logo} />
-                  <div className="flex-1 text-left">
-                    <h4 className={`font-bold ${selectedTeam?.id === team.id ? 'text-primary' : 'text-slate-900 dark:text-white'}`}>
-                      {team.name}
-                    </h4>
-                    <p className="text-xs text-gray-500">{team.isCaptain ? 'Quản trị viên' : 'Thành viên'}</p>
-                  </div>
-                  {selectedTeam?.id === team.id && (
-                    <div className="size-6 bg-primary rounded-full flex items-center justify-center text-black">
-                      <Icon name="check" className="text-sm" />
-                    </div>
-                  )}
+                  <Icon name="add" />
+                  <span className="font-medium">Tạo đội mới</span>
                 </button>
-              ))}
-
-              {/* Add new team option */}
-              <button
-                onClick={() => {
-                  setShowTeamSelector(false);
-                  navigate(appRoutes.teamsCreate);
-                }}
-                className="w-full flex items-center justify-center gap-2 p-4 rounded-2xl border border-dashed border-gray-300 dark:border-gray-600 text-gray-500 hover:text-primary hover:border-primary transition-colors"
-              >
-                <Icon name="add" />
-                <span className="font-medium">Tạo đội mới</span>
-              </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
       </div>
 
       {/* Filter Bottom Sheet - outside overflow-hidden container */}
@@ -482,9 +858,20 @@ const FindMatchScreen: React.FC = () => {
         matchedTeam={matchedTeam}
         myTeamLogo={selectedTeam?.logo}
         myTeamName={selectedTeam?.name}
-        onViewMatch={goToMatchDetail}
+        onViewMatch={handleViewMatch}
         onKeepSwiping={closeMatchModal}
       />
+
+      {/* Invite Match Modal */}
+      {inviteModalMatchId && selectedTeam && (
+        <InviteMatchModal
+          isOpen={!!inviteModalMatchId}
+          matchId={inviteModalMatchId}
+          myTeam={{ id: selectedTeam.id, name: selectedTeam.name, logo: selectedTeam.logo }}
+          onClose={handleCloseInviteModal}
+          onSuccess={handleInviteSuccess}
+        />
+      )}
     </>
   );
 };

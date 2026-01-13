@@ -6,6 +6,9 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://api.ca
 // Import centralized types
 import { ApiResponse, User, AuthTokens } from '@/types/api.types';
 
+// Import auth store helpers for token management
+import { getTokens, updateTokens as updateStoreTokens } from '@/stores/auth.store';
+
 // Create axios instance with default configuration
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
@@ -15,62 +18,25 @@ const apiClient: AxiosInstance = axios.create({
   },
 });
 
-// Helper to get token from zustand storage
+// Helper to get token from auth store (non-reactive)
 const getAccessToken = (): string | null => {
-  // Read from zustand persist storage
-  try {
-    const zustandStorage = localStorage.getItem('auth-storage');
-    console.log({zustandStorage});
-    
-    if (zustandStorage) {
-      const parsed = JSON.parse(zustandStorage);
-      const token = parsed?.state?.tokens?.accessToken;
-      if (token) return token;
-    }
-  } catch (e) {
-    console.warn('Failed to read token from zustand storage:', e);
-  }
-
-  return null;
+  return getTokens().accessToken;
 };
 
-// Helper to get refresh token from zustand storage
+// Helper to get refresh token from auth store (non-reactive)
 const getRefreshToken = (): string | null => {
-  try {
-    const zustandStorage = localStorage.getItem('auth-storage');
-    if (zustandStorage) {
-      const parsed = JSON.parse(zustandStorage);
-      const token = parsed?.state?.tokens?.refreshToken;
-      if (token) return token;
-    }
-  } catch (e) {
-    console.warn('Failed to read refresh token from zustand storage:', e);
-  }
-
-  return null;
+  return getTokens().refreshToken;
 };
 
-// Helper to update tokens and user in zustand storage
+// Helper to update tokens in auth store (non-reactive)
 const updateTokens = (newTokens: AuthTokens, newUser?: User): void => {
-  try {
-    const zustandStorage = localStorage.getItem('auth-storage');
-    if (zustandStorage) {
-      const parsed = JSON.parse(zustandStorage);
-      parsed.state.tokens = newTokens;
-      if (newUser) {
-        parsed.state.user = newUser;
-      }
-      localStorage.setItem('auth-storage', JSON.stringify(parsed));
-    }
-  } catch (e) {
-    console.warn('Failed to update zustand storage:', e);
-  }
+  updateStoreTokens(newTokens, newUser);
 };
 
 // Request interceptor to add auth token
 apiClient.interceptors.request.use(
   (config) => {
-    // Add auth token from zustand persist storage
+    // Add auth token from auth store
     const token = getAccessToken();
 
     if (token) {
@@ -160,7 +126,7 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true;
       isRefreshing = true;
 
-      // Get refresh token from zustand storage
+      // Get refresh token from auth store
       const refreshToken = getRefreshToken();
 
       if (!refreshToken) {
@@ -186,8 +152,8 @@ apiClient.interceptors.response.use(
           // Response structure: { success: true, data: { user, tokens } }
           const { user, tokens: newTokens } = response.data.data;
 
-          // Update zustand storage with both user and tokens
-          updateTokens(newTokens);
+          // Update auth store with both user and tokens
+          updateTokens(newTokens, user);
 
           // Update original request with new token
           originalRequest.headers.Authorization = `Bearer ${newTokens.accessToken}`;

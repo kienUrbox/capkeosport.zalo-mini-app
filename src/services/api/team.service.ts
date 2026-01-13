@@ -87,16 +87,29 @@ export interface TeamMember {
   id: string;
   userId: string;
   teamId: string;
-  role: 'CAPTAIN' | 'PLAYER' | 'SUBSTITUTE';
+  role: 'admin' | 'member' | 'CAPTAIN' | 'PLAYER' | 'SUBSTITUTE';
   position?: string; // e.g., "Captain", "Forward", "Midfielder", etc.
+  jerseyNumber?: number;
+  permissions?: Record<string, any>;
   user?: {
     id: string;
     name: string;
     avatar?: string;
+    banner?: string;
     phone?: string;
+    position?: string;
+    jerseyNumber?: number;
+    bio?: string;
+    playerStats?: {
+      attack: number;
+      defense: number;
+      technique: number;
+    };
   };
   joinedAt: string;
-  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  isActive?: boolean;
 }
 
 // Add Member DTO

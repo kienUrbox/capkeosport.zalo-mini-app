@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Header, Icon, Button, EmptyState, ErrorState } from '@/components/ui';
 import { appRoutes } from '@/utils/navigation';
 import { TeamService } from '@/services/api/team.service';
+import { useMyTeams } from '@/stores/team.store';
 import type { TeamMember } from '@/services/api/team.service';
 
 /**
@@ -23,6 +24,11 @@ const TeamMembersScreen: React.FC = () => {
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
   const [showActionSheet, setShowActionSheet] = useState(false);
   const [showAddMethodSheet, setShowAddMethodSheet] = useState(false);
+
+  // Check user role in this team
+  const myTeams = useMyTeams();
+  const currentTeam = myTeams.find(t => t.id === teamId);
+  const isCurrentUserAdmin = currentTeam?.userRole === 'admin' || currentTeam?.userRole === 'captain';
 
   useEffect(() => {
     const fetchMembers = async () => {
@@ -79,7 +85,10 @@ const TeamMembersScreen: React.FC = () => {
   };
 
   const getRoleLabel = (member: TeamMember) => {
-    // Check position first (from API response)
+    // Priority: user.position > member.position > role
+    if (member.user?.position) {
+      return member.user.position;
+    }
     if (member.position) {
       return member.position;
     }
@@ -101,19 +110,28 @@ const TeamMembersScreen: React.FC = () => {
   };
 
   const getRoleBadgeLabel = (member: TeamMember) => {
-    // Check admin by role or position
-    if (member.role === 'admin' || member.position === 'Captain') {
-      if (member.role === 'admin') return 'Quản trị viên';
+    // Check admin by role
+    if (member.role === 'admin') return 'Quản trị viên';
+    if (member.role === 'CAPTAIN') return 'Đội trưởng';
+    if (member.position === 'Captain') return 'Đội trưởng';
+    if (member.user?.position?.toLowerCase() === 'đội trưởng' || member.user?.position?.toLowerCase() === 'captain') {
       return 'Đội trưởng';
     }
-    if (member.role === 'CAPTAIN') return 'Đội trưởng';
     return 'Thành viên';
   };
 
   const isAdmin = (member: TeamMember) => {
     return member.role === 'CAPTAIN' ||
            member.role === 'admin' ||
-           member.position === 'Captain';
+           member.position === 'Captain' ||
+           member.user?.position?.toLowerCase() === 'đội trưởng' ||
+           member.user?.position?.toLowerCase() === 'captain';
+  };
+
+  const getJerseyNumber = (member: TeamMember) => {
+    // Priority: user.jerseyNumber > member.jerseyNumber
+    if (member.user?.jerseyNumber) return member.user.jerseyNumber;
+    return member.jerseyNumber;
   };
 
   return (
@@ -150,7 +168,7 @@ const TeamMembersScreen: React.FC = () => {
           {members.map((member) => (
             <div
               key={member.id}
-              onClick={() => navigate(appRoutes.memberProfile(teamId || '', member.id), { state: { member } })}
+              onClick={() => navigate(appRoutes.memberProfile(teamId || '', member.id), { state: { member, team: currentTeam } })}
               className="flex items-center gap-3 bg-white dark:bg-surface-dark p-3 rounded-xl border border-gray-100 dark:border-white/5 shadow-sm active:scale-[0.99] transition-transform cursor-pointer"
             >
               <div className="relative">
@@ -186,27 +204,31 @@ const TeamMembersScreen: React.FC = () => {
                   </span>
                 </div>
               </div>
-              <button
-                onClick={(e) => openActionSheet(e, member)}
-                className="size-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 active:bg-gray-200"
-              >
-                <Icon name="more_vert" />
-              </button>
+              {isCurrentUserAdmin && (
+                <button
+                  onClick={(e) => openActionSheet(e, member)}
+                  className="size-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 active:bg-gray-200"
+                >
+                  <Icon name="more_vert" />
+                </button>
+              )}
             </div>
           ))}
         </div>
       )}
 
-      {/* Floating Add Button */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-background-light dark:from-background-dark via-background-light/80 dark:via-background-dark/80 to-transparent z-10 pointer-events-none flex justify-center pb-8">
-        <button
-          onClick={() => setShowAddMethodSheet(true)}
-          className="pointer-events-auto h-12 px-6 rounded-full bg-primary text-black font-bold shadow-lg shadow-primary/30 flex items-center gap-2 active:scale-95 transition-transform"
-        >
-          <Icon name="person_add" />
-          Thêm thành viên
-        </button>
-      </div>
+      {/* Floating Add Button - Admin only */}
+      {isCurrentUserAdmin && (
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-background-light dark:from-background-dark via-background-light/80 dark:via-background-dark/80 to-transparent z-10 pointer-events-none flex justify-center pb-8">
+          <button
+            onClick={() => setShowAddMethodSheet(true)}
+            className="pointer-events-auto h-12 px-6 rounded-full bg-primary text-black font-bold shadow-lg shadow-primary/30 flex items-center gap-2 active:scale-95 transition-transform"
+          >
+            <Icon name="person_add" />
+            Thêm thành viên
+          </button>
+        </div>
+      )}
 
       {/* --- BOTTOM SHEETS --- */}
 
@@ -242,7 +264,7 @@ const TeamMembersScreen: React.FC = () => {
             <div className="space-y-2">
               <button
                 onClick={() => {
-                  navigate(appRoutes.memberProfile(teamId || '', selectedMember.id), { state: { member: selectedMember } });
+                  navigate(appRoutes.memberProfile(teamId || '', selectedMember.id), { state: { member: selectedMember, team: currentTeam } });
                   closeActionSheet();
                 }}
                 className="w-full flex items-center gap-3 p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"

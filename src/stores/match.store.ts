@@ -8,6 +8,8 @@ import {
   type FinishMatchDto,
   type CancelMatchDto,
   type RematchDto,
+  type SendMatchRequestDto,
+  type UpdateMatchRequestDto,
 } from '@/services/api/match.service';
 
 // Simplified match types for UI
@@ -45,6 +47,8 @@ export interface Match {
   location: string;
   status: MatchStatus;
   type?: 'matched' | 'received' | 'sent' | 'accepted';
+  requestedByTeam?: string;
+  acceptedByTeam?: string;
 }
 
 // Map API match status to UI status
@@ -69,6 +73,45 @@ const needsConfirmation = (apiMatch: ApiMatch): boolean => {
   return apiMatch.status === 'ACCEPTED';
 };
 
+/**
+ * Get match stage based on date/time
+ * @param date - Match date in format DD/MM/YYYY or ISO string
+ * @param time - Match time in format HH:mm
+ * @returns 'upcoming' | 'live' | 'finished'
+ */
+const getMatchStage = (date: string, time: string): 'upcoming' | 'live' | 'finished' => {
+  try {
+    // Parse date and time
+    // Handle both DD/MM/YYYY and ISO formats
+    let dateTimeStr = date;
+    if (date.includes('/')) {
+      // Convert DD/MM/YYYY to YYYY-MM-DD
+      const [day, month, year] = date.split('/');
+      dateTimeStr = `${year}-${month}-${day}`;
+    }
+    const dateTime = new Date(`${dateTimeStr}T${time}`);
+
+    const now = new Date();
+    const matchTime = dateTime.getTime();
+    const currentTime = now.getTime();
+
+    // Match duration: 2 hours (assume standard match duration)
+    const matchDuration = 2 * 60 * 60 * 1000; // 2 hours in ms
+    const matchEndTime = matchTime + matchDuration;
+
+    if (currentTime < matchTime) {
+      return 'upcoming'; // Match hasn't started
+    } else if (currentTime >= matchTime && currentTime < matchEndTime) {
+      return 'live'; // Match is in progress
+    } else {
+      return 'finished'; // Match has ended
+    }
+  } catch (error) {
+    console.error('[getMatchStage] Error parsing date/time:', error);
+    return 'upcoming'; // Default to upcoming if parsing fails
+  }
+};
+
 // Transform API match to UI match
 const transformApiMatch = (
   apiMatch: ApiMatch,
@@ -84,7 +127,7 @@ const transformApiMatch = (
       break;
     case 'REQUESTED':
       // Check if current team sent or received the request
-      if (apiMatch.requestedBy === currentTeamId) {
+      if (apiMatch.requestedByTeam === currentTeamId) {
         type = 'sent';
       } else {
         type = 'received';
@@ -104,6 +147,23 @@ const transformApiMatch = (
       type = undefined;
   }
 
+  // Get match date/time from API response
+  const matchDate = apiMatch.date || apiMatch.proposedDate || '';
+  const matchTime = apiMatch.time || apiMatch.proposedTime || '';
+
+  // Determine UI status based on API status
+  let uiStatus = mapApiStatusToUiStatus(apiMatch.status);
+
+  // For CONFIRMED matches, check if they should be 'live' or 'finished'
+  if (apiMatch.status === 'CONFIRMED') {
+    const stage = getMatchStage(matchDate, matchTime);
+    if (stage === 'live') {
+      uiStatus = 'live';
+    } else if (stage === 'finished') {
+      uiStatus = 'finished';
+    }
+  }
+
   return {
     id: apiMatch.id,
     teamA: {
@@ -120,11 +180,13 @@ const transformApiMatch = (
     },
     scoreA: apiMatch.score?.teamA,
     scoreB: apiMatch.score?.teamB,
-    time: apiMatch.time || apiMatch.proposedTime || 'TBD',
-    date: apiMatch.date || apiMatch.proposedDate || 'TBD',
+    time: matchTime || 'TBD',
+    date: matchDate || 'TBD',
     location: apiMatch.location?.address || apiMatch.proposedPitch || 'TBD',
-    status: mapApiStatusToUiStatus(apiMatch.status),
+    status: uiStatus,
     type,
+    requestedByTeam: apiMatch.requestedByTeam,
+    acceptedByTeam: apiMatch.acceptedByTeam,
   };
 };
 
@@ -188,6 +250,8 @@ interface MatchState {
   // Match Action Methods
   acceptMatch: (matchId: string) => Promise<void>;
   declineMatch: (matchId: string) => Promise<void>;
+  sendMatchRequest: (matchId: string, data: SendMatchRequestDto) => Promise<void>;
+  updateMatchRequest: (matchId: string, data: UpdateMatchRequestDto) => Promise<void>;
   confirmMatch: (matchId: string, data: ConfirmMatchDto) => Promise<void>;
   finishMatch: (matchId: string, data: FinishMatchDto) => Promise<void>;
   cancelMatch: (matchId: string, data: CancelMatchDto) => Promise<void>;
@@ -322,7 +386,7 @@ export const useMatchStore = create<MatchState>()(
           }
 
           const response = await MatchService.getMatches({
-            statuses: ['CONFIRMED'], // Lịch đấu
+            statuses: ['CONFIRMED'], // Lịch đấu (includes upcoming, live, and finished based on date/time)
             teamId,
             page,
             limit: 20
@@ -332,11 +396,14 @@ export const useMatchStore = create<MatchState>()(
             const matches = Array.isArray(response.data.matches) ? response.data.matches : [];
             const transformedMatches = matches.map((m) => transformApiMatch(m, teamId));
 
-            // Update state
+            // Separate matches into upcoming (upcoming + live) and live
+            // Note: We keep live matches in upcomingMatches for the "Lịch đấu" tab
+            // The card component will display them differently based on status
             set((state) => ({
               upcomingMatches: page === 1 || forceRefresh
                 ? transformedMatches
                 : [...state.upcomingMatches, ...transformedMatches],
+              liveMatches: transformedMatches.filter(m => m.status === 'live'),
               _fetchedTabs: teamId
                 ? {
                     ...state._fetchedTabs,
@@ -566,6 +633,44 @@ export const useMatchStore = create<MatchState>()(
           if (response.success) {
             // Match stays in upcoming but with CONFIRMED status
             // Will be updated on refresh
+          }
+        } catch (error: any) {
+          throw error;
+        }
+      },
+
+      sendMatchRequest: async (matchId: string, data: SendMatchRequestDto) => {
+        try {
+          const response = await MatchService.sendMatchRequest(matchId, data);
+          if (response.success && response.data) {
+            // Update match in pendingMatches
+            const currentTeamId = get().currentTeamId;
+            set((state) => ({
+              pendingMatches: state.pendingMatches.map((m) =>
+                m.id === matchId
+                  ? transformApiMatch(response.data, currentTeamId)
+                  : m
+              ),
+            }));
+          }
+        } catch (error: any) {
+          throw error;
+        }
+      },
+
+      updateMatchRequest: async (matchId: string, data: UpdateMatchRequestDto) => {
+        try {
+          const response = await MatchService.updateMatchRequest(matchId, data);
+          if (response.success && response.data) {
+            // Update match in pendingMatches
+            const currentTeamId = get().currentTeamId;
+            set((state) => ({
+              pendingMatches: state.pendingMatches.map((m) =>
+                m.id === matchId
+                  ? transformApiMatch(response.data, currentTeamId)
+                  : m
+              ),
+            }));
           }
         } catch (error: any) {
           throw error;

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Navigate } from 'react-router-dom'
-import { AuthService } from '@/services/api/services'
 import { zaloThreeStepAuthService } from '@/services/zalo-three-step-auth'
+import { useAuthStore, hasValidAuth } from '@/stores/auth.store'
 
 export interface ProtectedRouteProps {
   children: React.ReactNode
@@ -63,7 +63,9 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     console.log('🔒 ProtectedRoute: Checking authentication state...')
 
     try {
-      const authMethod = localStorage.getItem('auth_method')
+      // Use auth store to check auth method and status
+      const authStore = useAuthStore.getState()
+      const authMethod = authStore.metadata.authMethod
       console.log('- Auth method:', authMethod)
 
       let isAuthenticated = false
@@ -84,7 +86,8 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
           }
         }
       } else {
-        isAuthenticated = AuthService.isAuthenticated()
+        // Use hasValidAuth helper for general auth check
+        isAuthenticated = hasValidAuth()
         console.log('- General auth valid:', isAuthenticated)
       }
 

@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect } from 'react';
+import { useUIStore } from '@/stores/ui.store';
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -18,46 +19,24 @@ export const useTheme = () => {
   return context;
 };
 
+/**
+ * Theme Provider Component
+ *
+ * NOTE: This provider now uses ui.store.ts for theme state management.
+ * The theme is persisted via Zustand persist middleware.
+ *
+ * All localStorage operations have been moved to ui.store.ts
+ */
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [theme, setTheme] = useState<Theme>(() => {
-    const stored = localStorage.getItem('theme') as Theme;
-    return stored || 'system';
-  });
+  const { theme, setTheme, effectiveTheme } = useUIStore();
 
-  const [effectiveTheme, setEffectiveTheme] = useState<'light' | 'dark'>(() => {
-    if (typeof window === 'undefined') return 'light';
-    const systemPrefers = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    return systemPrefers ? 'dark' : 'light';
-  });
-
+  // Listen for system theme changes when theme is set to 'system'
   useEffect(() => {
-    const root = document.documentElement;
-
-    const updateTheme = () => {
-      let resolved: 'light' | 'dark';
-
-      if (theme === 'system') {
-        resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-      } else {
-        resolved = theme;
-      }
-
-      setEffectiveTheme(resolved);
-
-      if (resolved === 'dark') {
-        root.classList.add('dark');
-      } else {
-        root.classList.remove('dark');
-      }
-    };
-
-    updateTheme();
-
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+
     const handleChange = () => {
-      if (theme === 'system') {
-        updateTheme();
-      }
+      // Trigger updateEffectiveTheme in ui store
+      useUIStore.getState().updateEffectiveTheme();
     };
 
     mediaQuery.addEventListener('change', handleChange);
@@ -65,10 +44,6 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return () => {
       mediaQuery.removeEventListener('change', handleChange);
     };
-  }, [theme]);
-
-  useEffect(() => {
-    localStorage.setItem('theme', theme);
   }, [theme]);
 
   return (

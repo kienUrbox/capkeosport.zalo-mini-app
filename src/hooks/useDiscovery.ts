@@ -113,9 +113,14 @@ export const useDiscovery = (): UseDiscoveryReturn => {
   useEffect(() => {
     if (!hasFetched.current && selectedTeam) {
       const defaults = getDefaultFilters(selectedTeam.level, selectedTeam.gender);
-      // Only update if filters haven't been set by user (check persist storage)
-      const storedFilters = localStorage.getItem('discovery-storage');
-      if (!storedFilters || storedFilters === '{}') {
+      // Only update if filters haven't been set by user (check if filters are still default)
+      const currentFilters = useDiscoveryStore.getState().filters;
+      const isDefaultFilter =
+        currentFilters.center.lat === defaults.center.lat &&
+        currentFilters.center.lng === defaults.center.lng &&
+        currentFilters.radius === defaults.radius;
+
+      if (isDefaultFilter) {
         resetFilters(selectedTeam.level, selectedTeam.gender);
       }
     }

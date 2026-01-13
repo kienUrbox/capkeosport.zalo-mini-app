@@ -1,4 +1,7 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+
+type Theme = 'light' | 'dark' | 'system';
 
 interface UIState {
   // Bottom Nav
@@ -6,8 +9,10 @@ interface UIState {
   setActiveTab: (tab: string) => void;
 
   // Theme
-  isDarkMode: boolean;
-  toggleTheme: () => void;
+  theme: Theme;
+  setTheme: (theme: Theme) => void;
+  effectiveTheme: 'light' | 'dark';
+  updateEffectiveTheme: () => void;
 
   // Modals
   isModalOpen: boolean;
@@ -31,44 +36,109 @@ interface UIState {
   closeBottomSheet: () => void;
 }
 
-export const useUIStore = create<UIState>()((set) => ({
-  // Initial state
-  activeTab: 'home',
-  isDarkMode: true,
-  isModalOpen: false,
-  modalContent: null,
-  globalLoading: false,
-  toast: null,
-  isBottomSheetOpen: false,
-  bottomSheetContent: null,
+export const useUIStore = create<UIState>()(
+  persist(
+    (set, get) => ({
+      // Initial state
+      activeTab: 'home',
+      theme: 'system',
+      effectiveTheme: 'dark',
+      isModalOpen: false,
+      modalContent: null,
+      globalLoading: false,
+      toast: null,
+      isBottomSheetOpen: false,
+      bottomSheetContent: null,
 
-  // Actions
-  setActiveTab: (tab) => set({ activeTab: tab }),
+      // Actions
+      setActiveTab: (tab) => set({ activeTab: tab }),
 
-  toggleTheme: () => set((state) => ({ isDarkMode: !state.isDarkMode })),
+      setTheme: (theme) => {
+        set({ theme });
+        // Update effective theme immediately
+        get().updateEffectiveTheme();
+      },
 
-  openModal: (content) => set({ isModalOpen: true, modalContent: content }),
+      updateEffectiveTheme: () => {
+        const state = get();
+        let resolved: 'light' | 'dark';
 
-  closeModal: () => set({ isModalOpen: false, modalContent: null }),
+        if (state.theme === 'system') {
+          if (typeof window !== 'undefined') {
+            resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          } else {
+            resolved = 'light'; // Default for SSR
+          }
+        } else {
+          resolved = state.theme;
+        }
 
-  setGlobalLoading: (loading) => set({ globalLoading: loading }),
+        // Update DOM
+        if (typeof document !== 'undefined') {
+          const root = document.documentElement;
+          if (resolved === 'dark') {
+            root.classList.add('dark');
+          } else {
+            root.classList.remove('dark');
+          }
+        }
 
-  showToast: (message, type = 'info') =>
-    set({ toast: { message, type } }),
+        set({ effectiveTheme: resolved });
+      },
 
-  hideToast: () => set({ toast: null }),
+      openModal: (content) => set({ isModalOpen: true, modalContent: content }),
 
-  openBottomSheet: (content) =>
-    set({ isBottomSheetOpen: true, bottomSheetContent: content }),
+      closeModal: () => set({ isModalOpen: false, modalContent: null }),
 
-  closeBottomSheet: () =>
-    set({ isBottomSheetOpen: false, bottomSheetContent: null }),
-}));
+      setGlobalLoading: (loading) => set({ globalLoading: loading }),
+
+      showToast: (message, type = 'info') =>
+        set({ toast: { message, type } }),
+
+      hideToast: () => set({ toast: null }),
+
+      openBottomSheet: (content) =>
+        set({ isBottomSheetOpen: true, bottomSheetContent: content }),
+
+      closeBottomSheet: () =>
+        set({ isBottomSheetOpen: false, bottomSheetContent: null }),
+    }),
+    {
+      name: 'ui-storage',
+      partialize: (state) => ({
+        theme: state.theme,
+        activeTab: state.activeTab,
+      }),
+    }
+  )
+);
+
+// Initialize effective theme on mount
+if (typeof window !== 'undefined') {
+  // Update effective theme on store mount
+  useUIStore.getState().updateEffectiveTheme();
+
+  // Listen for system theme changes
+  const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+  const handleChange = () => {
+    const state = useUIStore.getState();
+    if (state.theme === 'system') {
+      useUIStore.getState().updateEffectiveTheme();
+    }
+  };
+  mediaQuery.addEventListener('change', handleChange);
+}
 
 // Selectors
 export const useActiveTab = () => useUIStore((state) => state.activeTab);
 
-export const useIsDarkMode = () => useUIStore((state) => state.isDarkMode);
+export const useThemeState = () => useUIStore((state) => ({
+  theme: state.theme,
+  effectiveTheme: state.effectiveTheme,
+  setTheme: state.setTheme,
+}));
+
+export const useIsDarkMode = () => useUIStore((state) => state.effectiveTheme === 'dark');
 
 export const useModal = () =>
   useUIStore((state) => ({

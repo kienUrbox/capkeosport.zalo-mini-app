@@ -7,6 +7,7 @@ export interface AddMemberBottomSheetProps {
   isOpen: boolean;
   onClose: () => void;
   teamId?: string;
+  onAddByPhone?: () => void;
 }
 
 /**
@@ -20,6 +21,7 @@ export const AddMemberBottomSheet: React.FC<AddMemberBottomSheetProps> = ({
   isOpen,
   onClose,
   teamId,
+  onAddByPhone,
 }) => {
   const navigate = useNavigate();
 
@@ -34,7 +36,10 @@ export const AddMemberBottomSheet: React.FC<AddMemberBottomSheetProps> = ({
 
   const handleAddByPhone = () => {
     onClose();
-    if (teamId) {
+    // Use callback if provided, otherwise navigate to add-member screen
+    if (onAddByPhone) {
+      onAddByPhone();
+    } else if (teamId) {
       navigate(appRoutes.memberAdd(teamId));
     }
   };
