@@ -42,7 +42,7 @@ interface AuthState {
   zaloThreeStepVerify: (data: ZaloThreeStepDto) => Promise<void>;
   refreshTokens: () => Promise<boolean>;
   checkAuth: () => Promise<void>;
-  getProfile: () => Promise<User>;
+  getProfile: (forceRefresh?: boolean) => Promise<User>;
   updateProfile: (data: UpdateProfileDto) => Promise<User>;
 }
 
@@ -289,11 +289,11 @@ export const useAuthStore = create<AuthState>()(
        * Get current user profile
        * GET /auth/profile
        */
-      getProfile: async (): Promise<User> => {
+      getProfile: async (forceRefresh = false): Promise<User> => {
         try {
           set({ isLoading: true, error: null });
 
-          const response = await api.get('/auth/profile');
+          const response = await api.get('/auth/profile', undefined, forceRefresh ? { noCache: true } : undefined);
 
           if (response.success && response.data) {
             set({ user: response.data, error: null });

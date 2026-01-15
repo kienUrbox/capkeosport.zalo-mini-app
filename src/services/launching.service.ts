@@ -1,6 +1,4 @@
 import { User } from '@/types/api.types';
-import { Team } from './api/team.service';
-import { AuthService } from './api/auth.service';
 import { getTokens } from '@/stores/auth.store';
 
 export interface LaunchResult {
@@ -42,10 +40,13 @@ class LaunchingService {
       }
 
       // Step 2: Load profile and teams IN PARALLEL
-      const [profileResult, teamsResult] = await Promise.all([
+      const results = await Promise.all([
         this.loadUserProfile(),
         this.loadMyTeams(),
       ]);
+
+      const profileResult = results[0];
+      const teamsResult = results[1];
 
       // Check if any API failed
       if (!profileResult.success) {
@@ -114,20 +115,15 @@ class LaunchingService {
   }
 
   /**
-   * Load user profile from API
+   * Load user profile from API and save to auth.store
    */
   private async loadUserProfile(): Promise<{ success: boolean; data?: User; error?: string }> {
     try {
-      const response = await AuthService.getProfile();
+      // Use auth.store.getProfile() which automatically saves to store
+      const { useAuthStore } = await import('@/stores/auth.store');
+      const user = await useAuthStore.getState().getProfile();
 
-      if (response.success && response.data) {
-        return { success: true, data: response.data };
-      } else {
-        return {
-          success: false,
-          error: response.message || 'Không thể tải thông tin người dùng',
-        };
-      }
+      return { success: true, data: user };
     } catch (error: any) {
       console.error('Error loading profile:', error);
       return {
@@ -138,21 +134,15 @@ class LaunchingService {
   }
 
   /**
-   * Load user's teams from API
+   * Load user's teams from API and save to store
+   * Uses teamStore.fetchMyTeams() which handles smart caching and persistence
    */
-  private async loadMyTeams(): Promise<{ success: boolean; data?: Team[]; error?: string }> {
+  private async loadMyTeams(): Promise<{ success: boolean; error?: string }> {
     try {
-      const { TeamService } = await import('./api/team.service');
-      const response = await TeamService.getMyTeams();
-
-      if (response.data) {
-        return { success: true, data: response.data };
-      } else {
-        return {
-          success: false,
-          error: response.message || 'Không thể tải danh sách đội',
-        };
-      }
+      const { useTeamStore } = await import('@/stores/team.store');
+      // Use store's fetchMyTeams which saves to store and has smart caching
+      await useTeamStore.getState().fetchMyTeams();
+      return { success: true };
     } catch (error: any) {
       console.error('Error loading teams:', error);
       return {

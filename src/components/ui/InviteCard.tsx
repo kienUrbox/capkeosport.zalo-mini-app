@@ -102,7 +102,7 @@ export const InviteCard: React.FC<InviteCardProps> = ({
         <div className="space-y-1 mb-3 px-2">
           {invite.role && (
             <p className="text-xs text-gray-500">
-              <span className="font-medium">Vai trò:</span> {invite.role === 'captain' ? 'Đội trưởng' : 'Thành viên'}
+              <span className="font-medium">Vai trò:</span> {invite.role === 'admin' ? 'Quản trị viên' : 'Thành viên'}
             </p>
           )}
           {invite.position && (
@@ -263,7 +263,7 @@ export const SentInviteCard: React.FC<SentInviteCardProps> = ({
           <p className="text-sm text-gray-500">
             {invite.position && `Vị trí: ${invite.position}`}
             {invite.position && invite.role && ' • '}
-            {invite.role && `${invite.role === 'captain' ? 'Đội trưởng' : 'Thành viên'}`}
+            {invite.role && `${invite.role === 'admin' ? 'Quản trị viên' : 'Thành viên'}`}
           </p>
         </div>
       </div>

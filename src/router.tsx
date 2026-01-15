@@ -38,7 +38,6 @@ import SwipeStatsScreen from './screens/swipe/stats';
 
 // Team Invitation Screens
 import MyInvitesScreen from './screens/invites/received';
-import SentInvitesScreen from './screens/teams/sent-invites';
 
 // Simple 404 component
 const NotFound = () => (
@@ -172,14 +171,6 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <ShareTeamScreen />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/teams/:teamId/invites/sent',
-    element: (
-      <ProtectedRoute>
-        <SentInvitesScreen />
       </ProtectedRoute>
     ),
   },

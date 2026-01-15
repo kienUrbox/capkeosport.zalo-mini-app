@@ -49,6 +49,7 @@ export {
   ScheduleUpcomingSkeleton,
   ScheduleHistorySkeleton,
   FindMatchSkeleton,
+  ProfileSkeleton,
 } from './Skeleton';
 
 // Empty States

@@ -89,6 +89,28 @@ export const FileService = {
   },
 
   /**
+   * Upload user avatar
+   * POST /files/user/avatar
+   */
+  uploadUserAvatar: async (
+    file: File,
+    onProgress?: (progress: number) => void
+  ): Promise<ApiResponse<FileEntity>> => {
+    return uploadFile(`/files/user/avatar`, file, onProgress);
+  },
+
+  /**
+   * Upload user banner
+   * POST /files/user/banner
+   */
+  uploadUserBanner: async (
+    file: File,
+    onProgress?: (progress: number) => void
+  ): Promise<ApiResponse<FileEntity>> => {
+    return uploadFile(`/files/user/banner`, file, onProgress);
+  },
+
+  /**
    * Get files by entity
    * GET /files/entity/:entityType/:entityId?fileType=logo
    */

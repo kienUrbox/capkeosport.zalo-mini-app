@@ -1,4 +1,5 @@
 import { api } from './index';
+import type { Match } from '@/types/api.types';
 
 // Team Gender Enum - Matches API documentation
 // Supports both enum values (MALE, FEMALE, MIXED) and Vietnamese strings (Nam, Nữ, Mixed)
@@ -62,10 +63,13 @@ export interface Team {
   membersCount?: number;
   status?: 'active' | 'archived';
   isActive?: boolean;
+  isArchived?: boolean;
   createdBy?: string;
   createdAt: string;
   updatedAt?: string;
   members?: TeamMemberDetail[];
+  userRole?: 'admin' | 'member'; // User's role in this team (from /teams/my-teams response)
+  recentMatches?: Match[]; // Recent matches (max 5) when includeRecentMatches=true is passed
 }
 
 // Team Member Detail (from team detail API response)
@@ -123,6 +127,11 @@ export interface UpdateMemberRoleDto {
   role: 'CAPTAIN' | 'PLAYER' | 'SUBSTITUTE';
 }
 
+// Update Member Admin Role DTO (for promote/demote)
+export interface UpdateMemberAdminRoleDto {
+  role: 'admin' | 'member';
+}
+
 /**
  * Team Service
  *
@@ -148,9 +157,19 @@ export const TeamService = {
   /**
    * Get team by ID
    * GET /teams/:id
+   * @param teamId - Team ID
+   * @param options - Optional query parameters
+   * @param options.includeRecentMatches - Include recent matches (max 5) in response
    */
-  getTeamById: async (teamId: string) => {
-    return api.get<Team>(`/teams/${teamId}`);
+  getTeamById: async (
+    teamId: string,
+    options?: { includeRecentMatches?: boolean }
+  ) => {
+    const params = options?.includeRecentMatches
+      ? { includeRecentMatches: 'true' }
+      : undefined;
+
+    return api.get<Team>(`/teams/${teamId}`, params ? { params } : undefined);
   },
 
   /**
@@ -203,6 +222,18 @@ export const TeamService = {
     roleDto: UpdateMemberRoleDto
   ) => {
     return api.patch<TeamMember>(`/teams/${teamId}/members/${memberId}`, roleDto);
+  },
+
+  /**
+   * Update member admin role (promote/demote)
+   * PUT /teams/:id/members/:memberId/role
+   */
+  updateMemberAdminRole: async (
+    teamId: string,
+    memberId: string,
+    role: 'admin' | 'member'
+  ) => {
+    return api.put(`/teams/${teamId}/members/${memberId}/role`, { role });
   },
 
   /**

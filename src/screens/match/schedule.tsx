@@ -15,9 +15,10 @@ import {
 } from '@/components/ui';
 import { appRoutes } from '@/utils/navigation';
 import { useScheduleData } from '@/hooks/useScheduleData';
-import { useMyTeams, useSelectedTeam, useTeamActions, useTeamStore, type UserRole } from '@/stores/team.store';
+import { useMyTeams, useSelectedTeam, useTeamActions, useTeamStore, hasAdminPermission } from '@/stores/team.store';
 import { useMatchActions } from '@/stores/match.store';
 import type { TabType } from '@/stores/match.store';
+import { toast } from '@/utils/toast';
 
 /**
  * MatchSchedule Screen
@@ -53,12 +54,8 @@ const MatchScheduleScreen: React.FC = () => {
   const myTeams = useMyTeams();
   const teamStore = useTeamStore();
   const currentTeam = useSelectedTeam();
-  const { setSelectedTeam, fetchMyTeams } = useTeamActions();
-
-  // Check if user has admin/captain permissions
-  const hasAdminPermission = (userRole?: UserRole): boolean => {
-    return userRole === 'admin' || userRole === 'captain';
-  };
+  
+  const { setSelectedTeam } = useTeamActions();
 
   // Check if current team can edit the request (only team who sent can edit)
   const canEditRequest = (match: { requestedByTeam?: string }): boolean => {
@@ -89,12 +86,6 @@ const MatchScheduleScreen: React.FC = () => {
   const currentScrollTop = useRef(0);
 
   const matchActions = useMatchActions();
-
-  // Simple toast helper
-  const showToast = (message: string) => {
-    // TODO: Implement proper toast
-    alert(message);
-  };
 
   const tabs = [
     { id: 'pending' as const, label: 'Chờ kèo' },
@@ -183,14 +174,6 @@ const MatchScheduleScreen: React.FC = () => {
     });
   };
 
-  // Fetch teams if not loaded
-  useEffect(() => {
-    if (myTeams.length === 0 && !teamStore.isLoading) {
-      fetchMyTeams();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // Show loading state while fetching teams
   if (teamStore.isLoading && myTeams.length === 0) {
     return (
@@ -241,9 +224,9 @@ const MatchScheduleScreen: React.FC = () => {
         refreshTab('pending'),
         refreshTab('upcoming'),
       ]);
-      showToast('Đã chấp nhận lời mời');
+      toast.success('Đã chấp nhận lời mời');
     } catch (err: any) {
-      showToast(err.message || 'Không thể chấp nhận lời mời');
+      toast.error(err.message || 'Không thể chấp nhận lời mời');
     }
   };
 
@@ -251,9 +234,9 @@ const MatchScheduleScreen: React.FC = () => {
     try {
       await matchActions.declineMatch(matchId);
       await refreshTab('pending');
-      showToast('Đã từ chối lời mời');
+      toast.success('Đã từ chối lời mời');
     } catch (err: any) {
-      showToast(err.message || 'Không thể từ chối lời mời');
+      toast.error(err.message || 'Không thể từ chối lời mời');
     }
   };
 
@@ -264,10 +247,10 @@ const MatchScheduleScreen: React.FC = () => {
       matchActions.cancelMatch(matchId, { reason })
         .then(() => {
           refreshTab('pending');
-          showToast('Đã hủy lời mời');
+          toast.success('Đã hủy lời mời');
         })
         .catch((err: any) => {
-          showToast(err.message || 'Không thể hủy lời mời');
+          toast.error(err.message || 'Không thể hủy lời mời');
         });
     }
   };
@@ -277,7 +260,7 @@ const MatchScheduleScreen: React.FC = () => {
       // Open invite modal to confirm/edit match details
       setInviteModalMatchId(matchId);
     } catch (err: any) {
-      showToast(err.message || 'Không thể chốt kèo');
+      toast.error(err.message || 'Không thể chốt kèo');
     }
   };
 
@@ -293,7 +276,7 @@ const MatchScheduleScreen: React.FC = () => {
   const handleInviteSuccess = async () => {
     setInviteModalMatchId(null);
     await Promise.all([refreshTab('pending'), refreshTab('upcoming')]);
-    showToast('Đã gửi lời mời');
+    toast.success('Đã gửi lời mời');
   };
 
   const handleEditRequest = (matchId: string) => {
@@ -308,14 +291,14 @@ const MatchScheduleScreen: React.FC = () => {
   const handleRequestSuccess = async () => {
     setRequestModalMatchId(null);
     await refreshTab('pending');
-    showToast(requestMode === 'send' ? 'Đã gửi lời mời' : 'Đã cập nhật lời mời');
+    toast.success(requestMode === 'send' ? 'Đã gửi lời mời' : 'Đã cập nhật lời mời');
   };
 
   const handleFinishMatch = async (matchId: string) => {
     try {
       navigate(appRoutes.matchUpdateScore(matchId));
     } catch (err: any) {
-      showToast(err.message || 'Không thể kết thúc trận đấu');
+      toast.error(err.message || 'Không thể kết thúc trận đấu');
     }
   };
 
@@ -323,7 +306,7 @@ const MatchScheduleScreen: React.FC = () => {
     try {
       navigate(appRoutes.matchUpdateScore(matchId));
     } catch (err: any) {
-      showToast(err.message || 'Không thể cập nhật tỉ số');
+      toast.error(err.message || 'Không thể cập nhật tỉ số');
     }
   };
 
@@ -331,7 +314,7 @@ const MatchScheduleScreen: React.FC = () => {
     try {
       navigate(appRoutes.matchRematch(matchId));
     } catch (err: any) {
-      showToast(err.message || 'Không thể mở màn hình tái đấu');
+      toast.error(err.message || 'Không thể mở màn hình tái đấu');
     }
   };
 
@@ -645,8 +628,7 @@ const MatchScheduleScreen: React.FC = () => {
                       {team.name}
                     </h4>
                     <p className="text-xs text-gray-500">
-                      {team.userRole === 'admin' ? 'Quản trị viên' :
-                       team.userRole === 'captain' ? 'Đội trưởng' : 'Thành viên'}
+                      {team.userRole === 'admin' ? 'Quản trị viên' : 'Thành viên'}
                     </p>
                   </div>
                   {currentTeam?.id === team.id && (
@@ -698,6 +680,7 @@ const MatchScheduleScreen: React.FC = () => {
               proposedDate: match.date,
               proposedTime: match.time,
               proposedPitch: match.location,
+              notes: match.notes,
             } : undefined}
             onClose={handleCloseRequestModal}
             onSuccess={handleRequestSuccess}

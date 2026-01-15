@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Header, Icon, Button, EmptyState, ErrorState } from '@/components/ui';
+import { Header, Icon, EmptyState, ErrorState, SentInviteCard, InvitationSkeleton } from '@/components/ui';
 import { appRoutes } from '@/utils/navigation';
 import { TeamService } from '@/services/api/team.service';
-import { useMyTeams } from '@/stores/team.store';
+import { useMyTeams, useSentInvites, useTeamActions, useTeamStore } from '@/stores/team.store';
+import { useUser } from '@/stores/auth.store';
 import type { TeamMember } from '@/services/api/team.service';
+import type { TeamInvite } from '@/types/api.types';
+import { toast } from '@/utils/toast';
 
 /**
  * TeamMembers Screen
@@ -13,7 +16,13 @@ import type { TeamMember } from '@/services/api/team.service';
  * Floating "Thêm thành viên" button opens bottom sheet with 2 options:
  * - Add by phone
  * - Share link
+ *
+ * Tabs:
+ * - Cầu thủ: List all team members
+ * - Đang mời: List pending invites (admin can cancel)
  */
+type TabType = 'players' | 'pending';
+
 const TeamMembersScreen: React.FC = () => {
   const navigate = useNavigate();
   const { teamId } = useParams<{ teamId: string }>();
@@ -25,10 +34,44 @@ const TeamMembersScreen: React.FC = () => {
   const [showActionSheet, setShowActionSheet] = useState(false);
   const [showAddMethodSheet, setShowAddMethodSheet] = useState(false);
 
+  // Tab state
+  const [activeTab, setActiveTab] = useState<TabType>('players');
+  const [pendingInvites, setPendingInvites] = useState<TeamInvite[]>([]);
+  const [isInvitesLoading, setIsInvitesLoading] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  // Store hooks
+  const sentInvites = useSentInvites();
+  const { fetchSentInvites, cancelInvite } = useTeamActions();
+  const currentUser = useUser();
+
   // Check user role in this team
   const myTeams = useMyTeams();
   const currentTeam = myTeams.find(t => t.id === teamId);
-  const isCurrentUserAdmin = currentTeam?.userRole === 'admin' || currentTeam?.userRole === 'captain';
+  const isCurrentUserAdmin = currentTeam?.userRole === 'admin';
+
+  // Load pending invites when switching to pending tab
+  useEffect(() => {
+    if (activeTab === 'pending' && teamId) {
+      loadPendingInvites();
+    }
+  }, [activeTab, teamId]);
+
+  const loadPendingInvites = async () => {
+    if (!teamId) return;
+
+    setIsInvitesLoading(true);
+    try {
+      await fetchSentInvites(teamId, { status: 'pending' });
+      // Filter for pending only from the store
+      const pending = sentInvites.filter(i => i.status === 'pending');
+      setPendingInvites(pending);
+    } catch (error) {
+      console.error('Failed to load pending invites:', error);
+    } finally {
+      setIsInvitesLoading(false);
+    }
+  };
 
   useEffect(() => {
     const fetchMembers = async () => {
@@ -68,19 +111,116 @@ const TeamMembersScreen: React.FC = () => {
   };
 
   const handleDeleteMember = async () => {
-    if (!selectedMember || !teamId) return;
+    if (!selectedMember || !teamId || !currentTeam) return;
+
+    // Permission check
+    if (!isCurrentUserAdmin) {
+      toast.error('Chỉ admin mới có quyền xóa thành viên');
+      return;
+    }
+
+    // Cannot delete yourself
+    if (selectedMember.userId === currentUser?.id) {
+      toast.error('Không thể xóa chính mình. Hãy dùng tính năng rời đội.');
+      return;
+    }
+
+    // Confirmation dialog
+    if (!confirm(`Bạn có chắc muốn xóa ${selectedMember.user?.name} khỏi đội?`)) {
+      return;
+    }
 
     try {
       const response = await TeamService.removeMember(teamId, selectedMember.id);
       if (response.success) {
+        toast.success('Đã xóa thành viên khỏi đội');
         setMembers((prev) => prev.filter((m) => m.id !== selectedMember.id));
         closeActionSheet();
       } else {
-        alert('Không thể xóa thành viên');
+        toast.error(response.error?.message || 'Không thể xóa thành viên');
       }
     } catch (error) {
       console.error('Failed to remove member:', error);
-      alert('Có lỗi xảy ra');
+      toast.error('Có lỗi xảy ra');
+    }
+  };
+
+  const handlePromoteToAdmin = async () => {
+    if (!selectedMember || !teamId || !currentTeam) return;
+
+    if (!isCurrentUserAdmin) {
+      toast.error('Chỉ admin mới có quyền thăng cấp');
+      return;
+    }
+    if (isAdmin(selectedMember)) {
+      toast.error('Thành viên này đã là admin rồi');
+      return;
+    }
+
+    try {
+      const teamStore = useTeamStore.getState();
+      await teamStore.updateMemberAdminRole(teamId, selectedMember.id, 'admin');
+
+      toast.success(`Đã thăng ${selectedMember.user?.name} làm admin`);
+      closeActionSheet();
+
+      // Refresh members list
+      const response = await TeamService.getTeamMembers(teamId);
+      if (response.success && response.data) {
+        setMembers(response.data);
+      }
+    } catch (error) {
+      console.error('Failed to promote member:', error);
+      toast.error('Không thể thăng cấp thành viên');
+    }
+  };
+
+  const handleDemoteToMember = async () => {
+    if (!selectedMember || !teamId || !currentTeam) return;
+
+    if (!isCurrentUserAdmin) {
+      toast.error('Chỉ admin mới có quyền hạ cấp');
+      return;
+    }
+    if (!isAdmin(selectedMember)) {
+      toast.error('Chỉ có thể hạ cấp admin');
+      return;
+    }
+
+    // Confirmation
+    if (!confirm(`Bạn có chắc muốn hạ cấp ${selectedMember.user?.name} xuống thành viên?`)) {
+      return;
+    }
+
+    try {
+      const teamStore = useTeamStore.getState();
+      await teamStore.updateMemberAdminRole(teamId, selectedMember.id, 'member');
+
+      toast.success(`Đã hạ cấp ${selectedMember.user?.name} xuống thành viên`);
+      closeActionSheet();
+
+      // Refresh members list
+      const response = await TeamService.getTeamMembers(teamId);
+      if (response.success && response.data) {
+        setMembers(response.data);
+      }
+    } catch (error) {
+      console.error('Failed to demote member:', error);
+      toast.error('Không thể hạ cấp thành viên');
+    }
+  };
+
+  const handleCancelInvite = async (inviteId: string) => {
+    if (!confirm('Bạn có chắc muốn hủy lời mời này?')) return;
+
+    setIsProcessing(true);
+    try {
+      await cancelInvite(inviteId);
+      await loadPendingInvites(); // Refresh list
+    } catch (error) {
+      console.error('Failed to cancel invite:', error);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -94,8 +234,6 @@ const TeamMembersScreen: React.FC = () => {
     }
     // Fallback to role
     switch (member.role) {
-      case 'CAPTAIN':
-        return 'Đội trưởng';
       case 'admin':
         return 'Cầu thủ';
       case 'PLAYER':
@@ -112,7 +250,6 @@ const TeamMembersScreen: React.FC = () => {
   const getRoleBadgeLabel = (member: TeamMember) => {
     // Check admin by role
     if (member.role === 'admin') return 'Quản trị viên';
-    if (member.role === 'CAPTAIN') return 'Đội trưởng';
     if (member.position === 'Captain') return 'Đội trưởng';
     if (member.user?.position?.toLowerCase() === 'đội trưởng' || member.user?.position?.toLowerCase() === 'captain') {
       return 'Đội trưởng';
@@ -121,100 +258,156 @@ const TeamMembersScreen: React.FC = () => {
   };
 
   const isAdmin = (member: TeamMember) => {
-    return member.role === 'CAPTAIN' ||
-           member.role === 'admin' ||
+    return member.role === 'admin' ||
            member.position === 'Captain' ||
            member.user?.position?.toLowerCase() === 'đội trưởng' ||
            member.user?.position?.toLowerCase() === 'captain';
   };
 
-  const getJerseyNumber = (member: TeamMember) => {
-    // Priority: user.jerseyNumber > member.jerseyNumber
-    if (member.user?.jerseyNumber) return member.user.jerseyNumber;
-    return member.jerseyNumber;
-  };
-
   return (
     <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark pb-safe">
-      <Header title={`Thành viên (${members.length})`} onBack={() => navigate(-1)} />
+      <Header title="Thành viên" onBack={() => navigate(-1)} />
 
-      {/* Loading State */}
-      {isLoading && (
-        <div className="flex-1 flex items-center justify-center p-8">
-          <div className="text-center">
-            <Icon name="refresh" className="animate-spin text-4xl text-primary mb-4 mx-auto" />
-            <p className="text-sm text-gray-500">Đang tải danh sách thành viên...</p>
-          </div>
+      {/* Tabs - Only for admin */}
+      {isCurrentUserAdmin && (
+        <div className="flex border-b border-gray-200 dark:border-white/10 bg-white dark:bg-surface-dark">
+          <button
+            className={`flex-1 py-3 text-center font-medium transition-colors ${
+              activeTab === 'players'
+                ? 'text-primary border-b-2 border-primary'
+                : 'text-gray-500 dark:text-gray-400'
+            }`}
+            onClick={() => setActiveTab('players')}
+          >
+            Cầu thủ ({members.length})
+          </button>
+          <button
+            className={`flex-1 py-3 text-center font-medium transition-colors ${
+              activeTab === 'pending'
+                ? 'text-primary border-b-2 border-primary'
+                : 'text-gray-500 dark:text-gray-400'
+            }`}
+            onClick={() => setActiveTab('pending')}
+          >
+            Đang mời ({pendingInvites.length})
+          </button>
         </div>
       )}
 
-      {/* Error State */}
-      {!isLoading && error && (
-        <div className="flex-1 flex items-center justify-center p-4">
-          <ErrorState message={error} onRetry={() => window.location.reload()} />
-        </div>
-      )}
+      {/* Content based on active tab - non-admin always sees players */}
+      {!isCurrentUserAdmin || activeTab === 'players' ? (
+        <>
+          {/* Loading State */}
+          {isLoading && (
+            <div className="flex-1 flex items-center justify-center p-8">
+              <div className="text-center">
+                <Icon name="refresh" className="animate-spin text-4xl text-primary mb-4 mx-auto" />
+                <p className="text-sm text-gray-500">Đang tải danh sách thành viên...</p>
+              </div>
+            </div>
+          )}
 
-      {/* Empty State */}
-      {!isLoading && !error && members.length === 0 && (
-        <div className="flex-1 flex items-center justify-center p-4">
-          <EmptyState icon="group_off" title="Chưa có thành viên nào" description="Team này chưa có thành viên. Hãy mời thêm thành viên!" />
-        </div>
-      )}
+          {/* Error State */}
+          {!isLoading && error && (
+            <div className="flex-1 flex items-center justify-center p-4">
+              <ErrorState message={error} onRetry={() => window.location.reload()} />
+            </div>
+          )}
 
-      {/* Members List */}
-      {!isLoading && !error && members.length > 0 && (
-        <div className="p-4 space-y-3 overflow-y-auto pb-24">
-          {members.map((member) => (
-            <div
-              key={member.id}
-              onClick={() => navigate(appRoutes.memberProfile(teamId || '', member.id), { state: { member, team: currentTeam } })}
-              className="flex items-center gap-3 bg-white dark:bg-surface-dark p-3 rounded-xl border border-gray-100 dark:border-white/5 shadow-sm active:scale-[0.99] transition-transform cursor-pointer"
-            >
-              <div className="relative">
-                <div className="size-12 rounded-full overflow-hidden bg-gray-200 dark:bg-white/10">
-                  {member.user?.avatar ? (
-                    <img src={member.user.avatar} alt={member.user?.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Icon name="person" className="text-gray-400" />
+          {/* Empty State */}
+          {!isLoading && !error && members.length === 0 && (
+            <div className="flex-1 flex items-center justify-center p-4">
+              <EmptyState icon="group_off" title="Chưa có thành viên nào" description="Team này chưa có thành viên. Hãy mời thêm thành viên!" />
+            </div>
+          )}
+
+          {/* Members List */}
+          {!isLoading && !error && members.length > 0 && (
+            <div className="p-4 space-y-3 overflow-y-auto pb-24">
+              {members.map((member) => (
+                <div
+                  key={member.id}
+                  onClick={() => navigate(appRoutes.memberProfile(teamId || '', member.id), { state: { member, team: currentTeam } })}
+                  className="flex items-center gap-3 bg-white dark:bg-surface-dark p-3 rounded-xl border border-gray-100 dark:border-white/5 shadow-sm active:scale-[0.99] transition-transform cursor-pointer"
+                >
+                  <div className="relative">
+                    <div className="size-12 rounded-full overflow-hidden bg-gray-200 dark:bg-white/10">
+                      {member.user?.avatar ? (
+                        <img src={member.user.avatar} alt={member.user?.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Icon name="person" className="text-gray-400" />
+                        </div>
+                      )}
                     </div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-bold text-slate-900 dark:text-white text-sm truncate">
+                        {member.user?.name || 'Thành viên'}
+                      </h4>
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-xs text-gray-500 dark:text-text-secondary">
+                        {getRoleLabel(member)}
+                      </span>
+                      <span className="text-[10px] text-gray-300">•</span>
+                      <span
+                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                          isAdmin(member)
+                            ? 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-500'
+                            : 'bg-gray-100 dark:bg-white/5 text-gray-500'
+                        }`}
+                      >
+                        {getRoleBadgeLabel(member)}
+                      </span>
+                    </div>
+                  </div>
+                  {isCurrentUserAdmin && (
+                    <button
+                      onClick={(e) => openActionSheet(e, member)}
+                      className="size-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 active:bg-gray-200"
+                    >
+                      <Icon name="more_vert" />
+                    </button>
                   )}
                 </div>
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <h4 className="font-bold text-slate-900 dark:text-white text-sm truncate">
-                    {member.user?.name || 'Thành viên'}
-                  </h4>
-                </div>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-xs text-gray-500 dark:text-text-secondary">
-                    {getRoleLabel(member)}
-                  </span>
-                  <span className="text-[10px] text-gray-300">•</span>
-                  <span
-                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                      isAdmin(member)
-                        ? 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-500'
-                        : 'bg-gray-100 dark:bg-white/5 text-gray-500'
-                    }`}
-                  >
-                    {getRoleBadgeLabel(member)}
-                  </span>
-                </div>
-              </div>
-              {isCurrentUserAdmin && (
-                <button
-                  onClick={(e) => openActionSheet(e, member)}
-                  className="size-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 active:bg-gray-200"
-                >
-                  <Icon name="more_vert" />
-                </button>
-              )}
+              ))}
             </div>
-          ))}
-        </div>
+          )}
+        </>
+      ) : (
+        <>
+          {/* Pending Invites Tab */}
+          <div className="flex-1 p-4 overflow-y-auto pb-24">
+            {isInvitesLoading ? (
+              <div className="space-y-3">
+                <InvitationSkeleton />
+                <InvitationSkeleton />
+                <InvitationSkeleton />
+              </div>
+            ) : pendingInvites.length === 0 ? (
+              <div className="flex items-center justify-center min-h-[400px]">
+                <EmptyState
+                  icon="send"
+                  title="Chưa có lời mời nào"
+                  description="Không có lời mời đang chờ xử lý"
+                />
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {pendingInvites.map((invite) => (
+                  <SentInviteCard
+                    key={invite.id}
+                    invite={invite}
+                    onCancel={isCurrentUserAdmin ? () => handleCancelInvite(invite.id) : undefined}
+                    isLoading={isProcessing}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </>
       )}
 
       {/* Floating Add Button - Admin only */}
@@ -276,11 +469,27 @@ const TeamMembersScreen: React.FC = () => {
               </button>
 
               {!isAdmin(selectedMember) && (
-                <button className="w-full flex items-center gap-3 p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                <button
+                  onClick={handlePromoteToAdmin}
+                  className="w-full flex items-center gap-3 p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                >
                   <div className="size-10 rounded-full bg-yellow-500/10 flex items-center justify-center text-yellow-600">
                     <Icon name="security" />
                   </div>
                   <span className="font-semibold text-slate-900 dark:text-white">Thăng làm đội trưởng</span>
+                </button>
+              )}
+
+              {/* Show demote button for admin members (not yourself) */}
+              {isAdmin(selectedMember) && selectedMember.userId !== currentUser?.id && (
+                <button
+                  onClick={handleDemoteToMember}
+                  className="w-full flex items-center gap-3 p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                >
+                  <div className="size-10 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-600">
+                    <Icon name="arrow_downward" />
+                  </div>
+                  <span className="font-semibold text-slate-900 dark:text-white">Hạ cấp xuống thành viên</span>
                 </button>
               )}
 

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { DiscoveredTeam, DiscoveryResponse, DiscoveryStats } from '@/types/api.types';
+import type { DiscoveredTeam, DiscoveryResponse, DiscoveryStats, Match } from '@/types/api.types';
 import { DiscoveryFilterDto } from '@/types/api.types';
 import { TEAM_LEVELS, TEAM_GENDER } from '@/constants/design';
 import { api } from '@/services/api/index';
@@ -44,6 +44,7 @@ interface DiscoveryState {
 
   // Match state
   matchedTeam: DiscoveredTeam | null;
+  matchedMatch: Match | null;
 
   // Stats
   stats: DiscoveryStats | null;
@@ -59,6 +60,7 @@ interface DiscoveryState {
   setCurrentIndex: (index: number) => void;
   nextCard: () => void;
   setMatchedTeam: (team: DiscoveredTeam | null) => void;
+  setMatchedMatch: (match: Match | null) => void;
   setLoading: (loading: boolean) => void;
   setRefreshing: (refreshing: boolean) => void;
   setError: (error: string | null) => void;
@@ -123,6 +125,7 @@ export const useDiscoveryStore = create<DiscoveryState>()(
       isRefreshing: false,
       error: null,
       matchedTeam: null,
+      matchedMatch: null,
       stats: null,
       statsLoading: false,
       _fetchedStats: false,
@@ -158,6 +161,11 @@ export const useDiscoveryStore = create<DiscoveryState>()(
       setMatchedTeam: (team) =>
         set({
           matchedTeam: team,
+        }),
+
+      setMatchedMatch: (match) =>
+        set({
+          matchedMatch: match,
         }),
 
       setLoading: (loading) =>

@@ -307,83 +307,175 @@ export const FindMatchSkeleton: React.FC = () => {
       <div className="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-primary/10 to-transparent pointer-events-none z-0" />
 
       {/* Header Skeleton */}
-      <div className="relative z-50 pt-4 px-4 flex justify-between items-center safe-area-top">
-        <SkeletonBase className="h-10 w-10 rounded-full" />
-
-        {/* Team Selector Skeleton */}
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/80 backdrop-blur-md border border-white/10 mx-2">
-          <div className="relative flex h-2 w-2 shrink-0">
-            <SkeletonBase className="absolute inline-flex h-full w-full rounded-full" />
-          </div>
-          <SkeletonBase className="h-3 w-24" />
+      <div className="relative z-50 pt-12 pb-2 px-4 flex justify-center shrink-0">
+        {/* Team Selector Skeleton - Centered */}
+        <div className="flex items-center gap-2 bg-surface-light/80 dark:bg-surface-dark/80 backdrop-blur-md pl-4 pr-5 py-2 rounded-full shadow-lg border border-white/5">
+          <SkeletonBase className="h-6 w-6 rounded-full" />
+          <SkeletonBase className="h-4 w-32" />
           <SkeletonBase className="h-4 w-4" />
         </div>
 
-        {/* Filter Button Skeleton */}
-        <SkeletonBase className="h-10 w-10 rounded-full" />
+        {/* Back Button Skeleton - Absolute Left */}
+        <SkeletonBase className="absolute left-4 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full" />
+
+        {/* Filter Button Skeleton - Absolute Right */}
+        <SkeletonBase className="absolute right-4 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full" />
       </div>
 
       {/* Card Stack Skeleton */}
-      <div className="flex-1 flex items-center justify-center p-4 z-10 relative mt-4">
+      <div className="flex-1 flex items-center justify-center p-4 z-10 relative overflow-visible">
+        {/* Decorative Stack Layers */}
+        <SkeletonBase className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[calc(50%+8px)] w-[82%] h-[calc(100%-24px)] rounded-[2.5rem] border opacity-40" />
+        <SkeletonBase className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[calc(50%+4px)] w-[82%] h-[calc(100%-24px)] rounded-[2.5rem] border opacity-70" />
+
         {/* Main Card Skeleton */}
-        <div className="absolute w-full max-w-sm aspect-[3/4] max-h-[65vh] bg-white dark:bg-surface-dark rounded-3xl shadow-2xl border border-gray-200 dark:border-white/10 overflow-hidden flex flex-col">
-          {/* Image Area Skeleton */}
-          <div className="relative h-[55%] w-full">
+        <div className="relative w-full max-w-[360px] h-[72vh] max-h-[660px] bg-surface-light dark:bg-surface-dark rounded-[2.5rem] shadow-2xl border border-gray-200 dark:border-white/10 overflow-hidden flex flex-col">
+          {/* Image Area Skeleton - 35% height */}
+          <div className="relative h-[35%] w-full bg-surface-light overflow-hidden shrink-0">
             <SkeletonBase className="w-full h-full" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-            {/* Match Badge Skeleton */}
-            <div className="absolute top-4 right-4">
-              <SkeletonBase className="h-8 w-16 rounded-lg" />
-            </div>
+            <div className="absolute inset-0 bg-surface-light/60 dark:bg-surface-dark/60" />
+            <div className="absolute inset-0 bg-gradient-to-t from-surface-light dark:from-surface-dark via-transparent to-transparent" />
+
+            {/* Compatibility Badge Skeleton - Top Left */}
+            <SkeletonBase className="absolute top-4 left-4 h-7 w-24 rounded-lg" />
           </div>
 
           {/* Content Skeleton */}
-          <div className="flex-1 px-5 pb-5 flex flex-col items-center -mt-16 relative z-20">
-            {/* Logo Skeleton */}
-            <SkeletonBase className="size-16 rounded-full border-4 border-white dark:border-surface-dark mb-1" />
-
-            {/* Team Name Skeleton */}
-            <SkeletonBase className="h-7 w-40 mb-1 mt-2" />
-
-            {/* Location & Level Skeleton */}
-            <div className="flex items-center gap-2 mb-4">
-              <SkeletonBase className="h-4 w-16" />
-              <SkeletonBase className="h-4 w-1" />
-              <SkeletonBase className="h-4 w-12" />
+          <div className="flex-1 flex flex-col pt-16 px-6 pb-6 items-center bg-surface-light dark:bg-surface-dark">
+            {/* Circular Logo Skeleton - positioned at top-[22%] */}
+            <div className="absolute top-[22%] left-1/2 -translate-x-1/2 z-10">
+              <SkeletonBase className="w-28 h-28 rounded-full border-4 border-surface-light dark:border-surface-dark" />
             </div>
 
-            {/* Members Skeleton */}
-            <SkeletonBase className="h-10 w-full rounded-xl mb-4" />
+            {/* Team Name + Verified Badge Skeleton */}
+            <div className="flex items-center gap-2 mb-1">
+              <SkeletonBase className="h-7 w-40" />
+              <SkeletonBase className="h-6 w-6 rounded-full" />
+            </div>
 
-            {/* Stats Grid Skeleton */}
-            <div className="grid grid-cols-3 gap-2 w-full">
-              <div className="flex flex-col items-center p-2 rounded-xl border border-gray-100 dark:border-white/5">
-                <SkeletonBase className="h-5 w-5 rounded-full mb-1" />
-                <SkeletonBase className="h-4 w-6" />
+            {/* Online Status Skeleton */}
+            <SkeletonBase className="h-4 w-28 mb-1" />
+
+            {/* Location Skeleton */}
+            <SkeletonBase className="h-4 w-32 mb-4" />
+
+            {/* Badges: Level + Members Skeleton */}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-primary/10 border border-primary/20">
+                <SkeletonBase className="h-4 w-4 rounded-full" />
+                <SkeletonBase className="h-4 w-12" />
               </div>
-              <div className="flex flex-col items-center p-2 rounded-xl border border-gray-100 dark:border-white/5">
-                <SkeletonBase className="h-5 w-5 rounded-full mb-1" />
-                <SkeletonBase className="h-4 w-6" />
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white/5 border border-white/10">
+                <SkeletonBase className="h-4 w-4 rounded-full" />
+                <SkeletonBase className="h-4 w-20" />
               </div>
-              <div className="flex flex-col items-center p-2 rounded-xl border border-gray-100 dark:border-white/5">
-                <SkeletonBase className="h-5 w-5 rounded-full mb-1" />
-                <SkeletonBase className="h-4 w-6" />
+            </div>
+
+            {/* Description Skeleton */}
+            <SkeletonBase className="h-10 w-full rounded-lg mb-6" />
+
+            {/* Stats Grid Skeleton - 3 cols with progress bars */}
+            <div className="grid grid-cols-3 gap-3 w-full mb-auto">
+              <div className="bg-surface-light/50 dark:bg-surface-dark/50 rounded-2xl p-3 flex flex-col items-center gap-1 border border-gray-200 dark:border-white/5">
+                <SkeletonBase className="h-3 w-12 mb-1" />
+                <SkeletonBase className="h-6 w-8" />
+                <SkeletonBase className="w-full h-1.5 rounded-full" />
+              </div>
+              <div className="bg-surface-light/50 dark:bg-surface-dark/50 rounded-2xl p-3 flex flex-col items-center gap-1 border border-gray-200 dark:border-white/5">
+                <SkeletonBase className="h-3 w-12 mb-1" />
+                <SkeletonBase className="h-6 w-8" />
+                <SkeletonBase className="w-full h-1.5 rounded-full" />
+              </div>
+              <div className="bg-surface-light/50 dark:bg-surface-dark/50 rounded-2xl p-3 flex flex-col items-center gap-1 border border-gray-200 dark:border-white/5">
+                <SkeletonBase className="h-3 w-12 mb-1" />
+                <SkeletonBase className="h-6 w-8" />
+                <SkeletonBase className="w-full h-1.5 rounded-full" />
+              </div>
+            </div>
+
+            {/* Info Grid Skeleton - 2 cols: Sân bóng, Cách xa */}
+            <div className="grid grid-cols-2 gap-3 w-full mt-4">
+              <div className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl border border-gray-200 dark:border-white/5">
+                <SkeletonBase className="h-5 w-5 rounded-full" />
+                <div className="flex flex-col items-start gap-1">
+                  <SkeletonBase className="h-2 w-12" />
+                  <SkeletonBase className="h-4 w-16" />
+                </div>
+              </div>
+              <div className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl border border-gray-200 dark:border-white/5">
+                <SkeletonBase className="h-5 w-5 rounded-full" />
+                <div className="flex flex-col items-start gap-1">
+                  <SkeletonBase className="h-2 w-12" />
+                  <SkeletonBase className="h-4 w-16" />
+                </div>
               </div>
             </div>
           </div>
         </div>
 
         {/* Next Card Skeleton (smaller, behind) */}
-        <div className="absolute w-full max-w-sm aspect-[3/4] max-h-[65vh] bg-white dark:bg-surface-dark rounded-3xl shadow-2xl border border-gray-200 dark:border-white/10 overflow-hidden scale-95 translate-y-2 opacity-60">
-          <SkeletonBase className="w-full h-full" />
-        </div>
+        <div className="absolute w-full max-w-[360px] h-[72vh] max-h-[660px] bg-surface-light dark:bg-surface-dark rounded-[2.5rem] shadow-2xl border border-gray-200 dark:border-white/10 scale-95 translate-y-2 opacity-60" />
       </div>
 
-      {/* Swipe Actions Skeleton */}
-      <div className="pb-8 pt-2 px-4 flex items-center justify-center gap-8 z-20">
-        <SkeletonBase className="size-16 rounded-full" />
-        <SkeletonBase className="size-12 rounded-full" />
-        <SkeletonBase className="size-16 rounded-full" />
+      {/* Swipe Actions Skeleton - Only 2 buttons */}
+      <div className="relative z-20 w-full flex items-center justify-center gap-10 pb-12 pt-4 px-6 shrink-0">
+        <SkeletonBase className="w-[72px] h-[72px] rounded-full" />
+        <SkeletonBase className="w-[84px] h-[84px] rounded-full" />
+      </div>
+    </div>
+  );
+};
+
+// Profile Screen Skeleton
+export const ProfileSkeleton: React.FC = () => {
+  return (
+    <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark">
+      {/* Banner Skeleton */}
+      <div className="h-32 bg-gray-200 dark:bg-gray-700" />
+
+      {/* Content */}
+      <div className="p-4 space-y-6">
+        {/* Avatar Skeleton */}
+        <div className="flex flex-col items-center -mt-16 mb-6">
+          <SkeletonBase className="size-28 rounded-full border-4 border-white dark:border-surface-dark" />
+          <SkeletonBase className="h-6 w-32 mt-3 rounded" />
+          <SkeletonBase className="h-4 w-40 mt-2 rounded" />
+        </div>
+
+        {/* Stats Skeleton */}
+        <div>
+          <SkeletonBase className="h-5 w-28 mb-3 rounded" />
+          <div className="bg-white dark:bg-surface-dark p-5 rounded-2xl border border-gray-100 dark:border-white/5 space-y-5">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <SkeletonBase className="h-4 w-20 rounded" />
+                  <SkeletonBase className="h-4 w-8 rounded" />
+                </div>
+                <SkeletonBase className="h-2 w-full rounded-full" />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Teams Skeleton */}
+        <div>
+          <SkeletonBase className="h-5 w-32 mb-3 rounded" />
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-white/5">
+                <div className="flex items-center gap-3">
+                  <SkeletonBase className="h-12 w-12 rounded-full" />
+                  <div>
+                    <SkeletonBase className="h-4 w-32 mb-2 rounded" />
+                    <SkeletonBase className="h-3 w-20 rounded" />
+                  </div>
+                </div>
+                <SkeletonBase className="h-5 w-5 rounded" />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -6,6 +6,7 @@ import { useDiscoveryStore, getDefaultFilters } from '@/stores/discovery.store';
 import { useSelectedTeam, useMyTeams } from '@/stores/team.store';
 import { useUIStore } from '@/stores/ui.store';
 import { appRoutes } from '@/utils/navigation';
+import type { Match } from '@/types/api.types';
 
 interface UseDiscoveryReturn {
   // Data
@@ -14,6 +15,7 @@ interface UseDiscoveryReturn {
   currentIndex: number;
   hasMoreCards: boolean;
   matchedTeam: DiscoveredTeam | null;
+  matchedMatch: Match | null;
 
   // Loading states
   isLoading: boolean;
@@ -60,12 +62,14 @@ export const useDiscovery = (): UseDiscoveryReturn => {
     isRefreshing,
     error,
     matchedTeam,
+    matchedMatch,
     setFilters,
     resetFilters,
     setTeams,
     setCurrentIndex,
     nextCard,
     setMatchedTeam,
+    setMatchedMatch,
     setLoading,
     setRefreshing,
     setError,
@@ -116,8 +120,8 @@ export const useDiscovery = (): UseDiscoveryReturn => {
       // Only update if filters haven't been set by user (check if filters are still default)
       const currentFilters = useDiscoveryStore.getState().filters;
       const isDefaultFilter =
-        currentFilters.center.lat === defaults.center.lat &&
-        currentFilters.center.lng === defaults.center.lng &&
+        (currentFilters.center?.lat ?? DEFAULT_LOCATION.lat) === defaults.center.lat &&
+        (currentFilters.center?.lng ?? DEFAULT_LOCATION.lng) === defaults.center.lng &&
         currentFilters.radius === defaults.radius;
 
       if (isDefaultFilter) {
@@ -145,7 +149,7 @@ export const useDiscovery = (): UseDiscoveryReturn => {
         const location = await getUserLocation();
 
         // Update filters with current location
-        setFilters({ lat: location.lat, lng: location.lng });
+        setFilters({ center: { lat: location.lat, lng: location.lng } });
 
         // Build API params - exclude current team from results
         const params: DiscoveryFilterDto = {
@@ -154,7 +158,7 @@ export const useDiscovery = (): UseDiscoveryReturn => {
           radius: filters.radius,
           level: filters.level,
           gender: filters.gender,
-          sortBy: filters.sortBy,
+          sortBy: filters.sortBy === 'rating' ? 'quality' : filters.sortBy === 'createdAt' ? 'activity' : filters.sortBy === 'lastActive' ? 'activity' : filters.sortBy,
           sortOrder: filters.sortOrder,
           limit: 50,
         };
@@ -168,7 +172,16 @@ export const useDiscovery = (): UseDiscoveryReturn => {
 
         if (response.success && response.data) {
           const fetchedTeams = response.data.teams || [];
-          setTeams(fetchedTeams, response.data.total || 0);
+          // Convert from service DiscoveredTeam to store DiscoveredTeam
+          const convertedTeams = fetchedTeams.map((team) => ({
+            ...team,
+            logo: team.logo || '',
+            isActive: true,
+            isArchived: false,
+            createdBy: '',
+            createdAt: team.lastActive || new Date().toISOString(),
+          }));
+          setTeams(convertedTeams as any, response.data.total || 0);
           hasFetched.current = true;
         } else {
           setError('Không thể tải danh sách đội');
@@ -226,8 +239,11 @@ export const useDiscovery = (): UseDiscoveryReturn => {
         });
 
         if (apiResponse.success && apiResponse.data?.isMatch) {
-          // Show match modal
+          // Show match modal with both team and match info
           setMatchedTeam(currentCard);
+          if (apiResponse.data.newMatch) {
+            setMatchedMatch(apiResponse.data.newMatch);
+          }
         }
 
         nextCard();
@@ -249,13 +265,16 @@ export const useDiscovery = (): UseDiscoveryReturn => {
   // Close match modal
   const closeMatchModal = useCallback(() => {
     setMatchedTeam(null);
-  }, [setMatchedTeam]);
+    setMatchedMatch(null);
+  }, [setMatchedTeam, setMatchedMatch]);
 
   // Go to match detail
   const goToMatchDetail = useCallback(
     (matchId: string) => {
       closeMatchModal();
-      navigate(appRoutes.matchDetail(matchId));
+      if (matchId) {
+        navigate(appRoutes.matchDetail(matchId));
+      }
     },
     [closeMatchModal, navigate]
   );
@@ -285,6 +304,7 @@ export const useDiscovery = (): UseDiscoveryReturn => {
     currentIndex,
     hasMoreCards,
     matchedTeam,
+    matchedMatch,
 
     // Loading states
     isLoading,

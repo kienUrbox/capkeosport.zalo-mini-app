@@ -5,7 +5,7 @@ import { TeamDetailSkeleton } from '@/components/ui/Skeleton';
 import { AddMemberBottomSheet as PhoneInviteBottomSheet } from '@/screens/teams/add-member';
 import { appRoutes } from '@/utils/navigation';
 import { TeamService } from '@/services/api/team.service';
-import { useMyTeams } from '@/stores/team.store';
+import { useMyTeams, isAdmin } from '@/stores/team.store';
 import type { Team } from '@/services/api/team.service';
 
 /**
@@ -26,7 +26,10 @@ const TeamDetailScreen: React.FC = () => {
   // Check user role in this team
   const myTeams = useMyTeams();
   const currentTeam = myTeams.find(t => t.id === teamId);
-  const isAdmin = currentTeam?.userRole === 'admin' || currentTeam?.userRole === 'captain';
+  const hasAdminPermission = isAdmin(currentTeam);
+
+  // Rename variable to avoid conflict with function name
+  const isAdminTeam = hasAdminPermission;
 
   useEffect(() => {
     const fetchTeamDetail = async () => {
@@ -96,7 +99,7 @@ const TeamDetailScreen: React.FC = () => {
   const remainingCount = Math.max(0, (team.membersCount || 0) - (team.members?.length || 0));
 
   return (
-    <div className={`flex flex-col min-h-screen bg-background-light dark:bg-background-dark ${isAdmin ? 'pb-24' : ''}`}>
+    <div className={`flex flex-col min-h-screen bg-background-light dark:bg-background-dark ${isAdminTeam ? 'pb-24' : ''}`}>
       <Header title="Chi tiết đội bóng" onBack={() => navigate(-1)} />
 
       {/* Cover & Header Info */}
@@ -125,7 +128,7 @@ const TeamDetailScreen: React.FC = () => {
         {/* Team name with edit icon button */}
         <div className="flex items-center justify-center gap-2">
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{team.name}</h1>
-          {isAdmin && (
+          {isAdminTeam && (
             <button
               onClick={() => navigate(appRoutes.teamEdit(teamId!), { state: { team } })}
               className="size-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-white/10 active:bg-gray-200 dark:active:bg-white/20 transition-colors"
@@ -214,7 +217,7 @@ const TeamDetailScreen: React.FC = () => {
       )}
 
       {/* Members Summary Link */}
-      <div className="px-4 mt-6">
+      <div className="px-4 mt-6 pb-32">
         <h3 className="font-bold text-lg mb-3">Thành viên ({team.membersCount || 0})</h3>
         <div
           onClick={() => teamId && navigate(appRoutes.teamMembers(teamId))}
@@ -250,31 +253,8 @@ const TeamDetailScreen: React.FC = () => {
         </div>
       </div>
 
-      {/* Sent Invites Link - Admin only */}
-      {isAdmin && (
-        <div className="px-4 mt-4">
-          <div
-            onClick={() => teamId && navigate(appRoutes.teamInvitesSent(teamId))}
-            className="flex items-center justify-between p-4 rounded-xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-white/5 shadow-sm active:bg-gray-50 dark:active:bg-white/5 cursor-pointer transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <div className="size-10 rounded-full bg-blue-500/10 flex items-center justify-center">
-                <Icon name="send" className="text-blue-500 text-lg" />
-              </div>
-              <div className="flex flex-col">
-                <span className="font-bold text-sm text-slate-900 dark:text-white">Lời mời đã gửi</span>
-                <span className="text-xs text-gray-500">Xem và quản lý lời mời</span>
-              </div>
-            </div>
-            <div className="size-8 rounded-full bg-gray-100 dark:bg-white/5 flex items-center justify-center">
-              <Icon name="arrow_forward" className="text-gray-400 text-lg" />
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Floating Action - Only for admins */}
-      {isAdmin && (
+      {isAdminTeam && (
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 dark:bg-background-dark/95 backdrop-blur-md border-t border-gray-200 dark:border-white/5 z-40">
           <div className="flex gap-3 max-w-md mx-auto">
             <Button

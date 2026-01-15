@@ -4,6 +4,7 @@ import { Button, Icon } from '@/components/ui';
 import { appRoutes } from '@/utils/navigation';
 import { FONT_SIZES, SPACE_Y, SPACING, ICON_SIZES, PADDING, SECTION } from '@/constants/design';
 import { zaloThreeStepAuthService } from '@/services/zalo-three-step-auth';
+import { toast } from '@/utils/toast';
 
 interface OnboardingStep {
   id: number;
@@ -78,11 +79,11 @@ const OnboardingScreen: React.FC = () => {
         navigate(appRoutes.dashboard);
       } else {
         console.error('Login failed:', result.error);
-        alert(result.error || 'Đăng nhập thất bại');
+        toast.error(result.error || 'Đăng nhập thất bại');
       }
     } catch (error) {
       console.error('Zalo login error:', error);
-      alert('Có lỗi xảy ra, vui lòng thử lại');
+      toast.error('Có lỗi xảy ra, vui lòng thử lại');
     } finally {
       setIsLoading(false);
     }

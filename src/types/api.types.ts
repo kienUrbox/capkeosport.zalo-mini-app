@@ -17,8 +17,17 @@ export interface User {
   zaloUserId: string;
   name: string;
   avatar?: string;
+  banner?: string;
   phone: string;
   email?: string;
+  position?: string;
+  jerseyNumber?: number;
+  bio?: string;
+  playerStats?: {
+    attack: number;
+    defense: number;
+    technique: number;
+  };
   status?: 'active' | 'suspended';
   preferences?: UserPreferences;
   verificationMethod?: 'OAUTH' | 'THREE_STEP' | 'PHONE';
@@ -67,8 +76,17 @@ export interface RefreshTokenResponse {
 export interface UpdateProfileDto {
   name?: string;
   avatar?: string;
+  banner?: string;
   email?: string;
   phone?: string;
+  position?: string;
+  jerseyNumber?: number;
+  bio?: string;
+  playerStats?: {
+    attack?: number;
+    defense?: number;
+    technique?: number;
+  };
 }
 
 // Team Types
@@ -93,6 +111,8 @@ export interface Team extends BaseEntity {
   winsCount?: number;
   lossesCount?: number;
   rating?: number;
+  userRole?: 'admin' | 'member'; // User's role in this team (from /teams/my-teams response)
+  recentMatches?: Match[]; // Recent matches (max 5) when includeRecentMatches=true is passed
 }
 
 export interface TeamMember {
@@ -710,7 +730,7 @@ export interface RespondInviteResponse {
 }
 
 export interface PaginatedInvites {
-  invites: TeamInvite[];
+  invitations: TeamInvite[];
   total: number;
   page: number;
   limit: number;

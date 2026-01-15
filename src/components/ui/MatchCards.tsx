@@ -196,8 +196,17 @@ export const PendingMatchCard: React.FC<PendingMatchCardProps> = ({
         <div className="flex items-center gap-3">
           <TeamAvatar src={match.teamB.logo || ''} size="sm" />
           <div>
-            <h4 className="font-bold text-slate-900 dark:text-white">
+            <h4 className="flex align-middle justify-start font-bold text-slate-900 dark:text-white">
               {match.teamB.name}
+              <button
+                className="ml-2 size-5 flex items-center justify-center rounded-full bg-white dark:bg-surface-dark border border-gray-200 dark:border-white/10 shadow-sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(appRoutes.teamDetail(match.teamB.id));
+                }}
+              >
+                <Icon name="info" size="sm" className="text-gray-500" />
+              </button>
             </h4>
             <div className="mt-1">{renderStatus()}</div>
           </div>
@@ -384,8 +393,8 @@ export const UpcomingMatchCard: React.FC<UpcomingMatchCardProps> = ({
     <div
       onClick={() => navigate(appRoutes.matchDetail(match.id))}
       className={`bg-white dark:bg-surface-dark p-4 rounded-xl border shadow-sm transition-all cursor-pointer hover:border-primary/50 active:scale-[0.99] ${stage === 'live'
-          ? 'border-red-500/30 ring-1 ring-red-500/20'
-          : 'border-gray-100 dark:border-white/5'
+        ? 'border-red-500/30 ring-1 ring-red-500/20'
+        : 'border-gray-100 dark:border-white/5'
         }`}
     >
       <div className="flex justify-between items-start mb-4">
@@ -419,8 +428,8 @@ export const UpcomingMatchCard: React.FC<UpcomingMatchCardProps> = ({
             <div className="text-center">
               <span
                 className={`text-3xl font-extrabold font-mono block ${stage === 'live'
-                    ? 'text-red-500'
-                    : 'text-slate-900 dark:text-white'
+                  ? 'text-red-500'
+                  : 'text-slate-900 dark:text-white'
                   }`}
               >
                 {match.scoreA !== undefined && match.scoreB !== undefined

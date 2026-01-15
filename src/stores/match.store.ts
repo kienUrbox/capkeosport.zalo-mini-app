@@ -49,6 +49,7 @@ export interface Match {
   type?: 'matched' | 'received' | 'sent' | 'accepted';
   requestedByTeam?: string;
   acceptedByTeam?: string;
+  notes?: string;
 }
 
 // Map API match status to UI status
@@ -187,6 +188,7 @@ const transformApiMatch = (
     type,
     requestedByTeam: apiMatch.requestedByTeam,
     acceptedByTeam: apiMatch.acceptedByTeam,
+    notes: apiMatch.notes,
   };
 };
 
@@ -768,6 +770,8 @@ export const useMatchActions = () => {
     fetchHistoryMatches: store.fetchHistoryMatches,
     acceptMatch: store.acceptMatch,
     declineMatch: store.declineMatch,
+    sendMatchRequest: store.sendMatchRequest,
+    updateMatchRequest: store.updateMatchRequest,
     confirmMatch: store.confirmMatch,
     finishMatch: store.finishMatch,
     cancelMatch: store.cancelMatch,

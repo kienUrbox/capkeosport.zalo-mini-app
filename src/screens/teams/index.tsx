@@ -223,11 +223,11 @@ const TeamsScreen: React.FC = () => {
                 >
                   {/* Role Badge */}
                   <div className={`absolute top-0 right-0 px-3 py-1 rounded-bl-xl text-[10px] font-bold uppercase tracking-wider ${
-                    team.isCaptain
+                    team.userRole === 'admin'
                       ? 'bg-primary/10 text-primary'
                       : 'bg-gray-100 dark:bg-white/10 text-gray-500'
                   }`}>
-                    {team.isCaptain ? 'Quản trị viên' : 'Thành viên'}
+                    {team.userRole === 'admin' ? 'Quản trị viên' : 'Thành viên'}
                   </div>
 
                   <div className="flex items-center gap-4 mb-4">
@@ -285,7 +285,7 @@ const TeamsScreen: React.FC = () => {
                     <div className="pt-3 border-t border-gray-100 dark:border-white/5">
                       <div className="flex items-center justify-between">
                         <p className="text-sm text-gray-400 italic">Chưa có lịch thi đấu</p>
-                        {team.isCaptain && (
+                        {team.userRole === 'admin' && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();

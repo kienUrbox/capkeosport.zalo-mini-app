@@ -1,0 +1,804 @@
+/* ============================================
+   MATCH MODAL - FOOTBALL SPORTS STYLE
+   POWERFUL, ATHLETIC, ENERGETIC
+   ============================================ */
+
+/* Base Styles */
+.match-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.match-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.9) 0%, rgba(17, 212, 115, 0.15) 100%);
+  backdrop-filter: blur(12px);
+}
+
+.match-modal-content {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: matchPopIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* ============================================
+   FOOTBALL FIELD BACKGROUND WITH LIGHTING
+   ============================================ */
+
+.football-field-bg {
+  position: absolute;
+  inset: -20px;
+  background:
+    linear-gradient(90deg, rgba(17, 212, 115, 0.05) 1px, transparent 1px),
+    linear-gradient(rgba(17, 212, 115, 0.05) 1px, transparent 1px),
+    radial-gradient(circle at 30% 50%, rgba(17, 212, 115, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 70% 50%, rgba(59, 130, 246, 0.1) 0%, transparent 50%);
+  background-size: 40px 40px, 40px 40px, 100% 100%, 100% 100%;
+  border-radius: 20px;
+  pointer-events: none;
+  animation: fieldPulse 3s ease-in-out infinite;
+}
+
+@keyframes fieldPulse {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* ============================================
+   CONFETTI - SPORTS CELEBRATION STYLE
+   ============================================ */
+
+.confetti-container {
+  position: absolute;
+  inset: -100px;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 20;
+}
+
+.confetti-particle {
+  position: absolute;
+  top: -50px;
+  border-radius: 2px;
+  animation: confettiFall 3s ease-in forwards;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+@keyframes confettiFall {
+  0% {
+    opacity: 1;
+    transform: translateY(0) rotate(0deg) translateX(0) scale(1);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(150px) rotate(180deg) translateX(var(--drift)) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(600px) rotate(720deg) translateX(var(--drift)) scale(0.3);
+  }
+}
+
+/* ============================================
+   ENERGY RING / STADIUM LIGHT EFFECT - ENHANCED
+   ============================================ */
+
+.energy-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 280px;
+  height: 280px;
+  border-radius: 50%;
+  border: 3px solid rgba(17, 212, 115, 0.5);
+  box-shadow: 0 0 30px rgba(17, 212, 115, 0.4), inset 0 0 30px rgba(17, 212, 115, 0.2);
+  animation: energyRingPulse 2s ease-out infinite;
+  pointer-events: none;
+}
+
+.energy-ring:nth-child(2) {
+  animation-delay: 0.4s;
+  border-color: rgba(59, 130, 246, 0.5);
+  box-shadow: 0 0 30px rgba(59, 130, 246, 0.4), inset 0 0 30px rgba(59, 130, 246, 0.2);
+}
+
+.energy-ring:nth-child(3) {
+  animation-delay: 0.8s;
+  border-color: rgba(251, 191, 36, 0.5);
+  box-shadow: 0 0 30px rgba(251, 191, 36, 0.4), inset 0 0 30px rgba(251, 191, 36, 0.2);
+}
+
+@keyframes energyRingPulse {
+  0% {
+    transform: translate(-50%, -50%) scale(0.7);
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(2.5);
+    opacity: 0;
+  }
+}
+
+/* Sparkle particles */
+.sparkle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: #ffffff;
+  border-radius: 50%;
+  animation: sparkleFloat 3s ease-in-out infinite;
+  box-shadow: 0 0 10px #ffffff, 0 0 20px #11d473;
+}
+
+@keyframes sparkleFloat {
+  0%, 100% {
+    opacity: 0;
+    transform: scale(0) translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1) translateY(-20px);
+  }
+}
+
+/* ============================================
+   HEADER - SPORTS STYLE
+   ============================================ */
+
+.match-header {
+  margin-bottom: 2rem;
+  text-align: center;
+  animation: headerSlideDown 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.2s backwards;
+}
+
+@keyframes headerSlideDown {
+  0% {
+    opacity: 0;
+    transform: translateY(-30px) scale(0.9);
+  }
+  60% {
+    transform: translateY(5px) scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.match-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(135deg, #11d473 0%, #059669 100%);
+  border-radius: 50px;
+  box-shadow: 0 8px 32px rgba(17, 212, 115, 0.6), 0 0 60px rgba(17, 212, 115, 0.4);
+  animation: badgePulse 1.5s ease-in-out infinite;
+  position: relative;
+  overflow: hidden;
+}
+
+.match-badge::before {
+  content: '';
+  position: absolute;
+  inset: -50%;
+  background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  animation: badgeShine 3s linear infinite;
+}
+
+@keyframes badgeShine {
+  0% {
+    transform: translateX(-100%) rotate(45deg);
+  }
+  100% {
+    transform: translateX(200%) rotate(45deg);
+  }
+}
+
+@keyframes badgePulse {
+  0%, 100% {
+    box-shadow: 0 8px 32px rgba(17, 212, 115, 0.6), 0 0 60px rgba(17, 212, 115, 0.4);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 8px 48px rgba(17, 212, 115, 1), 0 0 80px rgba(17, 212, 115, 0.6), 0 0 120px rgba(17, 212, 115, 0.3);
+    transform: scale(1.05);
+  }
+}
+
+.match-icon {
+  font-size: 1.5rem;
+  animation: iconBounce 2s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite;
+  filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.8));
+}
+
+@keyframes iconBounce {
+  0%, 100% {
+    transform: rotate(0deg) scale(1) translateY(0);
+  }
+  25% {
+    transform: rotate(-10deg) scale(1.15) translateY(-5px);
+  }
+  50% {
+    transform: rotate(10deg) scale(1.1) translateY(-8px);
+  }
+  75% {
+    transform: rotate(-5deg) scale(1.05) translateY(-3px);
+  }
+}
+
+.match-title {
+  margin: 1rem 0 0.5rem;
+  font-size: 2rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: #ffffff;
+  text-shadow: 0 0 20px rgba(17, 212, 115, 0.8), 0 4px 30px rgba(17, 212, 115, 0.4);
+  animation: titleImpact 1s cubic-bezier(0.68, -0.55, 0.265, 1.55) 0.3s forwards;
+  opacity: 0;
+  position: relative;
+}
+
+.match-title::after {
+  content: '';
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80%;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #11d473, transparent);
+  animation: titleUnderline 2s ease-in-out infinite 1s;
+}
+
+@keyframes titleUnderline {
+  0%, 100% {
+    width: 60%;
+    opacity: 0.5;
+  }
+  50% {
+    width: 100%;
+    opacity: 1;
+  }
+}
+
+@keyframes titleImpact {
+  0% {
+    opacity: 0;
+    transform: scale(0.3) rotate(-10deg);
+    filter: blur(15px);
+  }
+  50% {
+    transform: scale(1.2) rotate(5deg);
+    filter: blur(0);
+  }
+  70% {
+    transform: scale(0.95) rotate(-2deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+    filter: blur(0);
+  }
+}
+
+.match-subtitle {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  opacity: 0;
+  animation: subtitleFadeIn 0.5s ease-out 0.5s forwards;
+}
+
+@keyframes subtitleFadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.team-names {
+  color: #11d473;
+  font-weight: 700;
+}
+
+/* ============================================
+   SCOREBOARD / VS SECTION
+   ============================================ */
+
+.scoreboard {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  justify-items: center;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  width: 100%;
+  padding: 1rem 0.5rem;
+}
+
+.team-score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  opacity: 0;
+  z-index: 5;
+}
+
+.team-score-left {
+  animation: teamSlideLeft 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 0.4s forwards;
+}
+
+.team-score-right {
+  animation: teamSlideRight 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 0.4s forwards;
+}
+
+@keyframes teamSlideLeft {
+  0% {
+    opacity: 0;
+    transform: translateX(-100px) scale(0.8);
+  }
+  60% {
+    transform: translateX(10px) scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes teamSlideRight {
+  0% {
+    opacity: 0;
+    transform: translateX(100px) scale(0.8);
+  }
+  60% {
+    transform: translateX(-10px) scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+.team-avatar-container {
+  position: relative;
+}
+
+.team-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  border: 3px solid #11d473;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.3);
+  box-shadow: 0 8px 32px rgba(17, 212, 115, 0.6), 0 0 60px rgba(17, 212, 115, 0.4);
+  animation: avatarSpin 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.5s forwards, avatarGlow 2s ease-in-out infinite 1.3s forwards;
+  transform: scale(0) rotate(-180deg);
+}
+
+@keyframes avatarSpin {
+  0% {
+    transform: scale(0) rotate(-180deg);
+  }
+  60% {
+    transform: scale(1.15) rotate(10deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes avatarGlow {
+  0%, 100% {
+    box-shadow: 0 8px 32px rgba(17, 212, 115, 0.6), 0 0 60px rgba(17, 212, 115, 0.4);
+  }
+  50% {
+    box-shadow: 0 8px 40px rgba(17, 212, 115, 0.9), 0 0 80px rgba(17, 212, 115, 0.6), 0 0 120px rgba(17, 212, 115, 0.3);
+  }
+}
+
+.team-avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.team-avatar-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.5rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.team-avatar-placeholder-my {
+  background: linear-gradient(135deg, #11d473 0%, #065f46 100%);
+  color: #ffffff;
+}
+
+.team-avatar-placeholder-opponent {
+  background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+  color: #ffffff;
+}
+
+.team-avatar-glow {
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 2px solid rgba(17, 212, 115, 0.4);
+  animation: glowExpand 2s ease-out infinite;
+}
+
+@keyframes glowExpand {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+.team-name {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #ffffff;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  max-width: 100px;
+  text-align: center;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-clamp: 2;
+  word-break: break-word;
+}
+
+/* ============================================
+   VS BADGE - CENTER
+   ============================================ */
+
+.vs-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0;
+  opacity: 0;
+  animation: vsPop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 0.6s forwards;
+}
+
+@keyframes vsPop {
+  0% {
+    opacity: 0;
+    transform: scale(0) rotate(-180deg);
+  }
+  60% {
+    transform: scale(1.2) rotate(15deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+.vs-badge {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #11d473 0%, #059669 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 30px rgba(17, 212, 115, 0.7), 0 0 60px rgba(17, 212, 115, 0.4), inset 0 0 15px rgba(255, 255, 255, 0.3);
+  border: 3px solid #ffffff;
+  animation: vsBadgePulse 1.5s ease-in-out infinite, vsBadgeGlow 3s ease-in-out infinite;
+  position: relative;
+  overflow: hidden;
+}
+
+.vs-badge::before {
+  content: '';
+  position: absolute;
+  inset: -50%;
+  background: conic-gradient(from 0deg, transparent, rgba(255, 255, 255, 0.3), transparent 30%, transparent);
+  animation: vsBadgeRotate 4s linear infinite;
+}
+
+@keyframes vsBadgeRotate {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes vsBadgePulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
+}
+
+@keyframes vsBadgeGlow {
+  0%, 100% {
+    box-shadow: 0 8px 40px rgba(17, 212, 115, 0.8), 0 0 80px rgba(17, 212, 115, 0.5), inset 0 0 20px rgba(255, 255, 255, 0.3);
+  }
+  50% {
+    box-shadow: 0 8px 50px rgba(17, 212, 115, 1), 0 0 100px rgba(17, 212, 115, 0.7), inset 0 0 30px rgba(255, 255, 255, 0.5);
+  }
+}
+
+.vs-text {
+  font-size: 1rem;
+  font-weight: 900;
+  color: #ffffff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.match-label {
+  margin-top: 0.35rem;
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: #11d473;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+}
+
+/* ============================================
+   ACTION BUTTONS - SPORTS STYLE
+   ============================================ */
+
+.actions-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 300px;
+  position: relative;
+  z-index: 30;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.actions-section-hidden {
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.action-button {
+  position: relative;
+  width: 100%;
+  padding: 1rem 1.5rem;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(30px);
+}
+
+.action-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+.action-button:hover::before {
+  left: 100%;
+}
+
+.action-button-primary {
+  background: linear-gradient(135deg, #11d473 0%, #059669 100%);
+  color: #ffffff;
+  border: none;
+  box-shadow: 0 6px 25px rgba(17, 212, 115, 0.5), 0 0 40px rgba(17, 212, 115, 0.3);
+  animation: buttonSlideUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.9s forwards, buttonPrimaryGlow 2s ease-in-out infinite 1.4s forwards;
+}
+
+.action-button-primary:hover {
+  transform: translateY(-4px) scale(1.03);
+  box-shadow: 0 12px 35px rgba(17, 212, 115, 0.7), 0 0 60px rgba(17, 212, 115, 0.5);
+}
+
+.action-button-primary:active {
+  transform: translateY(-2px) scale(0.98);
+}
+
+@keyframes buttonPrimaryGlow {
+  0%, 100% {
+    box-shadow: 0 6px 25px rgba(17, 212, 115, 0.5), 0 0 40px rgba(17, 212, 115, 0.3);
+  }
+  50% {
+    box-shadow: 0 6px 35px rgba(17, 212, 115, 0.7), 0 0 60px rgba(17, 212, 115, 0.5);
+  }
+}
+
+.action-button-secondary {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  color: #ffffff;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  animation: buttonSlideUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 1.05s forwards;
+}
+
+.action-button-secondary:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+.action-button-secondary:active {
+  transform: translateY(0) scale(0.98);
+}
+
+@keyframes buttonSlideUp {
+  0% {
+    opacity: 0;
+    transform: translateY(40px) scale(0.95);
+  }
+  60% {
+    transform: translateY(-3px) scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.button-icon {
+  font-size: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.button-text {
+  flex: 1;
+  text-align: center;
+}
+
+/* ============================================
+   OVERLAY EFFECTS
+   ============================================ */
+
+.match-dim-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  border-radius: 20px;
+  z-index: 15;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.match-request-modal-wrapper {
+  position: relative;
+  z-index: 20;
+}
+
+/* ============================================
+   UTILITY ANIMATIONS
+   ============================================ */
+
+@keyframes fadeIn {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes matchPopIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.5) translateY(50px);
+  }
+  60% {
+    transform: scale(1.02) translateY(-5px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* ============================================
+   REDUCED MOTION SUPPORT
+   ============================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  .match-modal-overlay,
+  .match-modal-content,
+  .match-header,
+  .match-badge,
+  .match-icon,
+  .match-title,
+  .match-subtitle,
+  .team-score,
+  .team-avatar,
+  .vs-section,
+  .action-button,
+  .energy-ring,
+  .team-avatar-glow {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+
+@media (max-width: 400px) {
+  .match-title {
+    font-size: 1.75rem;
+  }
+
+  .team-avatar {
+    width: 75px;
+    height: 75px;
+  }
+
+  .vs-badge {
+    width: 50px;
+    height: 50px;
+  }
+
+  .vs-text {
+    font-size: 1rem;
+  }
+}

@@ -60,6 +60,24 @@ interface FileState {
   ) => Promise<FileEntity>;
 
   /**
+   * Upload user avatar
+   * POST /files/user/avatar
+   */
+  uploadUserAvatar: (
+    file: File,
+    onProgress?: (progress: number) => void
+  ) => Promise<FileEntity>;
+
+  /**
+   * Upload user banner
+   * POST /files/user/banner
+   */
+  uploadUserBanner: (
+    file: File,
+    onProgress?: (progress: number) => void
+  ) => Promise<FileEntity>;
+
+  /**
    * Get entity files
    * GET /files/entity/:entityType/:entityId
    */
@@ -256,6 +274,86 @@ export const useFileStore = create<FileState>((set, get) => ({
   },
 
   /**
+   * Upload user avatar
+   * POST /files/user/avatar
+   */
+  uploadUserAvatar: async (file, onProgress) => {
+    const fileId = generateFileId();
+
+    try {
+      set({ isLoading: true, error: null });
+
+      const response = await apiUploadFile(
+        { file, fileType: 'avatar' },
+        (progress) => {
+          get().setUploadProgress(fileId, progress, file.name);
+          onProgress?.(progress);
+        },
+        `/files/user/avatar`
+      );
+
+      if (response.success && response.data) {
+        // Remove upload progress
+        get().removeUploadProgress(fileId);
+
+        return response.data.file;
+      } else {
+        throw new Error(response.error?.message || 'Failed to upload avatar');
+      }
+    } catch (error: any) {
+      const errorMessage = error.error?.message || error.message || 'Không thể tải lên ảnh đại diện';
+      set({ error: errorMessage, isLoading: false });
+
+      // Remove upload progress on error
+      get().removeUploadProgress(fileId);
+
+      throw error;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  /**
+   * Upload user banner
+   * POST /files/user/banner
+   */
+  uploadUserBanner: async (file, onProgress) => {
+    const fileId = generateFileId();
+
+    try {
+      set({ isLoading: true, error: null });
+
+      const response = await apiUploadFile(
+        { file, fileType: 'banner' },
+        (progress) => {
+          get().setUploadProgress(fileId, progress, file.name);
+          onProgress?.(progress);
+        },
+        `/files/user/banner`
+      );
+
+      if (response.success && response.data) {
+        // Remove upload progress
+        get().removeUploadProgress(fileId);
+
+        return response.data.file;
+      } else {
+        throw new Error(response.error?.message || 'Failed to upload banner');
+      }
+    } catch (error: any) {
+      const errorMessage = error.error?.message || error.message || 'Không thể tải lên ảnh bìa';
+      set({ error: errorMessage, isLoading: false });
+
+      // Remove upload progress on error
+      get().removeUploadProgress(fileId);
+
+      throw error;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  /**
    * Get entity files
    * GET /files/entity/:entityType/:entityId
    */
@@ -367,6 +465,8 @@ export const useFileActions = () => {
     uploadFile: store.uploadFile,
     uploadTeamLogo: store.uploadTeamLogo,
     uploadTeamBanner: store.uploadTeamBanner,
+    uploadUserAvatar: store.uploadUserAvatar,
+    uploadUserBanner: store.uploadUserBanner,
     getEntityFiles: store.getEntityFiles,
     deleteFile: store.deleteFile,
   };

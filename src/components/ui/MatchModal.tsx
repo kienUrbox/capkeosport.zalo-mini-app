@@ -1,131 +1,260 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Icon } from './Icon';
-import { TeamAvatar } from './TeamAvatar';
+import { MatchRequestModal, type OpponentTeamInfo } from './MatchRequestModal';
 import type { DiscoveredTeam } from '@/services/api/discovery.service';
+import './MatchModal.css';
 
 export interface MatchModalProps {
   isOpen: boolean;
   matchedTeam: DiscoveredTeam | null;
   myTeamLogo?: string;
   myTeamName?: string;
-  onViewMatch: (matchId: string) => void;
+  myTeamId?: string;
+  matchId?: string; // Match ID from API response
   onKeepSwiping: () => void;
 }
 
+interface ConfettiParticle {
+  id: number;
+  color: string;
+  size: number;
+  left: string;
+  delay: string;
+  drift: string;
+}
+
+const CONFETTI_COLORS = [
+  '#11d473', // primary green
+  '#facc15', // gold/yellow
+  '#3b82f6', // blue
+  '#ef4444', // red
+  '#ffffff', // white
+  '#fbbf24', // amber
+  '#10b981', // emerald
+];
+
+const generateConfetti = (): ConfettiParticle[] => {
+  return Array.from({ length: 30 }, (_, i) => ({
+    id: i,
+    color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
+    size: Math.random() * 10 + 6,
+    left: `${Math.random() * 100}%`,
+    delay: `${Math.random() * 0.6}s`,
+    drift: `${(Math.random() - 0.5) * 200}px`,
+  }));
+};
+
 /**
- * MatchModal Component
+ * MatchModal Component - FOOTBALL SPORTS STYLE
  *
- * Celebration modal shown when both teams like each other:
- * - "It's a Match!" header with animation
- * - Both teams' logos facing each other
- * - View match / Keep swiping buttons
+ * Shown IMMEDIATELY when match happens:
+ * - Sports celebration with energy
+ * - Stadium light effects
+ * - Confetti particles
+ * - Scoreboard-style VS display
+ * - Two buttons: "Gửi lời mời" + "Tiếp tục swipe"
  */
 export const MatchModal: React.FC<MatchModalProps> = ({
   isOpen,
   matchedTeam,
   myTeamLogo,
   myTeamName,
-  onViewMatch,
+  myTeamId,
+  matchId,
   onKeepSwiping,
 }) => {
+  const [showMatchRequestModal, setShowMatchRequestModal] = useState(false);
+  const [confettiParticles, setConfettiParticles] = useState<ConfettiParticle[]>([]);
+
+  useEffect(() => {
+    if (isOpen) {
+      setConfettiParticles(generateConfetti());
+
+      // Haptic feedback - sports celebration pattern
+      if (navigator.vibrate) {
+        navigator.vibrate([80, 40, 80, 40, 120]);
+      }
+    } else {
+      setTimeout(() => setConfettiParticles([]), 500);
+    }
+  }, [isOpen]);
+
   if (!isOpen || !matchedTeam) return null;
 
-  // Get match ID from response data
-  const matchId = matchedTeam.id; // This would normally come from the match object in swipe response
+  const opponentTeamInfo: OpponentTeamInfo = {
+    id: matchedTeam.id,
+    name: matchedTeam.name,
+    logo: matchedTeam.logo,
+    level: matchedTeam.level,
+  };
+
+  const myTeamInfo: OpponentTeamInfo = {
+    id: myTeamId || '',
+    name: myTeamName || 'Đội của bạn',
+    logo: myTeamLogo,
+  };
+
+  // Use matchId from prop if available (from API response), otherwise fallback to team id
+  const actualMatchId = matchId || matchedTeam.id;
+
+  const handleSendInvite = () => {
+    setShowMatchRequestModal(true);
+  };
+
+  const handleInviteSuccess = () => {
+    setShowMatchRequestModal(false);
+    onKeepSwiping();
+  };
+
+  const handleInviteClose = () => {
+    setShowMatchRequestModal(false);
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+    <div className="match-modal-overlay">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm animate-fade-in" />
+      <div className="match-modal-backdrop" />
 
-      {/* Modal Content */}
-      <div className="relative z-10 w-full max-w-sm flex flex-col items-center">
-        {/* Match Animation Container */}
-        <div className="relative mb-8">
-          {/* Animated hearts */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="relative">
-              <div className="absolute inset-0 bg-primary/30 rounded-full animate-ping" style={{ animationDuration: '1s' }} />
-              <div className="absolute inset-4 bg-primary/20 rounded-full animate-ping" style={{ animationDuration: '1.5s', animationDelay: '0.2s' }} />
-            </div>
-          </div>
+      {/* Match Modal Content */}
+      <div className="match-modal-content">
 
-          {/* Match Badge */}
-          <div className="relative bg-gradient-to-br from-primary to-green-600 text-white px-8 py-4 rounded-full shadow-2xl">
-            <div className="flex items-center gap-2">
-              <Icon name="favorite" className="text-2xl animate-pulse" filled />
-              <span className="text-2xl font-black tracking-wide">It's a Match!</span>
-              <Icon name="favorite" className="text-2xl animate-pulse" filled />
-            </div>
-          </div>
+        {/* Football Field Grid Background */}
+        <div className="football-field-bg" />
+
+        {/* Energy Rings - Stadium Light Effect */}
+        <div className="energy-ring" />
+        <div className="energy-ring" />
+        <div className="energy-ring" />
+
+        {/* Sparkle Particles */}
+        {[...Array(12)].map((_, i) => (
+          <div
+            key={`sparkle-${i}`}
+            className="sparkle"
+            style={{
+              left: `${20 + (i * 6)}%`,
+              top: `${20 + ((i % 4) * 20)}%`,
+              animationDelay: `${i * 0.2}s`,
+            } as React.CSSProperties}
+          />
+        ))}
+
+        {/* Confetti Container */}
+        <div className="confetti-container">
+          {confettiParticles.map((particle) => (
+            <div
+              key={particle.id}
+              className="confetti-particle"
+              style={{
+                '--drift': particle.drift,
+                left: particle.left,
+                width: `${particle.size}px`,
+                height: `${particle.size}px`,
+                backgroundColor: particle.color,
+                animationDelay: particle.delay,
+              } as React.CSSProperties}
+            />
+          ))}
         </div>
 
-        {/* Teams Display */}
-        <div className="flex items-center justify-center gap-6 mb-10 w-full">
+        {/* Header */}
+        <div className="match-header">
+          <div className="match-badge">
+            <Icon name="sports_soccer" className="match-icon" filled />
+          </div>
+          <h2 className="match-title">MATCH KÈO!</h2>
+          <p className="match-subtitle">
+            <span className="team-names">{myTeamName}</span> và <span className="team-names">{matchedTeam.name}</span> đã tìm thấy nhau!
+          </p>
+        </div>
+
+        {/* Scoreboard / VS Section */}
+        <div className="scoreboard">
           {/* My Team */}
-          <div className="flex flex-col items-center">
-            <div className="relative">
-              <div className="size-24 rounded-full border-4 border-primary shadow-lg overflow-hidden bg-surface-dark">
+          <div className="team-score team-score-left">
+            <div className="team-avatar-container">
+              <div className="team-avatar">
                 {myTeamLogo ? (
-                  <img src={myTeamLogo} alt={myTeamName} className="w-full h-full object-cover" />
+                  <img src={myTeamLogo} alt={myTeamName} className="team-avatar-image" />
                 ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-primary to-green-600 flex items-center justify-center text-white font-bold text-2xl">
+                  <div className="team-avatar-placeholder team-avatar-placeholder-my">
                     {myTeamName?.charAt(0) || 'T'}
                   </div>
                 )}
               </div>
-              <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-primary text-background-dark text-xs font-bold px-3 py-1 rounded-full">
-                Đội của bạn
-              </div>
+              <div className="team-avatar-glow" />
             </div>
+            <p className="team-name">{myTeamName || 'Đội của bạn'}</p>
           </div>
 
-          {/* VS Icon */}
-          <div className="flex flex-col items-center">
-            <div className="size-12 rounded-full bg-surface-dark border-2 border-primary/50 flex items-center justify-center">
-              <Icon name="sports_soccer" className="text-primary text-xl" />
+          {/* VS Badge */}
+          <div className="vs-section">
+            <div className="vs-badge">
+              <span className="vs-text">VS</span>
             </div>
+            <span className="match-label">ĐỐI THỦ</span>
           </div>
 
-          {/* Matched Team */}
-          <div className="flex flex-col items-center">
-            <div className="relative">
-              <div className="size-24 rounded-full border-4 border-primary shadow-lg overflow-hidden bg-surface-dark">
+          {/* Opponent Team */}
+          <div className="team-score team-score-right">
+            <div className="team-avatar-container">
+              <div className="team-avatar">
                 {matchedTeam.logo ? (
-                  <img src={matchedTeam.logo} alt={matchedTeam.name} className="w-full h-full object-cover" />
+                  <img src={matchedTeam.logo} alt={matchedTeam.name} className="team-avatar-image" />
                 ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-primary to-green-600 flex items-center justify-center text-white font-bold text-2xl">
+                  <div className="team-avatar-placeholder team-avatar-placeholder-opponent">
                     {matchedTeam.name?.charAt(0) || 'T'}
                   </div>
                 )}
               </div>
-              <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-primary text-background-dark text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap">
-                {matchedTeam.name}
-              </div>
+              <div className="team-avatar-glow" />
             </div>
+            <p className="team-name">{matchedTeam.name}</p>
           </div>
         </div>
 
-        {/* Message */}
-        <p className="text-white text-center text-lg font-medium mb-8 px-4">
-          {myTeamName} và {matchedTeam.name} đã match với nhau!
-        </p>
-
-        {/* Actions */}
-        <div className="flex flex-col gap-3 w-full max-w-xs">
+        {/* Action Buttons */}
+        <div className={`actions-section${showMatchRequestModal ? ' actions-section-hidden' : ''}`}>
           <button
-            onClick={() => onViewMatch(matchId)}
-            className="w-full py-4 rounded-2xl bg-primary text-background-dark font-bold text-base shadow-lg shadow-primary/40 hover:scale-105 active:scale-95 transition-all"
+            onClick={handleSendInvite}
+            className="action-button action-button-primary"
           >
-            Xem kèo
+            <span className="button-icon">
+              <Icon name="send" filled />
+            </span>
+            <span className="button-text">Gửi lời mời giao lưu</span>
           </button>
+
           <button
             onClick={onKeepSwiping}
-            className="w-full py-4 rounded-2xl bg-white/10 backdrop-blur-md text-white font-bold text-base border border-white/20 hover:bg-white/20 active:scale-95 transition-all"
+            className="action-button action-button-secondary"
           >
-            Tiếp tục swipe
+            <span className="button-icon">
+              <Icon name="refresh" />
+            </span>
+            <span className="button-text">Tiếp tục tìm kèo</span>
           </button>
         </div>
+
+        {/* Dim overlay when MatchRequestModal is open */}
+        {showMatchRequestModal && (
+          <div className="match-dim-overlay" />
+        )}
+
+        {/* MatchRequestModal - Nested */}
+        {showMatchRequestModal && (
+          <div className="match-request-modal-wrapper">
+            <MatchRequestModal
+              isOpen={showMatchRequestModal}
+              mode="send"
+              matchId={actualMatchId}
+              myTeam={myTeamInfo}
+              opponentTeam={opponentTeamInfo}
+              onClose={handleInviteClose}
+              onSuccess={handleInviteSuccess}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

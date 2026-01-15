@@ -31,8 +31,6 @@ const MemberProfileScreen: React.FC = () => {
   const getRoleLabel = (member: TeamMember) => {
     // Fallback to role
     switch (member.role) {
-      case 'CAPTAIN':
-        return 'Đội trưởng';
       case 'admin':
         return 'Cầu thủ';
       case 'PLAYER':
@@ -47,17 +45,7 @@ const MemberProfileScreen: React.FC = () => {
   };
 
   const isAdmin = (member: TeamMember) => {
-    return member.role === 'CAPTAIN' ||
-           member.role === 'admin' ||
-           member.position === 'Captain' ||
-           member.user?.position?.toLowerCase() === 'đội trưởng' ||
-           member.user?.position?.toLowerCase() === 'captain';
-  };
-
-  const getJerseyNumber = (member: TeamMember) => {
-    // Priority: user.jerseyNumber > member.jerseyNumber
-    if (member.user?.jerseyNumber) return member.user.jerseyNumber;
-    return member.jerseyNumber;
+    return member.role === 'admin'
   };
 
   // Error State
@@ -114,7 +102,7 @@ const MemberProfileScreen: React.FC = () => {
               {isAdmin(member) && (
                 <div
                   className="absolute bottom-0 right-0 bg-yellow-500 text-white p-1.5 rounded-full border-4 border-background-light dark:border-background-dark shadow-sm"
-                  title="Đội trưởng"
+                  title="Admin"
                 >
                   <Icon name="star" className="text-xs" filled />
                 </div>
@@ -129,142 +117,156 @@ const MemberProfileScreen: React.FC = () => {
               )}
             </div>
             <h2 className="text-2xl font-bold text-slate-900 dark:text-white">{member.user?.name || 'Thành viên'}</h2>
-            <div className="flex items-center gap-2 text-gray-500 dark:text-text-secondary font-medium mt-1">
-              {member.user?.position && (
-                <span>{member.user.position}</span>
-              )}
-            </div>
+            <p className="text-gray-500 dark:text-text-secondary font-medium">
+              {member.user?.phone || 'Chưa cập nhật số điện thoại'}
+            </p>
+
+            {/* Position and Jersey Number */}
+            {(member.user?.position || member.user?.jerseyNumber) && (
+              <div className="flex items-center gap-3 mt-2 text-sm">
+                {member.user.position && (
+                  <div className="flex items-center gap-1 px-3 py-1 bg-primary/10 text-primary rounded-full font-medium">
+                    <Icon name="sports_soccer" className="text-sm" />
+                    {member.user.position}
+                  </div>
+                )}
+                {member.user.jerseyNumber && (
+                  <div className="flex items-center gap-1 px-3 py-1 bg-blue-500/10 text-blue-500 rounded-full font-bold">
+                    <Icon name="tag" className="text-sm" />
+                    #{member.user.jerseyNumber}
+                  </div>
+                )}
+              </div>
+            )}
             {isAdmin(member) && (
               <div className="mt-2 text-xs font-bold text-yellow-600 dark:text-yellow-500 bg-yellow-500/10 px-2 py-0.5 rounded border border-yellow-500/20">
-                Đội trưởng
+                Admin
               </div>
             )}
           </div>
 
-        {/* Player Stats */}
-        {member.user?.playerStats && (
-          <div className="mb-6">
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-3">Chỉ số kỹ năng</h3>
-            <div className="bg-white dark:bg-surface-dark p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm space-y-5">
-              {/* Attack */}
-              {member.user.playerStats.attack !== undefined && member.user.playerStats.attack !== null && (
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <div className="flex items-center gap-2 text-red-500 font-bold text-sm">
-                      <div className="p-1 bg-red-500/10 rounded">
-                        <Icon name="flash_on" className="text-sm" />
-                      </div>
-                      Tấn công
-                    </div>
-                    <span className="font-bold text-slate-900 dark:text-white">
-                      {(member.user.playerStats.attack / 10).toFixed(1)}
-                    </span>
-                  </div>
-                  <div className="h-2.5 w-full bg-gray-100 dark:bg-black/20 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-red-500 rounded-full transition-all duration-500"
-                      style={{ width: `${member.user.playerStats.attack}%` }}
-                    ></div>
-                  </div>
-                </div>
-              )}
-
-              {/* Defense */}
-              {member.user.playerStats.defense !== undefined && member.user.playerStats.defense !== null && (
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <div className="flex items-center gap-2 text-blue-500 font-bold text-sm">
-                      <div className="p-1 bg-blue-500/10 rounded">
-                        <Icon name="shield" className="text-sm" />
-                      </div>
-                      Phòng thủ
-                    </div>
-                    <span className="font-bold text-slate-900 dark:text-white">
-                      {(member.user.playerStats.defense / 10).toFixed(1)}
-                    </span>
-                  </div>
-                  <div className="h-2.5 w-full bg-gray-100 dark:bg-black/20 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-blue-500 rounded-full transition-all duration-500"
-                      style={{ width: `${member.user.playerStats.defense}%` }}
-                    ></div>
-                  </div>
-                </div>
-              )}
-
-              {/* Technique */}
-              {member.user.playerStats.technique !== undefined && member.user.playerStats.technique !== null && (
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <div className="flex items-center gap-2 text-primary font-bold text-sm">
-                      <div className="p-1 bg-primary/10 rounded">
-                        <Icon name="sports_soccer" className="text-sm" />
-                      </div>
-                      Kỹ thuật
-                    </div>
-                    <span className="font-bold text-slate-900 dark:text-white">
-                      {(member.user.playerStats.technique / 10).toFixed(1)}
-                    </span>
-                  </div>
-                  <div className="h-2.5 w-full bg-gray-100 dark:bg-black/20 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-primary rounded-full transition-all duration-500"
-                      style={{ width: `${member.user.playerStats.technique}%` }}
-                    ></div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Team Info */}
-        <div className="mb-6">
-          <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-3">Đội bóng</h3>
-          <div className="space-y-3">
-            {team && (
-              <div
-                onClick={() => navigate(appRoutes.teamDetail(teamId || ''))}
-                className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-white/5 active:scale-98 transition-transform cursor-pointer"
-              >
-                <div className="flex items-center gap-3">
-                  <TeamAvatar src={team.logo} size="sm" />
+          {/* Player Stats */}
+          {member.user?.playerStats && (
+            <div className="mb-6">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-3">Chỉ số kỹ năng</h3>
+              <div className="bg-white dark:bg-surface-dark p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm space-y-5">
+                {/* Attack */}
+                {member.user.playerStats.attack !== undefined && member.user.playerStats.attack !== null && (
                   <div>
-                    <h4 className="font-bold text-slate-900 dark:text-white">{team.name}</h4>
-                    <p className="text-xs text-primary font-medium">{getRoleLabel(member)}</p>
+                    <div className="flex justify-between items-center mb-2">
+                      <div className="flex items-center gap-2 text-red-500 font-bold text-sm">
+                        <div className="p-1 bg-red-500/10 rounded">
+                          <Icon name="flash_on" className="text-sm" />
+                        </div>
+                        Tấn công
+                      </div>
+                      <span className="font-bold text-slate-900 dark:text-white">
+                        {(member.user.playerStats.attack / 10).toFixed(1)}
+                      </span>
+                    </div>
+                    <div className="h-2.5 w-full bg-gray-100 dark:bg-black/20 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-red-500 rounded-full transition-all duration-500"
+                        style={{ width: `${member.user.playerStats.attack}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Defense */}
+                {member.user.playerStats.defense !== undefined && member.user.playerStats.defense !== null && (
+                  <div>
+                    <div className="flex justify-between items-center mb-2">
+                      <div className="flex items-center gap-2 text-blue-500 font-bold text-sm">
+                        <div className="p-1 bg-blue-500/10 rounded">
+                          <Icon name="shield" className="text-sm" />
+                        </div>
+                        Phòng thủ
+                      </div>
+                      <span className="font-bold text-slate-900 dark:text-white">
+                        {(member.user.playerStats.defense / 10).toFixed(1)}
+                      </span>
+                    </div>
+                    <div className="h-2.5 w-full bg-gray-100 dark:bg-black/20 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-blue-500 rounded-full transition-all duration-500"
+                        style={{ width: `${member.user.playerStats.defense}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Technique */}
+                {member.user.playerStats.technique !== undefined && member.user.playerStats.technique !== null && (
+                  <div>
+                    <div className="flex justify-between items-center mb-2">
+                      <div className="flex items-center gap-2 text-primary font-bold text-sm">
+                        <div className="p-1 bg-primary/10 rounded">
+                          <Icon name="sports_soccer" className="text-sm" />
+                        </div>
+                        Kỹ thuật
+                      </div>
+                      <span className="font-bold text-slate-900 dark:text-white">
+                        {(member.user.playerStats.technique / 10).toFixed(1)}
+                      </span>
+                    </div>
+                    <div className="h-2.5 w-full bg-gray-100 dark:bg-black/20 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-primary rounded-full transition-all duration-500"
+                        style={{ width: `${member.user.playerStats.technique}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Team Info */}
+          {/* <div className="mb-6">
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-3">Đội bóng</h3>
+            <div className="space-y-3">
+              {team && (
+                <div
+                  className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-white/5 active:scale-98 transition-transform cursor-pointer"
+                >
+                  <div className="flex items-center gap-3">
+                    <TeamAvatar src={team.logo} size="sm" />
+                    <div>
+                      <h4 className="font-bold text-slate-900 dark:text-white">{team.name}</h4>
+                      <p className="text-xs text-primary font-medium">{getRoleLabel(member)}</p>
+                    </div>
                   </div>
                 </div>
-                <Icon name="chevron_right" className="text-gray-400" />
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Intro */}
-        {member.user?.bio && (
-          <div className="bg-white dark:bg-surface-dark p-4 rounded-xl border border-gray-100 dark:border-white/5 mb-6">
-            <h4 className="text-sm font-bold text-gray-500 uppercase mb-2">Giới thiệu</h4>
-            <p className="text-slate-900 dark:text-white text-sm leading-relaxed whitespace-pre-wrap">
-              {member.user.bio}
-            </p>
-          </div>
-        )}
-
-        {/* Join Date */}
-        <div className="bg-white dark:bg-surface-dark p-4 rounded-xl border border-gray-100 dark:border-white/5">
-          <div className="flex items-center gap-3">
-            <div className="size-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-              <Icon name="event" className="text-lg" />
+              )}
             </div>
-            <div>
-              <p className="text-xs text-gray-500 uppercase font-bold">Ngày tham gia</p>
-              <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                {new Date(member.joinedAt).toLocaleDateString('vi-VN', { day: 'numeric', month: 'long', year: 'numeric' })}
+          </div> */}
+
+          {/* Intro */}
+          {member.user?.bio && (
+            <div className="bg-white dark:bg-surface-dark p-4 rounded-xl border border-gray-100 dark:border-white/5 mb-6">
+              <h4 className="text-sm font-bold text-gray-500 uppercase mb-2">Giới thiệu</h4>
+              <p className="text-slate-900 dark:text-white text-sm leading-relaxed whitespace-pre-wrap">
+                {member.user.bio}
               </p>
             </div>
+          )}
+
+          {/* Join Date */}
+          <div className="bg-white dark:bg-surface-dark p-4 rounded-xl border border-gray-100 dark:border-white/5">
+            <div className="flex items-center gap-3">
+              <div className="size-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                <Icon name="event" className="text-lg" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 uppercase font-bold">Ngày tham gia</p>
+                <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                  {new Date(member.joinedAt).toLocaleDateString('vi-VN', { day: 'numeric', month: 'long', year: 'numeric' })}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
       </div>
 
       {/* Footer Actions */}

@@ -58,7 +58,7 @@ class TeamInviteService {
   ): Promise<ApiResponse<PhoneInviteResponse>> {
     try {
       const response = await api.post(`${this.basePath}/teams/${teamId}/invite-by-phone`, data);
-      return response.data;
+      return response;
     } catch (error: any) {
       return {
         success: false,
@@ -82,7 +82,7 @@ class TeamInviteService {
   }): Promise<ApiResponse<PaginatedInvites>> {
     try {
       const response = await api.get(`${this.basePath}/my-invites`, { params });
-      return response.data;
+      return response;
     } catch (error: any) {
       return {
         success: false,
@@ -109,7 +109,7 @@ class TeamInviteService {
   ): Promise<ApiResponse<PaginatedInvites>> {
     try {
       const response = await api.get(`${this.basePath}/teams/${teamId}/sent-invites`, { params });
-      return response.data;
+      return response;
     } catch (error: any) {
       return {
         success: false,
@@ -129,7 +129,7 @@ class TeamInviteService {
   async respondToInvite(data: RespondInviteDto): Promise<ApiResponse<RespondInviteResponse>> {
     try {
       const response = await api.post(`${this.basePath}/respond`, data);
-      return response.data;
+      return response;
     } catch (error: any) {
       return {
         success: false,
@@ -149,7 +149,7 @@ class TeamInviteService {
   async cancelInvite(inviteId: string): Promise<ApiResponse> {
     try {
       const response = await api.delete(`${this.basePath}/${inviteId}/cancel`);
-      return response.data;
+      return response;
     } catch (error: any) {
       return {
         success: false,
@@ -169,7 +169,7 @@ class TeamInviteService {
   async resendInvite(inviteId: string): Promise<ApiResponse<PhoneInviteResponse>> {
     try {
       const response = await api.post(`${this.basePath}/${inviteId}/resend`);
-      return response.data;
+      return response;
     } catch (error: any) {
       return {
         success: false,

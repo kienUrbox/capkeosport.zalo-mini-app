@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { zaloThreeStepAuthService } from '@/services/zalo-three-step-auth'
-import { AuthService } from '@/services/api/services'
 import { PADDING, FONT_SIZES, SPACE_Y, BORDER_RADIUS } from '@/constants/design'
 
 const LoginScreen = () => {
@@ -19,12 +18,6 @@ const LoginScreen = () => {
       const authResult = await zaloThreeStepAuthService.authenticateWithThreeSteps()
 
       if (authResult.success) {
-        console.log('✅ Login successful!', authResult.user)
-        console.log('🔍 Checking AuthService after login...')
-        console.log('- isAuthenticated:', AuthService.isAuthenticated())
-        console.log('- getUser:', AuthService.getUser())
-        console.log('- getAccessToken:', AuthService.getAccessToken() ? 'EXISTS' : 'MISSING')
-
         // Redirect to dashboard directly (bypass onboarding)
         navigate('/dashboard')
       } else {

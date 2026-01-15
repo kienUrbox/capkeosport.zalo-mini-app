@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Icon, TeamAvatar, FindMatchSkeleton, FilterBottomSheet, MatchModal, InviteMatchModal, Button } from '@/components/ui';
+import { Icon, TeamAvatar, FindMatchSkeleton, FilterBottomSheet, MatchModal, Button } from '@/components/ui';
 import { appRoutes } from '@/utils/navigation';
 import { useDiscovery } from '@/hooks/useDiscovery';
 import { useMyTeams, useSelectedTeam, useTeamActions, useTeamStore } from '@/stores/team.store';
@@ -28,6 +28,7 @@ const FindMatchScreen: React.FC = () => {
     currentIndex,
     hasMoreCards,
     matchedTeam,
+    matchedMatch,
     isLoading,
     isRefreshing,
     error,
@@ -51,7 +52,6 @@ const FindMatchScreen: React.FC = () => {
   // UI states
   const [showTeamSelector, setShowTeamSelector] = useState(false);
   const [showFilterSheet, setShowFilterSheet] = useState(false);
-  const [inviteModalMatchId, setInviteModalMatchId] = useState<string | null>(null);
 
   // Swipe Logic
   const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
@@ -89,20 +89,6 @@ const FindMatchScreen: React.FC = () => {
       // User can still open selector by clicking header or "Chọn đội khác" button
     }
   }, [flowState, selectedTeam, adminTeams, setSelectedTeam]);
-
-  // Handle view match - open invite modal instead of navigating
-  const handleViewMatch = (matchId: string) => {
-    setInviteModalMatchId(matchId);
-  };
-
-  const handleCloseInviteModal = () => {
-    setInviteModalMatchId(null);
-  };
-
-  const handleInviteSuccess = async () => {
-    setInviteModalMatchId(null);
-    await refresh();
-  };
 
   // Handle team change
   const handleTeamChange = (teamId: string) => {
@@ -178,6 +164,7 @@ const FindMatchScreen: React.FC = () => {
     if (currentTeam && Math.abs(dragDelta.x) < 5 && Math.abs(dragDelta.y) < 5) {
       navigate(appRoutes.opponentDetail(currentTeam?.id), {
         state: {
+          team: currentTeam,
           sortBy: filters.sortBy,
           compatibilityScore: Math.round((currentTeam.compatibilityScore || 0) * 100),
           qualityScore: Math.round((currentTeam.qualityScore || 0) * 100),
@@ -374,20 +361,10 @@ const FindMatchScreen: React.FC = () => {
           matchedTeam={matchedTeam}
           myTeamLogo={selectedTeam?.logo}
           myTeamName={selectedTeam?.name}
-          onViewMatch={handleViewMatch}
+          myTeamId={selectedTeam?.id}
+          matchId={matchedMatch?.id}
           onKeepSwiping={closeMatchModal}
         />
-
-        {/* Invite Match Modal */}
-        {inviteModalMatchId && selectedTeam && (
-          <InviteMatchModal
-            isOpen={!!inviteModalMatchId}
-            matchId={inviteModalMatchId}
-            myTeam={{ id: selectedTeam.id, name: selectedTeam.name, logo: selectedTeam.logo }}
-            onClose={handleCloseInviteModal}
-            onSuccess={handleInviteSuccess}
-          />
-        )}
       </>
     );
   }
@@ -554,7 +531,7 @@ const FindMatchScreen: React.FC = () => {
                 key={team.id}
                 ref={index === 0 ? cardRef : null}
                 style={getCardStyle(index)}
-                className="absolute w-full max-w-[360px] h-[72vh] max-h-[660px] bg-surface-light dark:bg-surface-dark rounded-[2.5rem] shadow-card flex flex-col overflow-hidden border border-gray-200 dark:border-white/10 group cursor-grab active:cursor-grabbing select-none"
+                className="absolute w-full max-w-[360px] h-[65vh] sm:h-[72vh] max-h-[600px] sm:max-h-[660px] bg-surface-light dark:bg-surface-dark rounded-[2.5rem] shadow-card flex flex-col overflow-hidden border border-gray-200 dark:border-white/10 group cursor-grab active:cursor-grabbing select-none"
                 onTouchStart={index === 0 ? handleTouchStart : undefined}
                 onTouchMove={index === 0 ? handleTouchMove : undefined}
                 onTouchEnd={index === 0 ? handleTouchEnd : undefined}
@@ -608,10 +585,10 @@ const FindMatchScreen: React.FC = () => {
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 flex flex-col pt-16 px-6 pb-6 items-center text-center bg-surface-light dark:bg-surface-dark w-full" onClick={handleClickCard}>
+                <div className="flex-1 flex flex-col pt-16 px-4 sm:px-6 pb-24 items-center text-center bg-surface-light dark:bg-surface-dark w-full overflow-y-auto no-scrollbar" onClick={handleClickCard}>
                   {/* Circular Team Logo - Centered at top-[22%] */}
                   <div className="absolute top-[22%] left-1/2 -translate-x-1/2 z-10">
-                    <div className="w-28 h-28 rounded-full p-1.5 bg-surface-light dark:bg-surface-dark shadow-2xl">
+                    <div className="w-24 sm:w-28 h-24 sm:h-28 rounded-full p-1.5 bg-surface-light dark:bg-surface-dark shadow-2xl">
                       <div className="w-full h-full rounded-full overflow-hidden bg-surface-light border border-gray-200 dark:border-white/10 relative">
                         {team.logo ? (
                           <img src={team.logo} className="w-full h-full object-cover" alt="logo" />
@@ -663,7 +640,7 @@ const FindMatchScreen: React.FC = () => {
                   </div>
 
                   {/* Badges: Level + Members */}
-                  <div className="flex items-center gap-3 mb-4">
+                  <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-4">
                     <div className="px-3 py-1 rounded-lg bg-primary/10 border border-primary/20 flex items-center gap-1.5">
                       <Icon name="military_tech" className="text-primary text-[16px]" />
                       <span className="text-primary text-xs font-bold uppercase tracking-wide">{team.level || '-'}</span>
@@ -682,29 +659,29 @@ const FindMatchScreen: React.FC = () => {
                   </p>
 
                   {/* Stats Grid với Progress Bars - 3 cols */}
-                  <div className="w-full grid grid-cols-3 gap-3 mb-auto">
+                  <div className="w-full grid grid-cols-3 gap-2 sm:gap-3 mb-auto">
                     {team.stats?.attack && (
-                      <div className="bg-surface-light/50 dark:bg-surface-dark/50 rounded-2xl p-3 flex flex-col items-center gap-1 border border-gray-200 dark:border-white/5 shadow-inner-light">
+                      <div className="bg-surface-light/50 dark:bg-surface-dark/50 rounded-2xl p-2 sm:p-3 flex flex-col items-center gap-1 border border-gray-200 dark:border-white/5 shadow-inner-light">
                         <span className="text-[10px] text-text-secondary uppercase font-bold tracking-wider">Tấn công</span>
-                        <span className="text-lg font-bold text-slate-900 dark:text-white">{team.stats.attack}</span>
+                        <span className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">{team.stats.attack}</span>
                         <div className="w-full h-1.5 bg-white/10 rounded-full mt-1 overflow-hidden">
                           <div className="h-full bg-emerald-400 rounded-full" style={{ width: `${team.stats.attack}%` }}></div>
                         </div>
                       </div>
                     )}
                     {team.stats?.defense && (
-                      <div className="bg-surface-light/50 dark:bg-surface-dark/50 rounded-2xl p-3 flex flex-col items-center gap-1 border border-gray-200 dark:border-white/5 shadow-inner-light">
+                      <div className="bg-surface-light/50 dark:bg-surface-dark/50 rounded-2xl p-2 sm:p-3 flex flex-col items-center gap-1 border border-gray-200 dark:border-white/5 shadow-inner-light">
                         <span className="text-[10px] text-text-secondary uppercase font-bold tracking-wider">Phòng thủ</span>
-                        <span className="text-lg font-bold text-slate-900 dark:text-white">{team.stats.defense}</span>
+                        <span className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">{team.stats.defense}</span>
                         <div className="w-full h-1.5 bg-white/10 rounded-full mt-1 overflow-hidden">
                           <div className="h-full bg-blue-400 rounded-full" style={{ width: `${team.stats.defense}%` }}></div>
                         </div>
                       </div>
                     )}
                     {team.stats?.technique && (
-                      <div className="bg-surface-light/50 dark:bg-surface-dark/50 rounded-2xl p-3 flex flex-col items-center gap-1 border border-gray-200 dark:border-white/5 shadow-inner-light">
+                      <div className="bg-surface-light/50 dark:bg-surface-dark/50 rounded-2xl p-2 sm:p-3 flex flex-col items-center gap-1 border border-gray-200 dark:border-white/5 shadow-inner-light">
                         <span className="text-[10px] text-text-secondary uppercase font-bold tracking-wider">Kỹ thuật</span>
-                        <span className="text-lg font-bold text-slate-900 dark:text-white">{team.stats.technique}</span>
+                        <span className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">{team.stats.technique}</span>
                         <div className="w-full h-1.5 bg-white/10 rounded-full mt-1 overflow-hidden">
                           <div className="h-full bg-purple-400 rounded-full" style={{ width: `${team.stats.technique}%` }}></div>
                         </div>
@@ -713,19 +690,19 @@ const FindMatchScreen: React.FC = () => {
                   </div>
 
                   {/* Info Grid - 2 cols: Sân bóng, Cách xa */}
-                  <div className="w-full grid grid-cols-2 gap-3 mt-4">
-                    <div className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-surface-light dark:bg-surface-dark border border-gray-200 dark:border-white/5">
-                      <Icon name="sports_soccer" className="text-primary text-[20px]" />
+                  <div className="w-full grid grid-cols-2 gap-2 sm:gap-3 mt-3 sm:mt-4">
+                    <div className="flex items-center justify-center gap-2 py-2 sm:py-3 px-3 sm:px-4 rounded-xl bg-surface-light dark:bg-surface-dark border border-gray-200 dark:border-white/5">
+                      <Icon name="sports_soccer" className="text-primary text-[18px] sm:text-[20px]" />
                       <div className="flex flex-col items-start">
                         <span className="text-[10px] text-text-secondary uppercase font-bold">Sân bóng</span>
-                        <span className="text-sm font-bold text-slate-900 dark:text-white">{team.pitch?.join(' & ') || 'Sân 5 & 7'}</span>
+                        <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">{team.pitch?.join(' & ') || 'Sân 5 & 7'}</span>
                       </div>
                     </div>
-                    <div className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-surface-light dark:bg-surface-dark border border-gray-200 dark:border-white/5">
-                      <Icon name="near_me" className="text-primary text-[20px]" />
+                    <div className="flex items-center justify-center gap-2 py-2 sm:py-3 px-3 sm:px-4 rounded-xl bg-surface-light dark:bg-surface-dark border border-gray-200 dark:border-white/5">
+                      <Icon name="near_me" className="text-primary text-[18px] sm:text-[20px]" />
                       <div className="flex flex-col items-start">
                         <span className="text-[10px] text-text-secondary uppercase font-bold">Cách xa</span>
-                        <span className="text-sm font-bold text-slate-900 dark:text-white">{formatDistance(team.distance)}</span>
+                        <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">{formatDistance(team.distance)}</span>
                       </div>
                     </div>
                   </div>
@@ -858,20 +835,10 @@ const FindMatchScreen: React.FC = () => {
         matchedTeam={matchedTeam}
         myTeamLogo={selectedTeam?.logo}
         myTeamName={selectedTeam?.name}
-        onViewMatch={handleViewMatch}
+        myTeamId={selectedTeam?.id}
+        matchId={matchedMatch?.id}
         onKeepSwiping={closeMatchModal}
       />
-
-      {/* Invite Match Modal */}
-      {inviteModalMatchId && selectedTeam && (
-        <InviteMatchModal
-          isOpen={!!inviteModalMatchId}
-          matchId={inviteModalMatchId}
-          myTeam={{ id: selectedTeam.id, name: selectedTeam.name, logo: selectedTeam.logo }}
-          onClose={handleCloseInviteModal}
-          onSuccess={handleInviteSuccess}
-        />
-      )}
     </>
   );
 };

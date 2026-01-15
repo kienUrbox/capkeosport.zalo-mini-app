@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/Input';
 import { appRoutes } from '@/utils/navigation';
 import { MatchService, type RematchDto } from '@/services/api/match.service';
 import { useMatchActions } from '@/stores/match.store';
+import { toast } from '@/utils/toast';
 
 /**
  * Rematch Screen
@@ -77,7 +78,7 @@ const RematchScreen: React.FC = () => {
 
     // Validation
     if (!proposedDate || !proposedTime || !proposedPitch) {
-      alert('Vui lòng điền đầy đủ thông tin ngày, giờ và sân dự kiến');
+      toast.warning('Vui lòng điền đầy đủ thông tin ngày, giờ và sân dự kiến');
       return;
     }
 
@@ -94,11 +95,11 @@ const RematchScreen: React.FC = () => {
       await matchActions.rematch(matchId, rematchData);
 
       // Show success and navigate back
-      alert('Đã gửi lời mời đá lại!');
+      toast.success('Đã gửi lời mời đá lại!');
       navigate(appRoutes.matchSchedule);
     } catch (error: any) {
       console.error('Rematch error:', error);
-      alert(error.message || 'Không thể gửi lời mời đá lại');
+      toast.error(error.message || 'Không thể gửi lời mời đá lại');
     } finally {
       setIsLoading(false);
     }

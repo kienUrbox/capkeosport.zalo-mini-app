@@ -12,10 +12,16 @@ import type {
   TeamRole,
 } from '@/types/api.types';
 import { api } from '@/services/api/index';
+import { useAuthStore } from '@/stores/auth.store';
 
-// User's role in a team - simplified from API types for UI usage
-// Maps from API TeamRole: CAPTAIN/PLAYER/SUBSTITUTE → admin/captain/member
-export type UserRole = 'admin' | 'captain' | 'member';
+// Helper to get current user ID from auth store (non-reactive)
+const getCurrentUserId = (): string | undefined => {
+  return useAuthStore.getState().user?.id;
+};
+
+// User's role in a team - matches API response
+// API returns 'admin' | 'member' in TeamMemberDetail.role
+export type UserRole = 'admin' | 'member';
 
 export interface Team {
   id: string;
@@ -36,6 +42,17 @@ export interface TeamMember {
   role: 'captain' | 'player' | 'substitute';
   number?: string;
 }
+
+// Helper: Check if team has admin role
+export const isAdmin = (team: Team | undefined | null): boolean => {
+  if (!team) return false;
+  return team.userRole === 'admin';
+};
+
+// Helper: Check if userRole has admin permission
+export const hasAdminPermission = (userRole?: UserRole): boolean => {
+  return userRole === 'admin';
+};
 
 interface TeamState {
   // State
@@ -130,6 +147,9 @@ interface TeamState {
    */
   updateMemberRole: (teamId: string, memberId: string, role: TeamRole) => Promise<void>;
 
+  // Admin Role Actions (Promote/Demote)
+  updateMemberAdminRole: (teamId: string, memberId: string, role: 'admin' | 'member') => Promise<void>;
+
   // ========== Invite Actions ==========
   fetchSentInvites: (teamId: string, params?: { page?: number; limit?: number; status?: InviteStatus }) => Promise<void>;
   fetchReceivedInvites: (params?: { page?: number; limit?: number; status?: InviteStatus }) => Promise<void>;
@@ -140,17 +160,22 @@ interface TeamState {
 }
 
 // Transform API team to store team format
-const transformApiTeam = (apiTeam: ApiTeam, currentUserId?: string): Team => ({
-  id: apiTeam.id,
-  name: apiTeam.name,
-  logo: apiTeam.logo || apiTeam.avatar || '',
-  level: apiTeam.level,
-  gender: apiTeam.gender,
-  description: apiTeam.description,
-  memberCount: apiTeam.membersCount || apiTeam.members?.length || 0,
-  isCaptain: currentUserId ? apiTeam.createdBy === currentUserId : false,
-  userRole: 'member', // Will be determined by the caller
-});
+const transformApiTeam = (apiTeam: ApiTeam, currentUserId?: string): Team => {
+  // Use actual role from API response, default to 'member' if not provided
+  const userRole: UserRole = apiTeam.userRole || 'member';
+
+  return {
+    id: apiTeam.id,
+    name: apiTeam.name,
+    logo: apiTeam.logo || apiTeam.avatar || '',
+    level: apiTeam.level,
+    gender: apiTeam.gender,
+    description: apiTeam.description,
+    memberCount: apiTeam.membersCount || apiTeam.members?.length || 0,
+    isCaptain: currentUserId ? apiTeam.createdBy === currentUserId : false,
+    userRole, // Use actual role from API response (already included in /teams/my-teams response)
+  };
+};
 
 // Transform API team member to store member format
 const transformApiMember = (apiMember: any): TeamMember => ({
@@ -264,7 +289,8 @@ export const useTeamStore = create<TeamState>()(
             const teams = Array.isArray(response.data) ? response.data : [];
 
             // Transform API response to store format
-            const transformedTeams: Team[] = teams.map((apiTeam: ApiTeam) => transformApiTeam(apiTeam));
+            const currentUserId = getCurrentUserId();
+            const transformedTeams: Team[] = teams.map((apiTeam: ApiTeam) => transformApiTeam(apiTeam, currentUserId));
 
             set({ myTeams: transformedTeams, error: null });
 
@@ -273,8 +299,6 @@ export const useTeamStore = create<TeamState>()(
             if (!newState.selectedTeam && transformedTeams.length > 0) {
               set({ selectedTeam: transformedTeams[0] });
             }
-
-            console.log('[TeamStore] Successfully fetched my teams:', transformedTeams.length);
           }
         } catch (error: any) {
           console.error('[TeamStore] Fetch my teams error:', error);
@@ -326,7 +350,7 @@ export const useTeamStore = create<TeamState>()(
           const response = await api.post<ApiTeam>('/teams', teamData);
 
           if (response.success && response.data) {
-            const transformedTeam = transformApiTeam(response.data);
+            const transformedTeam = transformApiTeam(response.data, getCurrentUserId());
 
             // Add to my teams list
             set((state) => ({
@@ -358,7 +382,7 @@ export const useTeamStore = create<TeamState>()(
           const response = await api.patch<ApiTeam>(`/teams/${teamId}`, teamData);
 
           if (response.success && response.data) {
-            const transformedTeam = transformApiTeam(response.data);
+            const transformedTeam = transformApiTeam(response.data, getCurrentUserId());
 
             // Update in my teams list
             get().updateTeam(teamId, transformedTeam);
@@ -525,6 +549,24 @@ export const useTeamStore = create<TeamState>()(
         }
       },
 
+      // ========== Admin Role Actions (Promote/Demote) ==========
+      updateMemberAdminRole: async (teamId: string, memberId: string, role: 'admin' | 'member') => {
+        try {
+          // Dynamic import to avoid circular dependency
+          const teamModule = await import('@/services/api/team.service');
+          const TeamService = teamModule.TeamService;
+          const response = await TeamService.updateMemberAdminRole(teamId, memberId, role);
+
+          if (response.success) {
+            // Refresh member list to show updated role
+            await get().getTeamMembers(teamId);
+          }
+        } catch (error: any) {
+          console.error('Failed to update member admin role:', error);
+          throw error;
+        }
+      },
+
       // ========== Invite Actions ==========
       fetchSentInvites: async (teamId, params) => {
         try {
@@ -536,7 +578,7 @@ export const useTeamStore = create<TeamState>()(
           const response = await TeamInviteService.getSentInvites(teamId, params);
 
           if (response.success && response.data) {
-            set({ sentInvites: response.data.invites, isLoading: false });
+            set({ sentInvites: response.data.invitations, isLoading: false });
           }
         } catch (error: any) {
           console.error('[TeamStore] Fetch sent invites error:', error);
@@ -554,7 +596,7 @@ export const useTeamStore = create<TeamState>()(
           const response = await TeamInviteService.getMyInvites(params);
 
           if (response.success && response.data) {
-            set({ receivedInvites: response.data.invites, isLoading: false });
+            set({ receivedInvites: response.data.invitations, isLoading: false });
           }
         } catch (error: any) {
           console.error('[TeamStore] Fetch received invites error:', error);
@@ -708,6 +750,7 @@ export const useTeamActions = () => {
     addMemberToTeam: store.addMemberToTeam,
     removeMemberFromTeam: store.removeMemberFromTeam,
     updateMemberRole: store.updateMemberRole,
+    updateMemberAdminRole: store.updateMemberAdminRole,
     // Invite methods
     fetchSentInvites: store.fetchSentInvites,
     fetchReceivedInvites: store.fetchReceivedInvites,

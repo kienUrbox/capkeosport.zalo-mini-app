@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Icon, Button, Input } from './';
 import { TeamAvatar } from './TeamAvatar';
 import { useMatchActions } from '@/stores/match.store';
-import { appRoutes } from '@/utils/navigation';
 import type { SendMatchRequestDto, UpdateMatchRequestDto } from '@/services/api/match.service';
 
 export interface OpponentTeamInfo {
@@ -44,7 +42,6 @@ export const MatchRequestModal: React.FC<MatchRequestModalProps> = ({
   onClose,
   onSuccess,
 }) => {
-  const navigate = useNavigate();
   const matchActions = useMatchActions();
 
   // Form state
@@ -120,7 +117,7 @@ export const MatchRequestModal: React.FC<MatchRequestModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center">
+    <div className="fixed inset-0 z-[60] flex items-end justify-center">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in"
@@ -129,6 +126,16 @@ export const MatchRequestModal: React.FC<MatchRequestModalProps> = ({
 
       {/* Modal Content */}
       <div className="relative w-full max-w-md bg-white dark:bg-surface-dark rounded-t-3xl p-6 pb-safe animate-slide-up shadow-2xl max-h-[90vh] overflow-y-auto">
+        {/* Loading Overlay */}
+        {isSubmitting && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/90 dark:bg-surface-dark/90 backdrop-blur-sm rounded-t-3xl">
+            <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4" />
+            <p className="text-sm font-medium text-gray-600 dark:text-gray-300">
+              {mode === 'send' ? 'Đang gửi lời mời...' : 'Đang cập nhật...'}
+            </p>
+          </div>
+        )}
+
         {/* Handle bar */}
         <div className="w-12 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-6" />
 
@@ -148,28 +155,11 @@ export const MatchRequestModal: React.FC<MatchRequestModalProps> = ({
         {/* VS Team Display */}
         <div className="flex items-center justify-between mb-6 p-4 bg-gray-50 dark:bg-white/5 rounded-2xl">
           {/* My Team */}
-          <div
-            className="flex flex-col items-center gap-2 flex-1 cursor-pointer hover:bg-gray-100 dark:hover:bg-white/10 rounded-xl p-2 transition-colors"
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate(appRoutes.teamDetail(myTeam.id));
-            }}
-          >
-            <div className="relative">
-              <TeamAvatar
-                src={myTeam.logo || ''}
-                size="md"
-              />
-              <button
-                className="absolute -top-1 -right-1 size-5 flex items-center justify-center rounded-full bg-white dark:bg-surface-dark border border-gray-200 dark:border-white/10 shadow-sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate(appRoutes.teamDetail(myTeam.id));
-                }}
-              >
-                <Icon name="info" size="sm" className="text-gray-500" />
-              </button>
-            </div>
+          <div className="flex flex-col items-center gap-2 flex-1">
+            <TeamAvatar
+              src={myTeam.logo || ''}
+              size="md"
+            />
             <span className="text-xs font-bold truncate w-full text-center">
               {myTeam.name}
             </span>
@@ -181,28 +171,11 @@ export const MatchRequestModal: React.FC<MatchRequestModalProps> = ({
           </div>
 
           {/* Opponent Team */}
-          <div
-            className="flex flex-col items-center gap-2 flex-1 cursor-pointer hover:bg-gray-100 dark:hover:bg-white/10 rounded-xl p-2 transition-colors"
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate(appRoutes.teamDetail(opponentTeam.id));
-            }}
-          >
-            <div className="relative">
-              <TeamAvatar
-                src={opponentTeam.logo || ''}
-                size="md"
-              />
-              <button
-                className="absolute -top-1 -right-1 size-5 flex items-center justify-center rounded-full bg-white dark:bg-surface-dark border border-gray-200 dark:border-white/10 shadow-sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate(appRoutes.teamDetail(opponentTeam.id));
-                }}
-              >
-                <Icon name="info" size="sm" className="text-gray-500" />
-              </button>
-            </div>
+          <div className="flex flex-col items-center gap-2 flex-1">
+            <TeamAvatar
+              src={opponentTeam.logo || ''}
+              size="md"
+            />
             <span className="text-xs font-bold truncate w-full text-center">
               {opponentTeam.name}
             </span>

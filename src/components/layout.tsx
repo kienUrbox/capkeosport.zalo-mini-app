@@ -6,6 +6,7 @@ import {
 import type { AppProps } from 'zmp-ui/app'
 import type { FC, ReactNode } from 'react'
 
+import { ToastContainer } from '../components/ui/ToastContainer'
 import MiniApp from '../MiniApp'
 
 const SnackbarProviderWrapper = SnackbarProvider as unknown as FC<{ children: ReactNode }>
@@ -17,6 +18,7 @@ const Layout = () => {
     <ZaloMiniApp theme={theme}>
       <SnackbarProviderWrapper>
         <MiniApp />
+        <ToastContainer />
       </SnackbarProviderWrapper>
     </ZaloMiniApp>
   )
