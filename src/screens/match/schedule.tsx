@@ -146,7 +146,7 @@ const MatchScheduleScreen: React.FC = () => {
   // Reset and load initial tab when team changes
   useEffect(() => {
     if (currentTeam?.id) {
-      resetAll();
+      // resetAll();
       // Use the saved active tab from store, or 'pending' if first time
       const savedTab = matchActions.getActiveTab(currentTeam?.id);
       fetchTabOnDemand(savedTab);
@@ -753,6 +753,7 @@ const MatchScheduleScreen: React.FC = () => {
                 <button
                   key={team.id}
                   onClick={() => {
+                    resetAll()
                     setSelectedTeam(team);
                     setShowTeamSelector(false);
                   }}
