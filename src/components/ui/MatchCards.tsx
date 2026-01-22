@@ -259,6 +259,8 @@ interface UpcomingMatchCardProps {
   onFinish?: (id: string) => void;
   onUpdateScore?: (id: string) => void;
   onCancel?: (id: string) => void;
+  onConfirmAttendance?: (id: string) => void;
+  onAttendanceView?: (id: string) => void;
 }
 
 export const UpcomingMatchCard: React.FC<UpcomingMatchCardProps> = ({
@@ -268,6 +270,8 @@ export const UpcomingMatchCard: React.FC<UpcomingMatchCardProps> = ({
   onFinish,
   onUpdateScore,
   onCancel,
+  onConfirmAttendance,
+  onAttendanceView,
 }) => {
   const navigate = useNavigate();
 
@@ -305,25 +309,21 @@ export const UpcomingMatchCard: React.FC<UpcomingMatchCardProps> = ({
   };
 
   const renderActions = () => {
-    // Members (non-admin) cannot perform any actions
-    if (!isAdmin) {
-      return (
-        <div className="flex items-center justify-center gap-2 mt-4 pt-3 border-t border-gray-100 dark:border-white/5">
-          <Icon name="info" size="sm" className="text-gray-500" />
-          <span className="text-xs text-gray-500 dark:text-gray-400">
-            Chỉ quản trị viên được thực hiện thao tác
-          </span>
-        </div>
-      );
-    }
-
     switch (stage) {
       case 'upcoming':
         return (
           <div
-            className="flex gap-3 mt-4 pt-3 border-t border-gray-100 dark:border-white/5"
+            className="flex gap-2 mt-4 pt-3 border-t border-gray-100 dark:border-white/5"
             onClick={(e) => e.stopPropagation()}
           >
+            <Button
+              variant="secondary"
+              className="flex-1 h-9 text-xs"
+              icon="how_to_reg"
+              onClick={() => onConfirmAttendance?.(match.id)}
+            >
+              Điểm danh
+            </Button>
             <Button
               variant="secondary"
               className="flex-1 h-9 text-xs"
@@ -333,11 +333,12 @@ export const UpcomingMatchCard: React.FC<UpcomingMatchCardProps> = ({
               Báo bận
             </Button>
             <Button
+              variant="secondary"
               className="flex-1 h-9 text-xs"
-              icon="how_to_reg"
-              onClick={() => navigate(appRoutes.matchAttendance(match.id))}
+              icon="groups"
+              onClick={() => onAttendanceView?.(match.id)}
             >
-              Điểm danh
+              Lực lượng
             </Button>
           </div>
         );
@@ -399,9 +400,38 @@ export const UpcomingMatchCard: React.FC<UpcomingMatchCardProps> = ({
     >
       <div className="flex justify-between items-start mb-4">
         {renderStatus()}
-        <div className="flex items-center gap-1 text-xs font-bold text-gray-500">
-          <Icon name="location_on" className="text-xs" />
-          {match.location}
+        <div className="flex items-start gap-1.5">
+          <div className="w-5 h-5 bg-gray-100 dark:bg-white/5 rounded-md flex items-center justify-center shrink-0 mt-0.5">
+            <Icon name="place" className="text-primary" size="xs" />
+          </div>
+          <div className="flex-1 min-w-0">
+            {match.locationName ? (
+              <>
+                <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                  {match.locationName}
+                </p>
+                <p className="text-[10px] text-gray-500 dark:text-gray-400 line-clamp-1">
+                  {match.locationAddress}
+                </p>
+                {match.locationMapLink && (
+                  <a
+                    href={match.locationMapLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-0.5 text-[10px] text-primary font-medium mt-0.5 hover:text-primary/80 transition-colors"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Icon name="open_in_new" size="xs" />
+                    Xem bản đồ
+                  </a>
+                )}
+              </>
+            ) : (
+              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                {match.location}
+              </p>
+            )}
+          </div>
         </div>
       </div>
 

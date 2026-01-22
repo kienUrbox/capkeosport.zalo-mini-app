@@ -7,6 +7,7 @@ import { appRoutes } from '@/utils/navigation';
 import { MatchService, type RematchDto } from '@/services/api/match.service';
 import { useMatchActions } from '@/stores/match.store';
 import { toast } from '@/utils/toast';
+import { PITCH_TYPE_VALUES } from '@/constants/design';
 
 /**
  * Rematch Screen
@@ -63,7 +64,7 @@ const RematchScreen: React.FC = () => {
           // Pre-fill with previous match info
           setProposedDate(match.date || '');
           setProposedTime(match.time || '');
-          setProposedPitch(match.location?.address || match.proposedPitch || '');
+          setProposedPitch(match.proposedPitch || '');
         }
       } catch (error) {
         console.error('Failed to fetch match details:', error);
@@ -170,13 +171,27 @@ const RematchScreen: React.FC = () => {
             />
           </div>
 
-          <Input
-            label="Sân dự kiến"
-            placeholder="Nhập tên sân hoặc địa chỉ..."
-            value={proposedPitch}
-            onChange={(e) => setProposedPitch(e.target.value)}
-            icon="location_on"
-          />
+          <div>
+            <label className="text-sm font-medium text-gray-600 dark:text-text-secondary ml-1 mb-2 block">
+              Loại sân <span className="text-red-500">*</span>
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {PITCH_TYPE_VALUES.map((pitchType) => (
+                <button
+                  key={pitchType}
+                  type="button"
+                  onClick={() => setProposedPitch(pitchType)}
+                  className={`py-2.5 px-3 rounded-xl text-sm font-medium transition-all ${
+                    proposedPitch === pitchType
+                      ? 'bg-primary text-background-dark'
+                      : 'bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10'
+                  }`}
+                >
+                  {pitchType}
+                </button>
+              ))}
+            </div>
+          </div>
 
           <div className="flex flex-col gap-2">
             <label className="text-sm font-medium text-gray-600 dark:text-text-secondary ml-1">

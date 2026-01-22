@@ -132,7 +132,8 @@ export interface Attendee {
 }
 
 export interface TeamAttendance {
-  teamId: string;
+  id: string;
+  name: string;
   attendance: Attendee[];
   summary: {
     total: number;

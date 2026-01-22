@@ -82,7 +82,7 @@ export const useScheduleData = (teamId?: string) => {
 
       await fetchTabData(tab, 1, forceRefresh);
     },
-    [teamId, store._fetchedTabs, fetchTabData]
+    [teamId, fetchTabData]
   );
 
   // Load more (infinite scroll)

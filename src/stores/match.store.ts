@@ -45,6 +45,10 @@ export interface Match {
   time: string;
   date: string;
   location: string;
+  // Location details for CONFIRMED matches
+  locationName?: string;
+  locationAddress?: string;
+  locationMapLink?: string;
   status: MatchStatus;
   type?: 'matched' | 'received' | 'sent' | 'accepted';
   requestedByTeam?: string;
@@ -184,6 +188,10 @@ const transformApiMatch = (
     time: matchTime || 'TBD',
     date: matchDate || 'TBD',
     location: apiMatch.location?.address || apiMatch.proposedPitch || 'TBD',
+    // Preserve full location data for CONFIRMED matches
+    locationName: apiMatch.location?.name,
+    locationAddress: apiMatch.location?.address,
+    locationMapLink: apiMatch.location?.mapLink,
     status: uiStatus,
     type,
     requestedByTeam: apiMatch.requestedByTeam,
@@ -225,6 +233,11 @@ interface MatchState {
     };
   };
 
+  // Active tab per team
+  _activeTabs: {
+    [teamId: string]: TabType;
+  };
+
   // Actions
   setPendingMatches: (matches: Match[]) => void;
   setUpcomingMatches: (matches: Match[]) => void;
@@ -240,6 +253,12 @@ interface MatchState {
 
   // NEW: Clear all data (for team change)
   clearAllData: () => void;
+
+  // Get active tab for current team
+  getActiveTab: (teamId?: string) => TabType;
+
+  // Set active tab for current team
+  setActiveTab: (teamId: string | undefined, tab: TabType) => void;
 
   // NEW: Update pagination state
   updatePagination: (tab: TabType, pagination: Partial<PaginationState>) => void;
@@ -272,9 +291,9 @@ export const useMatchStore = create<MatchState>()(
       isLoading: false,
       error: null,
       pagination: {
-        pending: { page: 1, limit: 20, total: 0, totalPages: 0, hasMore: true },
-        upcoming: { page: 1, limit: 20, total: 0, totalPages: 0, hasMore: true },
-        history: { page: 1, limit: 20, total: 0, totalPages: 0, hasMore: true },
+        pending: { page: 1, limit: 10, total: 0, totalPages: 0, hasMore: true },
+        upcoming: { page: 1, limit: 10, total: 0, totalPages: 0, hasMore: true },
+        history: { page: 1, limit: 10, total: 0, totalPages: 0, hasMore: true },
       },
       isLoadingMore: {
         pending: false,
@@ -282,6 +301,7 @@ export const useMatchStore = create<MatchState>()(
         history: false,
       },
       _fetchedTabs: {},
+      _activeTabs: {},
 
       // Actions
       setPendingMatches: (matches) => set({ pendingMatches: matches }),
@@ -299,12 +319,28 @@ export const useMatchStore = create<MatchState>()(
         upcomingMatches: [],
         historyMatches: [],
         _fetchedTabs: {},
+        _activeTabs: {},
         pagination: {
-          pending: { page: 1, limit: 20, total: 0, totalPages: 0, hasMore: true },
-          upcoming: { page: 1, limit: 20, total: 0, totalPages: 0, hasMore: true },
-          history: { page: 1, limit: 20, total: 0, totalPages: 0, hasMore: true },
+          pending: { page: 1, limit: 10, total: 0, totalPages: 0, hasMore: true },
+          upcoming: { page: 1, limit: 10, total: 0, totalPages: 0, hasMore: true },
+          history: { page: 1, limit: 10, total: 0, totalPages: 0, hasMore: true },
         },
       }),
+
+      getActiveTab: (teamId?: string) => {
+        if (!teamId) return 'pending';
+        return get()._activeTabs[teamId] || 'pending';
+      },
+
+      setActiveTab: (teamId: string | undefined, tab: TabType) => {
+        if (!teamId) return;
+        set((state) => ({
+          _activeTabs: {
+            ...state._activeTabs,
+            [teamId]: tab,
+          },
+        }));
+      },
 
       updatePagination: (tab, paginationData) => set((state) => ({
         pagination: {
@@ -391,7 +427,7 @@ export const useMatchStore = create<MatchState>()(
             statuses: ['CONFIRMED'], // Lịch đấu (includes upcoming, live, and finished based on date/time)
             teamId,
             page,
-            limit: 20
+            limit: 10
           });
 
           if (response.success && response.data) {
@@ -475,7 +511,7 @@ export const useMatchStore = create<MatchState>()(
             statuses: ['MATCHED', 'REQUESTED', 'ACCEPTED'], // Chờ kèo
             teamId,
             page,
-            limit: 20
+            limit: 10
           });
 
           if (response.success && response.data) {
@@ -553,10 +589,10 @@ export const useMatchStore = create<MatchState>()(
           }
 
           const response = await MatchService.getMatches({
-            statuses: ['FINISHED', 'CANCELLED'], // BOTH statuses
+            statuses: ['FINISHED'], // Chỉ lấy trận đã kết thúc
             teamId,
             page,
-            limit: 20
+            limit: 10
           });
 
           if (response.success && response.data) {
@@ -765,6 +801,8 @@ export const useMatchActions = () => {
     setError: store.setError,
     clearAllData: store.clearAllData,
     updatePagination: store.updatePagination,
+    getActiveTab: store.getActiveTab,
+    setActiveTab: store.setActiveTab,
     fetchUpcomingMatches: store.fetchUpcomingMatches,
     fetchPendingMatches: store.fetchPendingMatches,
     fetchHistoryMatches: store.fetchHistoryMatches,
