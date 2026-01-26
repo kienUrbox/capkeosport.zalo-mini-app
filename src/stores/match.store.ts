@@ -10,6 +10,9 @@ import {
   type RematchDto,
   type SendMatchRequestDto,
   type UpdateMatchRequestDto,
+  type MatchResultData,
+  type MatchResultFile,
+  type SubmitResultDto,
 } from '@/services/api/match.service';
 
 // Simplified match types for UI
@@ -54,6 +57,22 @@ export interface Match {
   requestedByTeam?: string;
   acceptedByTeam?: string;
   notes?: string;
+  // Match result fields
+  result?: {
+    teamAScore: number;
+    teamBScore: number;
+    notes?: string;
+    fileIds?: string[];
+    lastUpdatedBy: string;
+    lastUpdatedAt: string;
+    files?: MatchResultFile[];
+  };
+  resultConfirmations?: {
+    teamA: { confirmed: boolean; confirmedBy?: string; confirmedAt?: string };
+    teamB: { confirmed: boolean; confirmedBy?: string; confirmedAt?: string };
+  };
+  resultLocked?: boolean;
+  canEditResult?: boolean;
 }
 
 // Map API match status to UI status
@@ -197,6 +216,21 @@ const transformApiMatch = (
     requestedByTeam: apiMatch.requestedByTeam,
     acceptedByTeam: apiMatch.acceptedByTeam,
     notes: apiMatch.notes,
+    // Result data - will be populated when includeResult=true
+    ...(apiMatch.result && {
+      result: {
+        teamAScore: apiMatch.result.teamAScore,
+        teamBScore: apiMatch.result.teamBScore,
+        notes: apiMatch.result.notes,
+        fileIds: apiMatch.result.fileIds,
+        lastUpdatedBy: apiMatch.result.lastUpdatedBy,
+        lastUpdatedAt: apiMatch.result.lastUpdatedAt,
+        files: apiMatch.result.files,
+      },
+      resultConfirmations: apiMatch.result.confirmations,
+      resultLocked: apiMatch.result.locked,
+      canEditResult: apiMatch.result.canEdit,
+    }),
   };
 };
 
@@ -277,6 +311,11 @@ interface MatchState {
   finishMatch: (matchId: string, data: FinishMatchDto) => Promise<void>;
   cancelMatch: (matchId: string, data: CancelMatchDto) => Promise<void>;
   rematch: (matchId: string, data: RematchDto) => Promise<void>;
+
+  // Match Result Actions
+  submitMatchResult: (matchId: string, data: SubmitResultDto) => Promise<void>;
+  confirmMatchResult: (matchId: string) => Promise<void>;
+  getMatchResult: (matchId: string) => Promise<MatchResultData | null>;
 }
 
 export const useMatchStore = create<MatchState>()(
@@ -427,7 +466,8 @@ export const useMatchStore = create<MatchState>()(
             statuses: ['CONFIRMED'], // Lịch đấu (includes upcoming, live, and finished based on date/time)
             teamId,
             page,
-            limit: 10
+            limit: 10,
+            includeResult: true, // Include match result data
           });
 
           if (response.success && response.data) {
@@ -758,6 +798,97 @@ export const useMatchStore = create<MatchState>()(
           throw error;
         }
       },
+
+      // Match Result Actions
+      submitMatchResult: async (matchId: string, data: SubmitResultDto) => {
+        try {
+          set({ isLoading: true, error: null });
+          const response = await MatchService.submitResult(matchId, data);
+
+          if (response.success && response.data) {
+            const resultData = response.data.data;
+
+            // Update the match in store with new result
+            set((state) => {
+              const updatedMatches = state.upcomingMatches.map((m) =>
+                m.id === matchId
+                  ? {
+                      ...m,
+                      result: resultData.result ? {
+                        teamAScore: resultData.result.teamAScore,
+                        teamBScore: resultData.result.teamBScore,
+                        notes: resultData.result.notes,
+                        fileIds: resultData.result.fileIds,
+                        lastUpdatedBy: resultData.result.lastUpdatedBy,
+                        lastUpdatedAt: resultData.result.lastUpdatedAt,
+                      } : undefined,
+                      resultConfirmations: resultData.confirmations,
+                      resultLocked: resultData.locked,
+                      canEditResult: resultData.canEdit,
+                    }
+                  : m
+              );
+              return { upcomingMatches: updatedMatches, isLoading: false };
+            });
+          }
+        } catch (error: any) {
+          set({ error: error.message || 'Không thể lưu kết quả', isLoading: false });
+          throw error;
+        }
+      },
+
+      confirmMatchResult: async (matchId: string) => {
+        try {
+          set({ isLoading: true, error: null });
+          const response = await MatchService.confirmResult(matchId);
+
+          if (response.success && response.data) {
+            const confirmData = response.data.data;
+            const { matchStatus, locked } = confirmData;
+
+            // If match is finished, move to history
+            if (matchStatus === 'FINISHED') {
+              set((state) => {
+                const match = state.upcomingMatches.find((m) => m.id === matchId);
+                if (match) {
+                  return {
+                    upcomingMatches: state.upcomingMatches.filter((m) => m.id !== matchId),
+                    historyMatches: [{ ...match, status: 'finished' as const, resultLocked: true }, ...state.historyMatches],
+                    isLoading: false,
+                  };
+                }
+                return { isLoading: false };
+              });
+            } else {
+              // Just update confirmations and locked status
+              set((state) => ({
+                upcomingMatches: state.upcomingMatches.map((m) =>
+                  m.id === matchId
+                    ? { ...m, resultLocked: locked }
+                    : m
+                ),
+                isLoading: false,
+              }));
+            }
+          }
+        } catch (error: any) {
+          set({ error: error.message || 'Không thể xác nhận kết quả', isLoading: false });
+          throw error;
+        }
+      },
+
+      getMatchResult: async (matchId: string) => {
+        try {
+          const response = await MatchService.getResult(matchId);
+          if (response.success && response.data) {
+            return response.data.data;
+          }
+          return null;
+        } catch (error) {
+          console.error('[MatchStore] Error getting match result:', error);
+          return null;
+        }
+      },
     }),
     {
       name: 'match-storage',
@@ -814,6 +945,9 @@ export const useMatchActions = () => {
     finishMatch: store.finishMatch,
     cancelMatch: store.cancelMatch,
     rematch: store.rematch,
+    submitMatchResult: store.submitMatchResult,
+    confirmMatchResult: store.confirmMatchResult,
+    getMatchResult: store.getMatchResult,
   };
 };
 

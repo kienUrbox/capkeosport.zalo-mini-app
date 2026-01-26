@@ -246,7 +246,7 @@ export const AttendanceBottomSheet: React.FC<AttendanceBottomSheetProps> = ({
       />
 
       {/* Sheet */}
-      <div className="relative w-full max-w-md bg-white dark:bg-surface-dark rounded-t-3xl p-6 pb-safe animate-slide-up shadow-2xl max-h-[85vh] overflow-y-auto">
+      <div className="relative w-full max-w-md bg-white dark:bg-surface-dark rounded-t-3xl p-6 pb-safe animate-slide-up shadow-2xl max-h-[calc(100dvh-80px)] overflow-y-auto">
         {/* Drag indicator */}
         <div className="w-12 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-6" />
 

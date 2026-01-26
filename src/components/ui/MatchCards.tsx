@@ -261,6 +261,8 @@ interface UpcomingMatchCardProps {
   onCancel?: (id: string) => void;
   onConfirmAttendance?: (id: string) => void;
   onAttendanceView?: (id: string) => void;
+  onSubmitResult?: (id: string) => void;
+  onConfirmResult?: (id: string) => void;
 }
 
 export const UpcomingMatchCard: React.FC<UpcomingMatchCardProps> = ({
@@ -272,6 +274,8 @@ export const UpcomingMatchCard: React.FC<UpcomingMatchCardProps> = ({
   onCancel,
   onConfirmAttendance,
   onAttendanceView,
+  onSubmitResult,
+  onConfirmResult,
 }) => {
   const navigate = useNavigate();
 
@@ -309,6 +313,53 @@ export const UpcomingMatchCard: React.FC<UpcomingMatchCardProps> = ({
   };
 
   const renderActions = () => {
+    const hasResult = match.result !== undefined;
+    const isLocked = match.resultLocked === true;
+
+    // Check if current team has confirmed
+    const myTeamId = myTeam.id;
+    const hasConfirmed = myTeamId === match.teamA.id
+      ? match.resultConfirmations?.teamA?.confirmed
+      : match.resultConfirmations?.teamB?.confirmed;
+
+    // If match has result and is locked, show confirmed message
+    if (hasResult && isLocked) {
+      return (
+        <div className="flex items-center justify-center gap-2 mt-4 text-green-600">
+          <Icon name="verified" size="sm" />
+          <span className="text-xs font-medium">Đã xác nhận bởi cả 2 đội</span>
+        </div>
+      );
+    }
+
+    // If match has result but not locked, can edit or confirm
+    if (hasResult && !isLocked) {
+      return (
+        <div className="flex gap-3 mt-4" onClick={(e) => e.stopPropagation()}>
+          {!hasConfirmed && (
+            <Button
+              variant="secondary"
+              className="flex-1 h-9 text-xs"
+              icon="edit"
+              onClick={() => onSubmitResult?.(match.id)}
+            >
+              Sửa kết quả
+            </Button>
+          )}
+          <Button
+            className={`flex-1 h-9 text-xs ${hasConfirmed
+              ? 'bg-green-500 text-white'
+              : 'bg-primary text-slate-900'
+            }`}
+            icon={hasConfirmed ? 'check_circle' : 'verified'}
+            onClick={() => onConfirmResult?.(match.id)}
+          >
+            {hasConfirmed ? 'Đã xác nhận' : 'Xác nhận'}
+          </Button>
+        </div>
+      );
+    }
+
     switch (stage) {
       case 'upcoming':
         return (
@@ -356,34 +407,22 @@ export const UpcomingMatchCard: React.FC<UpcomingMatchCardProps> = ({
             <Button
               className="flex-[1.5] h-10 text-xs bg-red-500 text-white hover:bg-red-600 shadow-red-500/30"
               icon="scoreboard"
-              onClick={() => onUpdateScore?.(match.id)}
+              onClick={() => onSubmitResult?.(match.id)}
             >
               Cập nhật tỉ số
             </Button>
           </div>
         );
       case 'finished':
+        // Match is finished but no result yet - show button to submit result
         return (
-          <div
-            className="flex gap-3 mt-4 pt-3 border-t border-gray-100 dark:border-white/5"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="flex gap-3 mt-4" onClick={(e) => e.stopPropagation()}>
             <Button
-              variant="secondary"
-              className="flex-1 h-9 text-xs"
-              icon="edit"
-              onClick={() => onUpdateScore?.(match.id)}
+              className="flex-1 h-9 text-xs bg-primary text-slate-900"
+              icon="scoreboard"
+              onClick={() => onSubmitResult?.(match.id)}
             >
-              Sửa kết quả
-            </Button>
-            <Button
-              className="flex-1 h-9 text-xs bg-slate-800 text-white dark:bg-white dark:text-slate-900"
-              icon="verified"
-              onClick={() => {
-                /* TODO: Confirm result */
-              }}
-            >
-              Xác nhận
+              Cập nhật kết quả
             </Button>
           </div>
         );
@@ -407,24 +446,29 @@ export const UpcomingMatchCard: React.FC<UpcomingMatchCardProps> = ({
           <div className="flex-1 min-w-0">
             {match.locationName ? (
               <>
-                <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                <button
+                  className="text-xs font-bold text-slate-900 dark:text-white truncate text-left hover:text-primary transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Open Google Maps with deep link fallback
+                    if (match.locationMapLink) {
+                      const mapsUrl = match.locationMapLink;
+                      const deepLinkUrl = 'comgooglemaps://';
+                      const start = Date.now();
+                      window.location.href = deepLinkUrl;
+                      setTimeout(() => {
+                        if (Date.now() - start < 600) {
+                          window.location.href = mapsUrl;
+                        }
+                      }, 500);
+                    }
+                  }}
+                >
                   {match.locationName}
-                </p>
+                </button>
                 <p className="text-[10px] text-gray-500 dark:text-gray-400 line-clamp-1">
                   {match.locationAddress}
                 </p>
-                {match.locationMapLink && (
-                  <a
-                    href={match.locationMapLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-0.5 text-[10px] text-primary font-medium mt-0.5 hover:text-primary/80 transition-colors"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Icon name="open_in_new" size="xs" />
-                    Xem bản đồ
-                  </a>
-                )}
               </>
             ) : (
               <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
@@ -445,7 +489,7 @@ export const UpcomingMatchCard: React.FC<UpcomingMatchCardProps> = ({
         </div>
 
         <div className="flex flex-col items-center justify-center w-1/3">
-          {stage === 'upcoming' ? (
+          {stage === 'upcoming' && !match.result ? (
             <div className="text-center">
               <span className="text-2xl font-bold text-slate-900 dark:text-white block">
                 {match.time}
@@ -462,15 +506,28 @@ export const UpcomingMatchCard: React.FC<UpcomingMatchCardProps> = ({
                   : 'text-slate-900 dark:text-white'
                   }`}
               >
-                {match.scoreA !== undefined && match.scoreB !== undefined
-                  ? `${match.scoreA} - ${match.scoreB}`
-                  : 'VS'}
+                {match.result
+                  ? `${match.result.teamAScore} - ${match.result.teamBScore}`
+                  : (match.scoreA !== undefined && match.scoreB !== undefined
+                    ? `${match.scoreA} - ${match.scoreB}`
+                    : 'VS')
+                }
               </span>
-              {stage === 'live' && (
+              {match.resultLocked ? (
+                <span className="text-xs text-green-600 font-bold flex items-center justify-center gap-1 mt-1">
+                  <Icon name="verified" size="xs" />
+                  Đã chốt
+                </span>
+              ) : stage === 'live' ? (
                 <span className="text-xs text-red-500 font-bold animate-pulse">
                   {match.time}
                 </span>
-              )}
+              ) : match.result ? (
+                <span className="text-xs text-gray-500 flex items-center justify-center gap-1 mt-1">
+                  <Icon name="schedule" size="xs" />
+                  Chờ xác nhận
+                </span>
+              ) : null}
             </div>
           )}
         </div>

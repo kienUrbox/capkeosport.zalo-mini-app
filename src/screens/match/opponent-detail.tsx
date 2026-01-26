@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Icon } from '@/components/ui';
 import { Button } from '@/components/ui/Button';
 import { appRoutes } from '@/utils/navigation';
-import { TeamService } from '@/services/api/team.service';
-import type { Team } from '@/services/api/team.service';
+import { useTeamDetail } from '@/hooks/useTeamDetail';
 
 /**
  * OpponentDetail Screen
@@ -15,43 +14,42 @@ const OpponentDetail: React.FC = () => {
   const navigate = useNavigate();
   const { teamId } = useParams<{ teamId: string }>();
 
-  const [team, setTeam] = useState<Team | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Use hook for opponent detail with caching (includesRecentMatches)
+  const { team, isLoading, error, isRefreshing, refresh } = useTeamDetail(teamId, true);
 
-  // Fetch team data with recent matches from API
-  useEffect(() => {
-    const fetchTeamData = async () => {
-      if (!teamId) return;
+  // Pull-to-refresh state
+  const [touchStart, setTouchStart] = useState(0);
+  const [pullDistance, setPullDistance] = useState(0);
 
-      try {
-        setIsLoading(true);
-        setError(null);
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (window.scrollY === 0) {
+      setTouchStart(e.touches[0].clientY);
+    }
+  };
 
-        // Fetch team with recent matches included
-        const teamResponse = await TeamService.getTeamById(teamId, {
-          includeRecentMatches: true
-        });
-
-        if (teamResponse.success && teamResponse.data) {
-          setTeam(teamResponse.data);
-        } else {
-          setError(teamResponse.error?.message || 'Không tìm thấy thông tin đội bóng');
-        }
-      } catch (err: any) {
-        setError(err.error?.message || err.message || 'Không thể tải thông tin đội');
-      } finally {
-        setIsLoading(false);
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStart && window.scrollY === 0) {
+      const distance = e.touches[0].clientY - touchStart;
+      if (distance > 0) {
+        // Limit pull distance to 120px
+        setPullDistance(Math.min(distance, 120));
       }
-    };
+    }
+  };
 
-    fetchTeamData();
-  }, [teamId]);
+  const handleTouchEnd = async () => {
+    // Trigger refresh if pulled more than 80px
+    if (pullDistance > 80) {
+      await refresh();
+    }
+    setTouchStart(0);
+    setPullDistance(0);
+  };
 
   // Loading state
-  if (isLoading) {
+  if (isLoading && !isRefreshing) {
     return (
-      <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark">
+      <div className="flex flex-col min-h-dvh bg-background-light dark:bg-background-dark">
         {/* Header with back button */}
         <div className="absolute top-0 left-0 right-0 z-50 p-4 flex justify-between items-center text-white safe-area-top">
           <button onClick={() => navigate(-1)} className="size-10 flex items-center justify-center rounded-full bg-black/30 backdrop-blur-md hover:bg-black/50 transition-colors">
@@ -70,7 +68,7 @@ const OpponentDetail: React.FC = () => {
   // Error state
   if (error || !team) {
     return (
-      <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark items-center justify-center p-6">
+      <div className="flex flex-col min-h-dvh bg-background-light dark:bg-background-dark items-center justify-center p-6">
         <div className="w-20 h-20 rounded-full bg-red-100 dark:bg-red-900/20 flex items-center justify-center mb-4">
           <Icon name="error" className="text-3xl text-red-500" />
         </div>
@@ -94,7 +92,12 @@ const OpponentDetail: React.FC = () => {
   const logoImage = team.logo;
 
   return (
-    <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark pb-24 animate-fade-in">
+    <div
+      className="flex flex-col min-h-dvh bg-background-light dark:bg-background-dark pb-24 animate-fade-in"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
       {/* Custom Header with transparent background initially */}
       <div className="absolute top-0 left-0 right-0 z-50 p-4 flex justify-between items-center text-white safe-area-top">
         <button onClick={() => navigate(-1)} className="size-10 flex items-center justify-center rounded-full bg-black/30 backdrop-blur-md hover:bg-black/50 transition-colors">
@@ -104,6 +107,36 @@ const OpponentDetail: React.FC = () => {
           <Icon name="more_vert" />
         </button>
       </div>
+
+      {/* Pull-to-refresh indicator */}
+      {(pullDistance > 0 || isRefreshing) && (
+        <div
+          className="absolute top-16 left-0 right-0 z-40 flex items-center justify-center pointer-events-none transition-all duration-200"
+          style={{
+            opacity: Math.min(pullDistance / 80, 1),
+            transform: `translateY(${Math.min(pullDistance, 80)}px)`,
+          }}
+        >
+          <div className="flex items-center gap-2 text-sm text-white">
+            {isRefreshing ? (
+              <>
+                <div className="w-5 h-5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                <span>Đang tải...</span>
+              </>
+            ) : pullDistance > 80 ? (
+              <>
+                <Icon name="refresh" className="text-white" />
+                <span>Thả để tải</span>
+              </>
+            ) : (
+              <>
+                <Icon name="arrow_downward" />
+                <span>Kéo để tải</span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Cover & Header Info */}
       <div className="relative">

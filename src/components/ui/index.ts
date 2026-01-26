@@ -109,5 +109,11 @@ export type { RematchBottomSheetProps } from './RematchBottomSheet';
 export { LocationPicker } from './LocationPicker';
 export type { LocationPickerProps, LocationValue } from './LocationPicker';
 
+export { StadiumAutocomplete } from './StadiumAutocomplete';
+export type { StadiumAutocompleteProps } from './StadiumAutocomplete';
+
 export { ConfirmMatchModal } from './ConfirmMatchModal';
 export type { ConfirmMatchModalProps } from './ConfirmMatchModal';
+
+export { UpdateScoreModal } from './UpdateScoreModal';
+export type { UpdateScoreModalProps } from './UpdateScoreModal';

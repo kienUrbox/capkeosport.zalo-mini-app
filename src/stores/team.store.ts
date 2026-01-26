@@ -63,6 +63,21 @@ interface TeamState {
   // Team details cache (for quick lookup)
   teamDetailsCache: Record<string, ApiTeam | undefined>;
 
+  // ========== Team Detail Caching (Memory Only - Not Persisted) ==========
+  // My Team Detail (for /teams/:id page)
+  currentTeamId: string | null;
+  currentTeamDetail: ApiTeam | null;
+  isTeamDetailLoading: boolean;
+  isTeamDetailRefreshing: boolean;
+  teamDetailError: string | null;
+
+  // Opponent Detail (for /match/opponent/:id page with recentMatches)
+  currentOpponentId: string | null;
+  currentOpponentDetail: ApiTeam | null;
+  isOpponentDetailLoading: boolean;
+  isOpponentDetailRefreshing: boolean;
+  opponentDetailError: string | null;
+
   // Invite state
   sentInvites: TeamInvite[];
   receivedInvites: TeamInvite[];
@@ -80,6 +95,22 @@ interface TeamState {
   setSentInvites: (invites: TeamInvite[]) => void;
   setReceivedInvites: (invites: TeamInvite[]) => void;
   setInviteToken: (token: InviteTokenResponse | null) => void;
+
+  // ========== Team Detail State Setters ==========
+  setCurrentTeamId: (teamId: string | null) => void;
+  setCurrentTeamDetail: (team: ApiTeam | null) => void;
+  setTeamDetailLoading: (loading: boolean) => void;
+  setTeamDetailRefreshing: (refreshing: boolean) => void;
+  setTeamDetailError: (error: string | null) => void;
+
+  setCurrentOpponentId: (teamId: string | null) => void;
+  setCurrentOpponentDetail: (team: ApiTeam | null) => void;
+  setOpponentDetailLoading: (loading: boolean) => void;
+  setOpponentDetailRefreshing: (refreshing: boolean) => void;
+  setOpponentDetailError: (error: string | null) => void;
+
+  clearTeamDetail: () => void;
+  clearOpponentDetail: () => void;
 
   addTeam: (team: Team) => void;
   updateTeam: (teamId: string, updates: Partial<Team>) => void;
@@ -104,6 +135,18 @@ interface TeamState {
    * GET /teams/:id
    */
   getTeamById: (teamId: string) => Promise<ApiTeam>;
+
+  /**
+   * Fetch my team detail with caching
+   * Only fetches if teamId changes OR forceRefresh is true
+   */
+  fetchTeamDetail: (teamId: string, forceRefresh?: boolean) => Promise<void>;
+
+  /**
+   * Fetch opponent detail with caching (includes recentMatches)
+   * Only fetches if teamId changes OR forceRefresh is true
+   */
+  fetchOpponentDetail: (teamId: string, forceRefresh?: boolean) => Promise<void>;
 
   /**
    * Create new team
@@ -194,6 +237,20 @@ export const useTeamStore = create<TeamState>()(
       selectedTeam: null,
       teamMembers: [],
       teamDetailsCache: {},
+
+      // NEW: Team Detail State (Memory Only - Not Persisted)
+      currentTeamId: null,
+      currentTeamDetail: null,
+      isTeamDetailLoading: false,
+      isTeamDetailRefreshing: false,
+      teamDetailError: null,
+
+      currentOpponentId: null,
+      currentOpponentDetail: null,
+      isOpponentDetailLoading: false,
+      isOpponentDetailRefreshing: false,
+      opponentDetailError: null,
+
       sentInvites: [],
       receivedInvites: [],
       inviteToken: null,
@@ -213,6 +270,44 @@ export const useTeamStore = create<TeamState>()(
       setReceivedInvites: (invites) => set({ receivedInvites: invites }),
 
       setInviteToken: (token) => set({ inviteToken: token }),
+
+      // ========== Team Detail State Setters ==========
+
+      setCurrentTeamId: (teamId) => set({ currentTeamId: teamId }),
+
+      setCurrentTeamDetail: (team) => set({ currentTeamDetail: team }),
+
+      setTeamDetailLoading: (loading) => set({ isTeamDetailLoading: loading }),
+
+      setTeamDetailRefreshing: (refreshing) => set({ isTeamDetailRefreshing: refreshing }),
+
+      setTeamDetailError: (error) => set({ teamDetailError: error }),
+
+      setCurrentOpponentId: (teamId) => set({ currentOpponentId: teamId }),
+
+      setCurrentOpponentDetail: (team) => set({ currentOpponentDetail: team }),
+
+      setOpponentDetailLoading: (loading) => set({ isOpponentDetailLoading: loading }),
+
+      setOpponentDetailRefreshing: (refreshing) => set({ isOpponentDetailRefreshing: refreshing }),
+
+      setOpponentDetailError: (error) => set({ opponentDetailError: error }),
+
+      clearTeamDetail: () => set({
+        currentTeamId: null,
+        currentTeamDetail: null,
+        isTeamDetailLoading: false,
+        isTeamDetailRefreshing: false,
+        teamDetailError: null,
+      }),
+
+      clearOpponentDetail: () => set({
+        currentOpponentId: null,
+        currentOpponentDetail: null,
+        isOpponentDetailLoading: false,
+        isOpponentDetailRefreshing: false,
+        opponentDetailError: null,
+      }),
 
       addTeam: (team) =>
         set((state) => ({
@@ -335,6 +430,150 @@ export const useTeamStore = create<TeamState>()(
         } catch (error: any) {
           const errorMessage = error.error?.message || error.message || 'Không thể tải thông tin đội';
           set({ error: errorMessage, isLoading: false });
+          throw error;
+        }
+      },
+
+      /**
+       * Fetch my team detail with caching
+       * GET /teams/:id
+       *
+       * Caching strategy:
+       * - If teamId !== currentTeamId: Fetch and cache new team
+       * - If teamId === currentTeamId && !forceRefresh: Use cached data
+       * - If forceRefresh: Always fetch fresh data
+       */
+      fetchTeamDetail: async (teamId: string, forceRefresh: boolean = false) => {
+        try {
+          const currentState = get();
+
+          // Guard: Skip if already loading (unless refreshing)
+          if (currentState.isTeamDetailLoading && !currentState.isTeamDetailRefreshing) {
+            console.log('[TeamStore] Skipping fetchTeamDetail - already loading');
+            return;
+          }
+
+          // Guard: Use cache if same teamId, have data, and not forcing refresh
+          if (!forceRefresh && currentState.currentTeamId === teamId && currentState.currentTeamDetail) {
+            console.log('[TeamStore] Using cached team detail for:', teamId);
+            return;
+          }
+
+          // Set loading state
+          if (forceRefresh) {
+            set({ isTeamDetailRefreshing: true, teamDetailError: null });
+          } else {
+            set({ isTeamDetailLoading: true, teamDetailError: null, currentTeamId: teamId });
+          }
+
+          // Dynamic import to avoid circular dependency
+          const teamModule = await import('@/services/api/team.service');
+          const TeamService = teamModule.TeamService;
+
+          const response = await TeamService.getTeamById(teamId);
+
+          if (response.success && response.data) {
+            set({
+              currentTeamDetail: response.data,
+              currentTeamId: teamId,
+              isTeamDetailLoading: false,
+              isTeamDetailRefreshing: false,
+              teamDetailError: null,
+            });
+
+            // Also update teamDetailsCache for backward compatibility
+            set((state) => ({
+              teamDetailsCache: {
+                ...state.teamDetailsCache,
+                [teamId]: response.data,
+              },
+            }));
+
+            console.log('[TeamStore] Successfully fetched team detail for:', teamId);
+          } else {
+            throw new Error(response.error?.message || 'Failed to fetch team detail');
+          }
+        } catch (error: any) {
+          console.error('[TeamStore] Fetch team detail error:', error);
+          const errorMessage = error.error?.message || error.message || 'Không thể tải thông tin đội';
+          set({
+            teamDetailError: errorMessage,
+            isTeamDetailLoading: false,
+            isTeamDetailRefreshing: false,
+          });
+          throw error;
+        }
+      },
+
+      /**
+       * Fetch opponent detail with caching (includes recentMatches)
+       * GET /teams/:id?includeRecentMatches=true
+       *
+       * Caching strategy:
+       * - If teamId !== currentOpponentId: Fetch and cache new opponent
+       * - If teamId === currentOpponentId && !forceRefresh: Use cached data
+       * - If forceRefresh: Always fetch fresh data
+       */
+      fetchOpponentDetail: async (teamId: string, forceRefresh: boolean = false) => {
+        try {
+          const currentState = get();
+
+          // Guard: Skip if already loading (unless refreshing)
+          if (currentState.isOpponentDetailLoading && !currentState.isOpponentDetailRefreshing) {
+            console.log('[TeamStore] Skipping fetchOpponentDetail - already loading');
+            return;
+          }
+
+          // Guard: Use cache if same teamId, have data, and not forcing refresh
+          if (!forceRefresh && currentState.currentOpponentId === teamId && currentState.currentOpponentDetail) {
+            console.log('[TeamStore] Using cached opponent detail for:', teamId);
+            return;
+          }
+
+          // Set loading state
+          if (forceRefresh) {
+            set({ isOpponentDetailRefreshing: true, opponentDetailError: null });
+          } else {
+            set({ isOpponentDetailLoading: true, opponentDetailError: null, currentOpponentId: teamId });
+          }
+
+          // Dynamic import to avoid circular dependency
+          const teamModule = await import('@/services/api/team.service');
+          const TeamService = teamModule.TeamService;
+
+          const response = await TeamService.getTeamById(teamId, {
+            includeRecentMatches: true
+          });
+
+          if (response.success && response.data) {
+            set({
+              currentOpponentDetail: response.data,
+              currentOpponentId: teamId,
+              isOpponentDetailLoading: false,
+              isOpponentDetailRefreshing: false,
+              opponentDetailError: null,
+            });
+
+            // Also update teamDetailsCache for backward compatibility
+            set((state) => ({
+              teamDetailsCache: {
+                ...state.teamDetailsCache,
+                [teamId]: response.data,
+              },
+            }));
+
+            console.log('[TeamStore] Successfully fetched opponent detail for:', teamId);
+          } else {
+            throw new Error(response.error?.message || 'Failed to fetch opponent detail');
+          }
+        } catch (error: any) {
+          console.error('[TeamStore] Fetch opponent detail error:', error);
+          const errorMessage = error.error?.message || error.message || 'Không thể tải thông tin đội đối thủ';
+          set({
+            opponentDetailError: errorMessage,
+            isOpponentDetailLoading: false,
+            isOpponentDetailRefreshing: false,
+          });
           throw error;
         }
       },
@@ -702,6 +941,7 @@ export const useTeamStore = create<TeamState>()(
       partialize: (state) => ({
         myTeams: state.myTeams,
         selectedTeam: state.selectedTeam,
+        // Don't persist: currentTeamDetail, currentOpponentDetail (memory only)
         // Don't persist large cache or invite data
       }),
     }
@@ -731,6 +971,19 @@ export const useTeamActions = () => {
     setSentInvites: store.setSentInvites,
     setReceivedInvites: store.setReceivedInvites,
     setInviteToken: store.setInviteToken,
+    // Team detail state setters
+    setCurrentTeamId: store.setCurrentTeamId,
+    setCurrentTeamDetail: store.setCurrentTeamDetail,
+    setTeamDetailLoading: store.setTeamDetailLoading,
+    setTeamDetailRefreshing: store.setTeamDetailRefreshing,
+    setTeamDetailError: store.setTeamDetailError,
+    setCurrentOpponentId: store.setCurrentOpponentId,
+    setCurrentOpponentDetail: store.setCurrentOpponentDetail,
+    setOpponentDetailLoading: store.setOpponentDetailLoading,
+    setOpponentDetailRefreshing: store.setOpponentDetailRefreshing,
+    setOpponentDetailError: store.setOpponentDetailError,
+    clearTeamDetail: store.clearTeamDetail,
+    clearOpponentDetail: store.clearOpponentDetail,
     addTeam: store.addTeam,
     updateTeam: store.updateTeam,
     removeTeam: store.removeTeam,
@@ -743,6 +996,8 @@ export const useTeamActions = () => {
     // API methods
     fetchMyTeams: store.fetchMyTeams,
     getTeamById: store.getTeamById,
+    fetchTeamDetail: store.fetchTeamDetail,
+    fetchOpponentDetail: store.fetchOpponentDetail,
     createTeam: store.createTeam,
     updateTeamById: store.updateTeamById,
     deleteTeam: store.deleteTeam,

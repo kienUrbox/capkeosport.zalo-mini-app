@@ -92,7 +92,7 @@ const OnboardingScreen: React.FC = () => {
   const content = steps[currentStep];
 
   return (
-    <div className="flex flex-col h-screen bg-background-light dark:bg-background-dark relative overflow-hidden transition-all duration-300">
+    <div className="flex flex-col h-dvh bg-background-light dark:bg-background-dark relative overflow-hidden transition-all duration-300">
       {/* Skip Button */}
       <div className="absolute top-4 right-4 z-50">
         <button

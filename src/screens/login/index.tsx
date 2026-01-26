@@ -19,7 +19,7 @@ const LoginScreen = () => {
 
       if (authResult.success) {
         // Redirect to dashboard directly (bypass onboarding)
-        navigate('/dashboard')
+        navigate('/')
       } else {
         throw new Error(authResult.error || authResult.message || 'Authentication failed')
       }

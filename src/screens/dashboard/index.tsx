@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Icon, TeamAvatar, BottomNav, DashboardSkeleton, NoMatches, DashboardError } from '@/components/ui';
+import { Button, Icon, TeamAvatar, DashboardSkeleton, NoMatches, DashboardError } from '@/components/ui';
 import { appRoutes } from '@/utils/navigation';
 import { useHomeData } from '@/hooks/useHomeData';
 import { useUser } from '@/stores/auth.store';
@@ -30,8 +30,6 @@ const DashboardScreen: React.FC = () => {
     refresh,
   } = useHomeData();
 
-  const [activeTab, setActiveTab] = useState('home');
-
   // Debug logging
   console.log('🏠 Dashboard Render:', {
     user: user?.name,
@@ -55,27 +53,6 @@ const DashboardScreen: React.FC = () => {
     return <DashboardError error={error} onRetry={refresh} />;
   }
 
-  const handleTabChange = (tab: string) => {
-    setActiveTab(tab);
-    switch (tab) {
-      case 'home':
-        navigate(appRoutes.dashboard, { replace: true });
-        break;
-      case 'schedule':
-        navigate(appRoutes.matchSchedule, { replace: true });
-        break;
-      case 'match':
-        navigate(appRoutes.matchFind, { replace: true });
-        break;
-      case 'team':
-        navigate(appRoutes.teams, { replace: true });
-        break;
-      case 'profile':
-        navigate(appRoutes.profile, { replace: true });
-        break;
-    }
-  };
-
   const handleRejectInvite = (id: string) => {
     // TODO: Implement reject invitation API call
     // For now, just remove from local state
@@ -97,7 +74,7 @@ const DashboardScreen: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark">
+    <div className="flex flex-col min-h-dvh bg-background-light dark:bg-background-dark">
       {/* Pull to refresh indicator */}
       {isRefreshing && (
         <div className="fixed top-0 left-0 right-0 z-50 bg-primary/10 py-2 text-center text-xs text-primary font-medium">
@@ -396,8 +373,6 @@ const DashboardScreen: React.FC = () => {
           )}
         </section> */}
       </div>
-
-      <BottomNav activeTab={activeTab} onTabChange={handleTabChange} />
     </div>
   );
 };

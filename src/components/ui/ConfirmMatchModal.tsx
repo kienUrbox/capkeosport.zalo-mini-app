@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Icon, Button } from './';
 import { TeamAvatar } from './TeamAvatar';
-import { LocationPicker, type LocationValue } from './LocationPicker';
+import { StadiumAutocomplete, type StadiumAutocompleteDto } from './StadiumAutocomplete';
 import { useMatchActions } from '@/stores/match.store';
 
 export interface OpponentTeamInfo {
@@ -11,10 +11,16 @@ export interface OpponentTeamInfo {
   level?: string;
 }
 
+export interface MatchInfo {
+  scheduledDate?: string;
+  scheduledTime?: string;
+}
+
 export interface ConfirmMatchModalProps {
   isOpen: boolean;
   onClose: () => void;
   matchId: string;
+  match?: MatchInfo; // Match data for auto-fill date/time
   myTeam: { id: string; name: string; logo?: string };
   opponentTeam: OpponentTeamInfo;
   onSuccess: () => void;
@@ -23,13 +29,14 @@ export interface ConfirmMatchModalProps {
 /**
  * ConfirmMatchModal Component
  *
- * Modal for confirming match details with date, time, and location.
+ * Modal for confirming match details with date, time, and stadium.
  * Follows the API requirements for POST /matches/:id/confirm
  */
 export const ConfirmMatchModal: React.FC<ConfirmMatchModalProps> = ({
   isOpen,
   onClose,
   matchId,
+  match,
   myTeam,
   opponentTeam,
   onSuccess,
@@ -39,17 +46,21 @@ export const ConfirmMatchModal: React.FC<ConfirmMatchModalProps> = ({
   // Form state
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
-  const [location, setLocation] = useState<LocationValue>({
-    name: '',
-    address: '',
-    lat: 0,
-    lng: 0,
-    mapLink: '',
-  });
+  const [selectedStadium, setSelectedStadium] = useState<StadiumAutocompleteDto | null>(null);
 
   // UI state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Auto-fill date/time from match data
+  useEffect(() => {
+    if (match?.scheduledDate) {
+      setDate(match.scheduledDate);
+    }
+    if (match?.scheduledTime) {
+      setTime(match.scheduledTime);
+    }
+  }, [match]);
 
   const handleSubmit = async () => {
     // Validation
@@ -58,8 +69,8 @@ export const ConfirmMatchModal: React.FC<ConfirmMatchModalProps> = ({
       return;
     }
 
-    if (!location.name || !location.address || location.lat === 0 || location.lng === 0) {
-      setError('Vui lòng chọn đầy đủ thông tin địa điểm (tên, địa chỉ, vị trí trên bản đồ)');
+    if (!selectedStadium) {
+      setError('Vui lòng chọn sân thi đấu');
       return;
     }
 
@@ -70,13 +81,9 @@ export const ConfirmMatchModal: React.FC<ConfirmMatchModalProps> = ({
       await matchActions.confirmMatch(matchId, {
         date, // YYYY-MM-DD format from date input
         time, // HH:mm format from time input
-        location: {
-          name: location.name,
-          address: location.address,
-          lat: location.lat,
-          lng: location.lng,
-          mapLink: location.mapLink,
-        },
+        stadiumName: selectedStadium.name,
+        mapUrl: selectedStadium.mapUrl,
+        // lat/lng is optional - backend already has it for known stadiums
       });
 
       onSuccess();
@@ -189,15 +196,15 @@ export const ConfirmMatchModal: React.FC<ConfirmMatchModalProps> = ({
             </div>
           </div>
 
-          {/* Location Picker */}
+          {/* Stadium Autocomplete */}
           <div>
             <label className="block text-sm font-medium text-slate-900 dark:text-white mb-2">
-              Địa điểm thi đấu <span className="text-red-500">*</span>
+              Sân thi đấu <span className="text-red-500">*</span>
             </label>
-            <LocationPicker
-              value={location}
-              onChange={setLocation}
-              error={error && (!location.name || !location.address || location.lat === 0 || location.lng === 0) ? 'Vui lòng chọn địa điểm' : undefined}
+            <StadiumAutocomplete
+              value={selectedStadium}
+              onChange={setSelectedStadium}
+              error={error && !selectedStadium ? 'Vui lòng chọn sân thi đấu' : undefined}
             />
           </div>
         </div>

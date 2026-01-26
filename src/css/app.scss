@@ -326,3 +326,105 @@ body {
   padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 72px);
 }
 
+/* ============================================
+   MOBILE VIEWPORT UTILITIES
+   Fix 100vh issues on mobile browsers
+   ============================================ */
+
+/* Fixed viewport height - for full screen overlays */
+.h-dvh {
+  height: 100dvh; /* Dynamic viewport height - modern browsers */
+  height: 100vh;  /* Fallback */
+}
+
+/* Min viewport height - for scrollable content */
+.min-h-dvh {
+  min-height: 100dvh;
+  min-height: 100vh;
+}
+
+/* ============================================
+   DATE/TIME INPUT FIXES
+   Platform-specific fixes for consistent styling
+   ============================================ */
+
+/* Base fixes for date/time inputs across platforms */
+input[type='date'],
+input[type='time'] {
+  /* Remove default browser styles */
+  -webkit-appearance: none;
+  -moz-appearance: textfield;
+  appearance: none;
+
+  /* Ensure consistent height for touch targets */
+  min-height: 44px; /* iOS touch target size */
+
+  /* Fix for iOS dark mode color scheme */
+  color-scheme: light;
+}
+
+/* Dark mode date/time inputs */
+.dark input[type='date'],
+.dark input[type='time'] {
+  color-scheme: dark;
+}
+
+/* Fix for calendar/time picker icon color */
+input[type='date']::-webkit-calendar-picker-indicator,
+input[type='time']::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  filter: invert(0);
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+input[type='date']::-webkit-calendar-picker-indicator:hover,
+input[type='time']::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
+/* Dark mode picker icon */
+.dark input[type='date']::-webkit-calendar-picker-indicator,
+.dark input[type='time']::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+
+/* Fix for time input spinner on some browsers */
+input[type='time']::-webkit-outer-spin-button,
+input[type='time']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type='time']::-webkit-datetime-edit {
+  -webkit-appearance: none;
+}
+
+/* Fix for date input fields on iOS */
+input[type='date']::-webkit-datetime-edit {
+  -webkit-appearance: none;
+}
+
+/* Ensure proper text color in date/time inputs */
+input[type='date'],
+input[type='time'] {
+  color: var(--tw-text-opacity, 1);
+}
+
+/* Firefox specific fixes */
+@supports (-moz-appearance: none) {
+  input[type='date'],
+  input[type='time'] {
+    -moz-appearance: textfield;
+  }
+}
+
+/* Safari specific fixes */
+@supports (font: -apple-system-body) and (-webkit-touch-callout: default) {
+  input[type='date'],
+  input[type='time'] {
+    -webkit-appearance: none;
+    border-radius: 12px;
+  }
+}
+

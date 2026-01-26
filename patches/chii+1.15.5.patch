@@ -1,0 +1,13 @@
+diff --git a/node_modules/chii/server/middle/router.js b/node_modules/chii/server/middle/router.js
+index 1111111..2222222 100644
+--- a/node_modules/chii/server/middle/router.js
++++ b/node_modules/chii/server/middle/router.js
+@@ -64,7 +64,7 @@ module.exports = function (channelManager, domain, cdn, basePath) {
+   });
+
+   function createStatic(prefix, folder) {
+-    router.get(`${basePath}${prefix}/:staticPath(.*)`, async ctx => {
++    router.get(`${basePath}${prefix}/*staticPath`, async ctx => {
+       await send(ctx, ctx.path.slice(basePath.length + prefix.length), {
+         root: path.resolve(__dirname, `../..${folder}`),
+         maxAge,

@@ -1,12 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Header, Icon, Button, AddMemberBottomSheet } from '@/components/ui';
 import { TeamDetailSkeleton } from '@/components/ui/Skeleton';
 import { AddMemberBottomSheet as PhoneInviteBottomSheet } from '@/screens/teams/add-member';
 import { appRoutes } from '@/utils/navigation';
-import { TeamService } from '@/services/api/team.service';
 import { useMyTeams, isAdmin } from '@/stores/team.store';
-import type { Team } from '@/services/api/team.service';
+import { useTeamDetail } from '@/hooks/useTeamDetail';
 
 /**
  * TeamDetail Screen
@@ -17,11 +16,41 @@ const TeamDetailScreen: React.FC = () => {
   const navigate = useNavigate();
   const { teamId } = useParams<{ teamId: string }>();
 
-  const [team, setTeam] = useState<Team | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Use hook for team detail with caching
+  const { team, isLoading, error, isRefreshing, refresh } = useTeamDetail(teamId);
+
+  // Local UI state only
   const [showAddMemberSheet, setShowAddMemberSheet] = useState(false);
   const [showPhoneInviteSheet, setShowPhoneInviteSheet] = useState(false);
+
+  // Pull-to-refresh state
+  const [touchStart, setTouchStart] = useState(0);
+  const [pullDistance, setPullDistance] = useState(0);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (window.scrollY === 0) {
+      setTouchStart(e.touches[0].clientY);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStart && window.scrollY === 0) {
+      const distance = e.touches[0].clientY - touchStart;
+      if (distance > 0) {
+        // Limit pull distance to 120px
+        setPullDistance(Math.min(distance, 120));
+      }
+    }
+  };
+
+  const handleTouchEnd = async () => {
+    // Trigger refresh if pulled more than 80px
+    if (pullDistance > 80) {
+      await refresh();
+    }
+    setTouchStart(0);
+    setPullDistance(0);
+  };
 
   // Check user role in this team
   const myTeams = useMyTeams();
@@ -30,31 +59,6 @@ const TeamDetailScreen: React.FC = () => {
 
   // Rename variable to avoid conflict with function name
   const isAdminTeam = hasAdminPermission;
-
-  useEffect(() => {
-    const fetchTeamDetail = async () => {
-      if (!teamId) return;
-
-      try {
-        setIsLoading(true);
-        setError(null);
-        const response = await TeamService.getTeamById(teamId);
-
-        if (response.success && response.data) {
-          setTeam(response.data);
-        } else {
-          setError('Không thể tải thông tin đội');
-        }
-      } catch (err: any) {
-        console.error('Failed to fetch team detail:', err);
-        setError(err?.message || 'Có lỗi xảy ra');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchTeamDetail();
-  }, [teamId]);
 
   // Helper function to format gender display
   const formatGender = (gender: string) => {
@@ -70,7 +74,7 @@ const TeamDetailScreen: React.FC = () => {
     return 'wc';
   };
 
-  if (isLoading) {
+  if (isLoading && !isRefreshing) {
     return (
       <>
         <Header title="Chi tiết đội bóng" onBack={() => navigate(-1)} />
@@ -99,8 +103,43 @@ const TeamDetailScreen: React.FC = () => {
   const remainingCount = Math.max(0, (team.membersCount || 0) - (team.members?.length || 0));
 
   return (
-    <div className={`flex flex-col min-h-screen bg-background-light dark:bg-background-dark ${isAdminTeam ? 'pb-24' : ''}`}>
+    <div
+      className={`flex flex-col min-h-screen bg-background-light dark:bg-background-dark ${isAdminTeam ? 'pb-24' : ''}`}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
       <Header title="Chi tiết đội bóng" onBack={() => navigate(-1)} />
+
+      {/* Pull-to-refresh indicator */}
+      {(pullDistance > 0 || isRefreshing) && (
+        <div
+          className="fixed top-16 left-0 right-0 z-30 flex items-center justify-center pointer-events-none transition-all duration-200"
+          style={{
+            opacity: Math.min(pullDistance / 80, 1),
+            transform: `translateY(${Math.min(pullDistance, 80)}px)`,
+          }}
+        >
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            {isRefreshing ? (
+              <>
+                <div className="w-5 h-5 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+                <span>Đang tải...</span>
+              </>
+            ) : pullDistance > 80 ? (
+              <>
+                <Icon name="refresh" className="text-primary" />
+                <span>Thả để tải</span>
+              </>
+            ) : (
+              <>
+                <Icon name="arrow_downward" />
+                <span>Kéo để tải</span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Cover & Header Info */}
       <div className="relative">

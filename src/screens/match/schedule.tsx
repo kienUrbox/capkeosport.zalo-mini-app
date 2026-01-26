@@ -16,6 +16,7 @@ import {
   RematchBottomSheet,
   ConfirmMatchModal,
   AttendanceBottomSheet,
+  UpdateScoreModal,
 } from '@/components/ui';
 import { appRoutes } from '@/utils/navigation';
 import { useScheduleData } from '@/hooks/useScheduleData';
@@ -46,6 +47,7 @@ const MatchScheduleScreen: React.FC = () => {
   const [inviteModalMatchId, setInviteModalMatchId] = useState<string | null>(null);
   const [requestModalMatchId, setRequestModalMatchId] = useState<string | null>(null);
   const [requestMode, setRequestMode] = useState<'send' | 'edit'>('send');
+  const [updateScoreMatchId, setUpdateScoreMatchId] = useState<string | null>(null);
 
   // Action bottom sheet state
   const [actionSheet, setActionSheet] = useState<{
@@ -466,6 +468,38 @@ const MatchScheduleScreen: React.FC = () => {
     setAttendanceSheet({ isOpen: false, matchId: '' });
   };
 
+  // Match Result Handlers
+  const handleSubmitResult = (matchId: string) => {
+    setUpdateScoreMatchId(matchId);
+  };
+
+  const handleCloseUpdateScoreModal = () => {
+    setUpdateScoreMatchId(null);
+  };
+
+  const handleUpdateScoreSuccess = async () => {
+    setUpdateScoreMatchId(null);
+    await refreshTab('upcoming');
+    toast.success('Đã cập nhật kết quả');
+  };
+
+  const handleConfirmResult = async (matchId: string) => {
+    try {
+      await matchActions.confirmMatchResult(matchId);
+
+      // Check if match moved to history
+      const match = upcomingMatches.find((m) => m.id === matchId);
+      if (!match) {
+        // Match was moved to history
+        await refreshTab('history');
+      }
+
+      toast.success('Đã xác nhận kết quả');
+    } catch (err: any) {
+      toast.error(err.message || 'Không thể xác nhận kết quả');
+    }
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark pb-safe-with-nav">
       {/* Custom Header with Team Selector */}
@@ -645,6 +679,8 @@ const MatchScheduleScreen: React.FC = () => {
                   onCancel={(id) => handleCancelMatch(id, 'report_busy')}
                   onConfirmAttendance={handleConfirmAttendance}
                   onAttendanceView={handleAttendanceView}
+                  onSubmitResult={handleSubmitResult}
+                  onConfirmResult={handleConfirmResult}
                 />
               ))
             )}
@@ -891,6 +927,27 @@ const MatchScheduleScreen: React.FC = () => {
         matchId={attendanceSheet.matchId}
         onAttendanceUpdate={handleAttendanceUpdate}
       />
+
+      {/* Update Score Modal */}
+      {updateScoreMatchId && (() => {
+        const match = upcomingMatches.find((m) => m.id === updateScoreMatchId);
+        return match ? (
+          <UpdateScoreModal
+            isOpen={!!updateScoreMatchId}
+            matchId={updateScoreMatchId}
+            myTeam={currentTeam || { id: '', name: '', logo: '' }}
+            opponentTeam={match.teamB || { id: '', name: '', logo: '' }}
+            initialData={match.result ? {
+              teamAScore: match.result.teamAScore,
+              teamBScore: match.result.teamBScore,
+              notes: match.result.notes,
+              fileIds: match.result.fileIds,
+            } : undefined}
+            onClose={handleCloseUpdateScoreModal}
+            onSuccess={handleUpdateScoreSuccess}
+          />
+        ) : null;
+      })()}
     </div>
   );
 };

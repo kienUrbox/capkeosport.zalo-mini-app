@@ -90,7 +90,7 @@ export const RematchBottomSheet: React.FC<RematchBottomSheetProps> = ({
       />
 
       {/* Sheet Content */}
-      <div className="relative w-full max-w-md bg-white dark:bg-surface-dark rounded-t-3xl p-6 pb-safe animate-slide-up shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div className="relative w-full max-w-md bg-white dark:bg-surface-dark rounded-t-3xl p-6 pb-safe animate-slide-up shadow-2xl max-h-[calc(100dvh-80px)] overflow-y-auto">
         {/* Loading Overlay */}
         {isSubmitting && (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/90 dark:bg-surface-dark/90 backdrop-blur-sm rounded-t-3xl">

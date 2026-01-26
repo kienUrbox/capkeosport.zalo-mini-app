@@ -236,7 +236,7 @@ const FindMatchScreen: React.FC = () => {
   // Error state
   if (error && !currentTeam) {
     return (
-      <div className="flex flex-col h-screen bg-background-light dark:bg-background-dark items-center justify-center p-6 text-center">
+      <div className="flex flex-col h-dvh bg-background-light dark:bg-background-dark items-center justify-center p-6 text-center">
         <div className="size-24 rounded-full bg-red-100 dark:bg-red-900/20 flex items-center justify-center mb-4">
           <Icon name="error" className="text-4xl text-red-500" />
         </div>
@@ -257,7 +257,7 @@ const FindMatchScreen: React.FC = () => {
   if (!hasMoreCards && hasFetchedWithAdminTeam && allTeams.length === 0) {
     return (
       <>
-        <div className="flex flex-col h-screen bg-background-light dark:bg-background-dark items-center justify-center p-6 text-center">
+        <div className="flex flex-col h-dvh bg-background-light dark:bg-background-dark items-center justify-center p-6 text-center">
           <div className="flex flex-col items-center text-center max-w-[280px] gap-4">
             <div className="w-20 h-20 rounded-full bg-surface-light dark:bg-surface-dark flex items-center justify-center mb-2">
               <Icon name="search_off" className="text-text-secondary text-4xl" />
@@ -374,7 +374,7 @@ const FindMatchScreen: React.FC = () => {
     return (
       <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark pb-safe-with-nav">
         {/* Header */}
-        <div className="pt-12 pb-2 px-4 flex items-center">
+        <div className="safe-area-top px-4 pb-2 flex items-center">
           <button
             onClick={() => navigate(appRoutes.dashboard)}
             className="size-10 flex items-center justify-center rounded-full bg-white/10 backdrop-blur-md hover:bg-white/20 transition-colors mr-4"
@@ -411,7 +411,7 @@ const FindMatchScreen: React.FC = () => {
     return (
       <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark pb-safe-with-nav">
         {/* Header */}
-        <div className="pt-12 pb-2 px-4 flex items-center">
+        <div className="safe-area-top px-4 pb-2 flex items-center">
           <button
             onClick={() => navigate(appRoutes.dashboard)}
             className="size-10 flex items-center justify-center rounded-full bg-white/10 backdrop-blur-md hover:bg-white/20 transition-colors mr-4"
@@ -453,7 +453,7 @@ const FindMatchScreen: React.FC = () => {
 
   return (
     <>
-      <div className="flex flex-col h-screen bg-background-light dark:bg-background-dark relative overflow-hidden">
+      <div className="flex flex-col h-dvh bg-background-light dark:bg-background-dark relative overflow-hidden">
         {/* Background Decor */}
         <div className="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-primary/10 to-transparent pointer-events-none z-0" />
 
@@ -465,7 +465,7 @@ const FindMatchScreen: React.FC = () => {
         )}
 
         {/* Header */}
-        <div className="relative z-50 pt-12 pb-2 px-4 flex justify-center shrink-0">
+        <div className="relative z-50 safe-area-top px-4 pb-2 flex justify-center shrink-0">
           {/* Team Selector Trigger - Always show */}
           <div
             onClick={() => setShowTeamSelector(true)}
@@ -531,7 +531,7 @@ const FindMatchScreen: React.FC = () => {
                 key={team.id}
                 ref={index === 0 ? cardRef : null}
                 style={getCardStyle(index)}
-                className="absolute w-full max-w-[360px] h-[65vh] sm:h-[72vh] max-h-[600px] sm:max-h-[660px] bg-surface-light dark:bg-surface-dark rounded-[2.5rem] shadow-card flex flex-col overflow-hidden border border-gray-200 dark:border-white/10 group cursor-grab active:cursor-grabbing select-none"
+                className="absolute w-full max-w-[360px] h-[calc(100dvh-200px)] sm:h-[calc(100dvh-180px)] max-h-[600px] sm:max-h-[660px] bg-surface-light dark:bg-surface-dark rounded-[2.5rem] shadow-card flex flex-col overflow-hidden border border-gray-200 dark:border-white/10 group cursor-grab active:cursor-grabbing select-none"
                 onTouchStart={index === 0 ? handleTouchStart : undefined}
                 onTouchMove={index === 0 ? handleTouchMove : undefined}
                 onTouchEnd={index === 0 ? handleTouchEnd : undefined}

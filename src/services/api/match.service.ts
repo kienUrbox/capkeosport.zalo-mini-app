@@ -51,6 +51,22 @@ export interface Match {
   acceptedAt?: string;
   createdAt?: string;
   notes?: string;
+  // Result data (when includeResult=true)
+  result?: {
+    teamAScore: number;
+    teamBScore: number;
+    notes?: string;
+    fileIds?: string[];
+    lastUpdatedBy: string;
+    lastUpdatedAt: string;
+    files?: MatchResultFile[];
+    confirmations?: {
+      teamA: { confirmed: boolean; confirmedBy?: string; confirmedAt?: string };
+      teamB: { confirmed: boolean; confirmedBy?: string; confirmedAt?: string };
+    };
+    locked: boolean;
+    canEdit: boolean;
+  };
 }
 
 export interface GetMatchesParams {
@@ -59,6 +75,7 @@ export interface GetMatchesParams {
   statuses?: MatchStatus | MatchStatus[];
   page?: number;
   limit?: number;
+  includeResult?: boolean;
 }
 
 export interface GetMatchesResponse {
@@ -86,15 +103,12 @@ export interface UpdateMatchRequestDto {
 }
 
 export interface ConfirmMatchDto {
-  date: string;
-  time: string;
-  location: {
-    name: string;
-    address: string;
-    lat: number;
-    lng: number;
-    mapLink?: string;
-  };
+  date: string;        // YYYY-MM-DD
+  time: string;        // HH:mm
+  stadiumName: string;
+  mapUrl: string;
+  lat?: number;        // Optional - backend may already have it
+  lng?: number;        // Optional - backend may already have it
 }
 
 export interface FinishMatchDto {
@@ -153,6 +167,58 @@ export interface MatchAttendance {
 export interface UpdateAttendanceDto {
   status: AttendanceStatus;
   reason?: string;
+}
+
+// Match Result types
+export interface MatchResult {
+  teamAScore: number;
+  teamBScore: number;
+  notes?: string;
+  fileIds?: string[];
+  lastUpdatedBy: string;
+  lastUpdatedAt: string;
+}
+
+export interface MatchResultFile {
+  id: string;
+  filename: string;
+  publicUrl: string;
+  thumbnailUrl?: string;
+  fileSize: number;
+  mimeType: string;
+}
+
+export interface MatchResultConfirmation {
+  confirmed: boolean;
+  confirmedBy: string | null;
+  confirmedAt: string | null;
+}
+
+export interface MatchResultData {
+  id: string;
+  matchId: string;
+  result: MatchResult | null;
+  confirmations: {
+    teamA: MatchResultConfirmation;
+    teamB: MatchResultConfirmation;
+  };
+  canEdit: boolean;
+  locked: boolean;
+}
+
+export interface SubmitResultDto {
+  teamAScore: number;
+  teamBScore: number;
+  notes?: string;
+  fileIds?: string[];
+}
+
+export interface ConfirmResultResponse {
+  matchStatus: string;
+  teamAConfirmed: boolean;
+  teamBConfirmed: boolean;
+  locked: boolean;
+  message?: string;
 }
 
 /**
@@ -297,5 +363,41 @@ export const MatchService = {
    */
   updateAttendance: async (matchId: string, data: UpdateAttendanceDto) => {
     return api.post<Attendee>(`/matches/${matchId}/attendance`, data);
+  },
+
+  /**
+   * Submit/Update match result
+   * POST /api/v1/matches/:id/result
+   */
+  submitResult: async (matchId: string, data: SubmitResultDto) => {
+    return api.post<{ data: MatchResultData }>(`/matches/${matchId}/result`, data);
+  },
+
+  /**
+   * Confirm match result
+   * POST /api/v1/matches/:id/result/confirm
+   */
+  confirmResult: async (matchId: string) => {
+    return api.post<{ data: ConfirmResultResponse }>(`/matches/${matchId}/result/confirm`);
+  },
+
+  /**
+   * Get match result
+   * GET /api/v1/matches/:id/result
+   */
+  getResult: async (matchId: string) => {
+    return api.get<{ data: MatchResultData }>(`/matches/${matchId}/result`);
+  },
+
+  /**
+   * Upload result files
+   * POST /api/v1/matches/:id/result/files
+   */
+  uploadResultFiles: async (matchId: string, files: File[]) => {
+    const formData = new FormData();
+    files.forEach(file => formData.append('files', file));
+    return api.post<{ data: { files: MatchResultFile[] } }>(`/matches/${matchId}/result/files`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
   },
 };

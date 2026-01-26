@@ -2,7 +2,14 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useMatchStore, type TabType } from '@/stores/match.store';
 
 export const useScheduleData = (teamId?: string) => {
+  // Subscribe to store changes - this ensures component re-renders when data changes
+  const pendingMatches = useMatchStore((state) => state.pendingMatches);
+  const upcomingMatches = useMatchStore((state) => state.upcomingMatches);
+  const historyMatches = useMatchStore((state) => state.historyMatches);
+  const isLoadingMore = useMatchStore((state) => state.isLoadingMore);
+  const pagination = useMatchStore((state) => state.pagination);
   const store = useMatchStore();
+
   const [isLoadingPending, setIsLoadingPending] = useState(false);
   const [isLoadingUpcoming, setIsLoadingUpcoming] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
@@ -88,17 +95,17 @@ export const useScheduleData = (teamId?: string) => {
   // Load more (infinite scroll)
   const loadMore = useCallback(
     async (tab: TabType) => {
-      const pagination = store.pagination[tab];
-      if (!pagination.hasMore || store.isLoadingMore[tab]) {
-        console.log(`[useScheduleData] Skipping loadMore for ${tab} - hasMore: ${pagination.hasMore}, isLoadingMore: ${store.isLoadingMore[tab]}`);
+      const tabPagination = pagination[tab];
+      if (!tabPagination.hasMore || isLoadingMore[tab]) {
+        console.log(`[useScheduleData] Skipping loadMore for ${tab} - hasMore: ${tabPagination.hasMore}, isLoadingMore: ${isLoadingMore[tab]}`);
         return;
       }
 
-      const nextPage = pagination.page + 1;
+      const nextPage = tabPagination.page + 1;
       console.log(`[useScheduleData] Loading more for ${tab}, page: ${nextPage}`);
       await fetchTabData(tab, nextPage, false);
     },
-    [store.pagination, store.isLoadingMore, fetchTabData]
+    [pagination, isLoadingMore, fetchTabData]
   );
 
   // Refresh single tab
@@ -141,9 +148,9 @@ export const useScheduleData = (teamId?: string) => {
   // Check if tab has more pages
   const hasMore = useCallback(
     (tab: TabType): boolean => {
-      return store.pagination[tab].hasMore;
+      return pagination[tab].hasMore;
     },
-    [store.pagination]
+    [pagination]
   );
 
   // Cleanup
@@ -155,19 +162,19 @@ export const useScheduleData = (teamId?: string) => {
 
   return {
     // Data
-    pendingMatches: store.pendingMatches,
-    upcomingMatches: store.upcomingMatches,
-    historyMatches: store.historyMatches,
+    pendingMatches,
+    upcomingMatches,
+    historyMatches,
 
     // Loading states
     isLoadingPending,
     isLoadingUpcoming,
     isLoadingHistory,
     isRefreshing,
-    isLoadingMore: store.isLoadingMore,
+    isLoadingMore,
 
     // Pagination state
-    pagination: store.pagination,
+    pagination,
 
     // Error
     error,
