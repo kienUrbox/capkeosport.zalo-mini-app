@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Icon, Button } from './';
 import { TeamAvatar } from './TeamAvatar';
 import { useMatchActions } from '@/stores/match.store';
+import { useKeyboardAvoidance } from '@/hooks/useKeyboardAvoidance';
 
 export interface UpdateScoreModalProps {
   isOpen: boolean;
@@ -43,6 +44,9 @@ export const UpdateScoreModal: React.FC<UpdateScoreModalProps> = ({
   // UI state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Enable keyboard avoidance for textarea input
+  useKeyboardAvoidance();
 
   // Reset form when modal opens with new initialData
   useEffect(() => {

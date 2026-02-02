@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Icon } from './Icon';
+import { useKeyboardAvoidance } from '@/hooks/useKeyboardAvoidance';
 
 export interface ActionBottomSheetProps {
   isOpen: boolean;
@@ -50,6 +51,9 @@ export const ActionBottomSheet: React.FC<ActionBottomSheetProps> = ({
   isLoading = false,
 }) => {
   const [inputValue, setInputValue] = useState('');
+
+  // Enable keyboard avoidance when sheet has input
+  useKeyboardAvoidance();
 
   // Reset input when sheet opens
   useEffect(() => {

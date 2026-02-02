@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Header, Icon, EmptyState, ErrorState, SentInviteCard, InvitationSkeleton } from '@/components/ui';
+import { Header, Icon, EmptyState, ErrorState, SentInviteCard, InvitationSkeleton, ActionBottomSheet } from '@/components/ui';
 import { appRoutes } from '@/utils/navigation';
 import { TeamService } from '@/services/api/team.service';
 import { useMyTeams, useSentInvites, useTeamActions, useTeamStore } from '@/stores/team.store';
@@ -23,6 +23,8 @@ import { toast } from '@/utils/toast';
  */
 type TabType = 'players' | 'pending';
 
+type ConfirmActionType = 'delete_member' | 'demote_admin' | 'cancel_invite' | null;
+
 const TeamMembersScreen: React.FC = () => {
   const navigate = useNavigate();
   const { teamId } = useParams<{ teamId: string }>();
@@ -39,6 +41,11 @@ const TeamMembersScreen: React.FC = () => {
   const [pendingInvites, setPendingInvites] = useState<TeamInvite[]>([]);
   const [isInvitesLoading, setIsInvitesLoading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Confirmation dialog state
+  const [showConfirmSheet, setShowConfirmSheet] = useState(false);
+  const [confirmActionType, setConfirmActionType] = useState<ConfirmActionType>(null);
+  const [confirmActionData, setConfirmActionData] = useState<{ member?: TeamMember; inviteId?: string } | null>(null);
 
   // Store hooks
   const sentInvites = useSentInvites();
@@ -110,6 +117,49 @@ const TeamMembersScreen: React.FC = () => {
     setTimeout(() => setSelectedMember(null), 300);
   };
 
+  // Show confirm dialog for delete member
+  const showDeleteMemberConfirm = (member: TeamMember) => {
+    setConfirmActionType('delete_member');
+    setConfirmActionData({ member });
+    setShowConfirmSheet(true);
+  };
+
+  // Show confirm dialog for demote admin
+  const showDemoteAdminConfirm = (member: TeamMember) => {
+    setConfirmActionType('demote_admin');
+    setConfirmActionData({ member });
+    setShowConfirmSheet(true);
+  };
+
+  // Show confirm dialog for cancel invite
+  const showCancelInviteConfirm = (inviteId: string) => {
+    setConfirmActionType('cancel_invite');
+    setConfirmActionData({ inviteId });
+    setShowConfirmSheet(true);
+  };
+
+  // Handle confirm action
+  const handleConfirmAction = async () => {
+    if (!confirmActionType || !confirmActionData) return;
+
+    switch (confirmActionType) {
+      case 'delete_member':
+        await handleDeleteMemberConfirmed();
+        break;
+      case 'demote_admin':
+        await handleDemoteToMemberConfirmed();
+        break;
+      case 'cancel_invite':
+        await handleCancelInviteConfirmed();
+        break;
+    }
+
+    // Reset confirm state
+    setShowConfirmSheet(false);
+    setConfirmActionType(null);
+    setConfirmActionData(null);
+  };
+
   const handleDeleteMember = async () => {
     if (!selectedMember || !teamId || !currentTeam) return;
 
@@ -125,16 +175,19 @@ const TeamMembersScreen: React.FC = () => {
       return;
     }
 
-    // Confirmation dialog
-    if (!confirm(`Bạn có chắc muốn xóa ${selectedMember.user?.name} khỏi đội?`)) {
-      return;
-    }
+    // Show confirm dialog
+    showDeleteMemberConfirm(selectedMember);
+  };
+
+  const handleDeleteMemberConfirmed = async () => {
+    const member = confirmActionData?.member;
+    if (!member || !teamId) return;
 
     try {
-      const response = await TeamService.removeMember(teamId, selectedMember.id);
+      const response = await TeamService.removeMember(teamId, member.id);
       if (response.success) {
         toast.success('Đã xóa thành viên khỏi đội');
-        setMembers((prev) => prev.filter((m) => m.id !== selectedMember.id));
+        setMembers((prev) => prev.filter((m) => m.id !== member.id));
         closeActionSheet();
       } else {
         toast.error(response.error?.message || 'Không thể xóa thành viên');
@@ -187,16 +240,19 @@ const TeamMembersScreen: React.FC = () => {
       return;
     }
 
-    // Confirmation
-    if (!confirm(`Bạn có chắc muốn hạ cấp ${selectedMember.user?.name} xuống thành viên?`)) {
-      return;
-    }
+    // Show confirm dialog
+    showDemoteAdminConfirm(selectedMember);
+  };
+
+  const handleDemoteToMemberConfirmed = async () => {
+    const member = confirmActionData?.member;
+    if (!member || !teamId) return;
 
     try {
       const teamStore = useTeamStore.getState();
-      await teamStore.updateMemberAdminRole(teamId, selectedMember.id, 'member');
+      await teamStore.updateMemberAdminRole(teamId, member.id, 'member');
 
-      toast.success(`Đã hạ cấp ${selectedMember.user?.name} xuống thành viên`);
+      toast.success(`Đã hạ cấp ${member.user?.name} xuống thành viên`);
       closeActionSheet();
 
       // Refresh members list
@@ -211,7 +267,12 @@ const TeamMembersScreen: React.FC = () => {
   };
 
   const handleCancelInvite = async (inviteId: string) => {
-    if (!confirm('Bạn có chắc muốn hủy lời mời này?')) return;
+    showCancelInviteConfirm(inviteId);
+  };
+
+  const handleCancelInviteConfirmed = async () => {
+    const inviteId = confirmActionData?.inviteId;
+    if (!inviteId) return;
 
     setIsProcessing(true);
     try {
@@ -221,6 +282,38 @@ const TeamMembersScreen: React.FC = () => {
       console.error('Failed to cancel invite:', error);
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  // Get confirm dialog content based on action type
+  const getConfirmDialogContent = () => {
+    switch (confirmActionType) {
+      case 'delete_member':
+        return {
+          title: 'Xóa thành viên',
+          description: `Bạn có chắc muốn xóa ${confirmActionData?.member?.user?.name} khỏi đội?`,
+          icon: 'person_remove',
+          iconColor: 'text-red-500',
+          primaryButtonText: 'Xóa',
+        };
+      case 'demote_admin':
+        return {
+          title: 'Hạ cấp thành viên',
+          description: `Bạn có chắc muốn hạ cấp ${confirmActionData?.member?.user?.name} xuống thành viên?`,
+          icon: 'arrow_downward',
+          iconColor: 'text-orange-500',
+          primaryButtonText: 'Hạ cấp',
+        };
+      case 'cancel_invite':
+        return {
+          title: 'Hủy lời mời',
+          description: 'Bạn có chắc muốn hủy lời mời này?',
+          icon: 'cancel',
+          iconColor: 'text-orange-500',
+          primaryButtonText: 'Hủy lời mời',
+        };
+      default:
+        return null;
     }
   };
 
@@ -263,6 +356,8 @@ const TeamMembersScreen: React.FC = () => {
            member.user?.position?.toLowerCase() === 'đội trưởng' ||
            member.user?.position?.toLowerCase() === 'captain';
   };
+
+  const confirmContent = getConfirmDialogContent();
 
   return (
     <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark pb-safe">
@@ -557,6 +652,23 @@ const TeamMembersScreen: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* 3. Confirm Action Bottom Sheet */}
+      {confirmContent && (
+        <ActionBottomSheet
+          isOpen={showConfirmSheet}
+          onClose={() => setShowConfirmSheet(false)}
+          type="confirm"
+          title={confirmContent.title}
+          description={confirmContent.description}
+          icon={confirmContent.icon}
+          iconColor={confirmContent.iconColor}
+          primaryButtonText={confirmContent.primaryButtonText}
+          onPrimaryAction={handleConfirmAction}
+          secondaryButtonText="Hủy"
+          isLoading={isProcessing}
+        />
       )}
 
       <style>{`

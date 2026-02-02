@@ -18,8 +18,8 @@ const LoginScreen = () => {
       const authResult = await zaloThreeStepAuthService.authenticateWithThreeSteps()
 
       if (authResult.success) {
-        // Redirect to dashboard directly (bypass onboarding)
-        navigate('/')
+        // Navigate directly to dashboard with replace to avoid back button loop
+        navigate('/', { replace: true })
       } else {
         throw new Error(authResult.error || authResult.message || 'Authentication failed')
       }

@@ -136,12 +136,13 @@ class LaunchingService {
   /**
    * Load user's teams from API and save to store
    * Uses teamStore.fetchMyTeams() which handles smart caching and persistence
+   * Always force refresh on app launch to ensure fresh data
    */
   private async loadMyTeams(): Promise<{ success: boolean; error?: string }> {
     try {
       const { useTeamStore } = await import('@/stores/team.store');
-      // Use store's fetchMyTeams which saves to store and has smart caching
-      await useTeamStore.getState().fetchMyTeams();
+      // Always force refresh on app launch to ensure fresh team data
+      await useTeamStore.getState().fetchMyTeams(true);
       return { success: true };
     } catch (error: any) {
       console.error('Error loading teams:', error);
