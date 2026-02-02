@@ -6,6 +6,7 @@ import { AddMemberBottomSheet as PhoneInviteBottomSheet } from '@/screens/teams/
 import { appRoutes } from '@/utils/navigation';
 import { useMyTeams, isAdmin } from '@/stores/team.store';
 import { useTeamDetail } from '@/hooks/useTeamDetail';
+import { getLevelColor, LEVEL_ICON, STAT_COLORS, STAT_ICONS } from '@/constants/design';
 
 /**
  * TeamDetail Screen
@@ -180,9 +181,14 @@ const TeamDetailScreen: React.FC = () => {
           <span className="px-3 py-1 rounded-full bg-gray-200 dark:bg-white/10 text-xs font-medium flex items-center gap-1">
             <Icon name={getGenderIcon(team.gender)} className="text-sm" /> {formatGender(team.gender)}
           </span>
-          <span className="px-3 py-1 rounded-full bg-gray-200 dark:bg-white/10 text-xs font-medium flex items-center gap-1">
-            <Icon name="hotel_class" className="text-sm" /> {team.level}
-          </span>
+          {(() => {
+            const levelColor = getLevelColor(team.level);
+            return (
+              <span className={`px-3 py-1 rounded-full ${levelColor.bg} ${levelColor.main} text-xs font-medium flex items-center gap-1`}>
+                <Icon name={LEVEL_ICON} className="text-sm" /> {team.level}
+              </span>
+            );
+          })()}
         </div>
       </div>
 
@@ -203,7 +209,7 @@ const TeamDetailScreen: React.FC = () => {
                 <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0"><Icon name="sports_soccer" className="text-lg" /></div>
                 <div>
                   <p className="text-xs text-gray-500 uppercase font-bold">Loại sân</p>
-                  <p className="text-sm font-medium">{team.pitch.map(p => `Sân ${p}`).join(' • ')}</p>
+                  <p className="text-sm font-medium">{team.pitch.join(' • ')}</p>
                 </div>
               </div>
             </>
@@ -232,21 +238,21 @@ const TeamDetailScreen: React.FC = () => {
           <div className="grid grid-cols-3 gap-3">
             {team.stats.attack !== undefined && (
               <div className="bg-white dark:bg-surface-dark p-3 rounded-xl border border-gray-100 dark:border-white/5 flex flex-col items-center gap-2">
-                <div className="size-10 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center"><Icon name="flash_on" /></div>
+                <div className={`size-10 ${STAT_COLORS.attack.bg} ${STAT_COLORS.attack.main} rounded-full flex items-center justify-center`}><Icon name={STAT_ICONS.attack} /></div>
                 <span className="text-xs font-medium text-gray-500">Tấn công</span>
                 <span className="font-bold text-lg">{(team.stats.attack / 10).toFixed(1)}</span>
               </div>
             )}
             {team.stats.defense !== undefined && (
               <div className="bg-white dark:bg-surface-dark p-3 rounded-xl border border-gray-100 dark:border-white/5 flex flex-col items-center gap-2">
-                <div className="size-10 bg-blue-500/10 text-blue-500 rounded-full flex items-center justify-center"><Icon name="shield" /></div>
+                <div className={`size-10 ${STAT_COLORS.defense.bg} ${STAT_COLORS.defense.main} rounded-full flex items-center justify-center`}><Icon name={STAT_ICONS.defense} /></div>
                 <span className="text-xs font-medium text-gray-500">Phòng thủ</span>
                 <span className="font-bold text-lg">{(team.stats.defense / 10).toFixed(1)}</span>
               </div>
             )}
             {team.stats.technique !== undefined && (
               <div className="bg-white dark:bg-surface-dark p-3 rounded-xl border border-gray-100 dark:border-white/5 flex flex-col items-center gap-2">
-                <div className="size-10 bg-primary/10 text-primary rounded-full flex items-center justify-center"><Icon name="sports_soccer" /></div>
+                <div className={`size-10 ${STAT_COLORS.technique.bg} ${STAT_COLORS.technique.main} rounded-full flex items-center justify-center`}><Icon name={STAT_ICONS.technique} /></div>
                 <span className="text-xs font-medium text-gray-500">Kỹ thuật</span>
                 <span className="font-bold text-lg">{(team.stats.technique / 10).toFixed(1)}</span>
               </div>

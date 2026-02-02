@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Header, Icon, ThemeSwitch } from '@/components/ui';
 import { appRoutes } from '@/utils/navigation';
 import { useUser, useAuthActions, useAuthStore } from '@/stores/auth.store';
+import { STAT_COLORS, STAT_ICONS } from '@/constants/design';
 
 /**
  * Profile Screen
@@ -200,9 +201,9 @@ const ProfileScreen: React.FC = () => {
             {/* Attack */}
             <div>
               <div className="flex justify-between items-center mb-2">
-                <div className="flex items-center gap-2 text-red-500 font-bold text-sm">
-                  <div className="p-1 bg-red-500/10 rounded">
-                    <Icon name="flash_on" className="text-sm" />
+                <div className={`flex items-center gap-2 ${STAT_COLORS.attack.main} font-bold text-sm`}>
+                  <div className={`p-1 ${STAT_COLORS.attack.bg} rounded`}>
+                    <Icon name={STAT_ICONS.attack} className="text-sm" />
                   </div>
                   Tấn công
                 </div>
@@ -210,7 +211,7 @@ const ProfileScreen: React.FC = () => {
               </div>
               <div className="h-2.5 w-full bg-gray-100 dark:bg-black/20 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-red-500 rounded-full shadow-[0_0_10px_rgba(239,68,68,0.5)]"
+                  className={`h-full bg-gradient-to-r ${STAT_COLORS.attack.gradient} rounded-full shadow-[0_0_10px_rgba(239,68,68,0.5)]`}
                   style={{ width: `${stats.attack * 10}%` }}
                 ></div>
               </div>
@@ -219,9 +220,9 @@ const ProfileScreen: React.FC = () => {
             {/* Defense */}
             <div>
               <div className="flex justify-between items-center mb-2">
-                <div className="flex items-center gap-2 text-blue-500 font-bold text-sm">
-                  <div className="p-1 bg-blue-500/10 rounded">
-                    <Icon name="shield" className="text-sm" />
+                <div className={`flex items-center gap-2 ${STAT_COLORS.defense.main} font-bold text-sm`}>
+                  <div className={`p-1 ${STAT_COLORS.defense.bg} rounded`}>
+                    <Icon name={STAT_ICONS.defense} className="text-sm" />
                   </div>
                   Phòng thủ
                 </div>
@@ -229,7 +230,7 @@ const ProfileScreen: React.FC = () => {
               </div>
               <div className="h-2.5 w-full bg-gray-100 dark:bg-black/20 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-blue-500 rounded-full shadow-[0_0_10px_rgba(59,130,246,0.5)]"
+                  className={`h-full bg-gradient-to-r ${STAT_COLORS.defense.gradient} rounded-full shadow-[0_0_10px_rgba(59,130,246,0.5)]`}
                   style={{ width: `${stats.defense * 10}%` }}
                 ></div>
               </div>
@@ -238,9 +239,9 @@ const ProfileScreen: React.FC = () => {
             {/* Technique */}
             <div>
               <div className="flex justify-between items-center mb-2">
-                <div className="flex items-center gap-2 text-primary font-bold text-sm">
-                  <div className="p-1 bg-primary/10 rounded">
-                    <Icon name="sports_soccer" className="text-sm" />
+                <div className={`flex items-center gap-2 ${STAT_COLORS.technique.main} font-bold text-sm`}>
+                  <div className={`p-1 ${STAT_COLORS.technique.bg} rounded`}>
+                    <Icon name={STAT_ICONS.technique} className="text-sm" />
                   </div>
                   Kỹ thuật
                 </div>
@@ -248,7 +249,7 @@ const ProfileScreen: React.FC = () => {
               </div>
               <div className="h-2.5 w-full bg-gray-100 dark:bg-black/20 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-primary rounded-full shadow-[0_0_10px_rgba(17,212,115,0.5)]"
+                  className={`h-full bg-gradient-to-r ${STAT_COLORS.technique.gradient} rounded-full shadow-[0_0_10px_rgba(17,212,115,0.5)]`}
                   style={{ width: `${stats.technique * 10}%` }}
                 ></div>
               </div>

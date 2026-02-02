@@ -82,7 +82,7 @@ export default function LaunchingScreen() {
 
   // Render loading state
   const renderLoading = () => (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white">
+    <div className="flex flex-col items-center justify-center min-h-dvh bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white px-6 pt-safe pb-safe">
       {/* Bouncing sports icons */}
       <div className="flex gap-3 mb-8">
         {SPORTS_ICONS.map((icon, index) => (
@@ -103,7 +103,7 @@ export default function LaunchingScreen() {
       </div>
 
       {/* Logo */}
-      <h1 className="text-3xl font-bold mb-4 tracking-wide">CÁP KÈO SPORT</h1>
+      <h1 className="text-3xl font-bold mb-4 tracking-wide text-center">CÁP KÈO SPORT</h1>
 
       {/* Loading text with pulse animation */}
       <div className="flex items-center gap-2">
@@ -115,12 +115,12 @@ export default function LaunchingScreen() {
 
   // Render error state
   const renderError = () => (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white px-8">
+    <div className="flex flex-col items-center justify-center min-h-dvh bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white px-6 pt-safe pb-safe">
       {/* Error icon */}
       <div className="material-icons text-red-500 text-6xl mb-6">error_outline</div>
 
       {/* Error message */}
-      <h2 className="text-xl font-semibold mb-2">Không thể tải dữ liệu</h2>
+      <h2 className="text-xl font-semibold mb-2 text-center">Không thể tải dữ liệu</h2>
       <p className="text-gray-400 text-center mb-8">{error}</p>
 
       {/* Hint text */}
@@ -129,17 +129,17 @@ export default function LaunchingScreen() {
       </p>
 
       {/* Buttons */}
-      <div className="flex gap-4">
+      <div className="flex flex-col sm:flex-row gap-3 w-full max-w-xs">
         <button
           onClick={handleRetry}
-          className="px-6 py-3 bg-[#11d473] hover:bg-[#0ea65e] text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+          className="flex-1 px-6 py-3 bg-[#11d473] hover:bg-[#0ea65e] text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
         >
           <span className="material-icons text-xl">refresh</span>
           Thử lại
         </button>
         <button
           onClick={handleLoginAgain}
-          className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+          className="flex-1 px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
         >
           <span className="material-icons text-xl">login</span>
           Đăng nhập lại

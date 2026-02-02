@@ -911,6 +911,8 @@ export const useHistoryMatches = () => useMatchStore((state) => state.historyMat
 
 export const useSelectedMatch = () => useMatchStore((state) => state.selectedMatch);
 
+export const useIsLoadingMatches = () => useMatchStore((state) => state.isLoading);
+
 // NEW: Pagination selectors
 export const usePagination = () => useMatchStore((state) => state.pagination);
 

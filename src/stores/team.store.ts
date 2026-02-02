@@ -524,11 +524,8 @@ export const useTeamStore = create<TeamState>()(
             return;
           }
 
-          // Guard: Use cache if same teamId, have data, and not forcing refresh
-          if (!forceRefresh && currentState.currentOpponentId === teamId && currentState.currentOpponentDetail) {
-            console.log('[TeamStore] Using cached opponent detail for:', teamId);
-            return;
-          }
+          // NOTE: No cache guard for opponent detail - always fetch fresh data
+          // Opponent data comes from external source and should always be up-to-date
 
           // Set loading state
           if (forceRefresh) {

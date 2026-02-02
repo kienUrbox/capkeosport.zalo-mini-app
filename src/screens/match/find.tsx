@@ -6,6 +6,7 @@ import { useDiscovery } from '@/hooks/useDiscovery';
 import { useMyTeams, useSelectedTeam, useTeamActions, useTeamStore } from '@/stores/team.store';
 import { useDiscoveryStore } from '@/stores/discovery.store';
 import type { Team } from '@/types/api.types';
+import { getLevelColor, LEVEL_ICON, STAT_COLORS } from '@/constants/design';
 
 /**
  * FindMatch Screen
@@ -193,13 +194,11 @@ const FindMatchScreen: React.FC = () => {
         zIndex: 10,
       };
     } else if (index === 1) {
-      // Next card animation
-      const scale = 0.95 + (Math.min(Math.abs(dragDelta.x), 100) / 100) * 0.05;
+      // Next card - static style, no calculation during drag
       return {
-        transform: `scale(${scale}) translateY(10px)`,
+        transform: 'scale(0.95) translateY(10px)',
         zIndex: 9,
         opacity: 1,
-        transition: 'transform 0.1s ease',
       };
     }
     return { zIndex: 0, opacity: 0 };
@@ -508,8 +507,8 @@ const FindMatchScreen: React.FC = () => {
         {/* Card Stack Area */}
         <div className="flex-1 relative w-full flex flex-col items-center justify-center p-4 z-10 overflow-visible">
           {/* Decorative Stack Layers (To give depth feel) */}
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 -translate-y-1/2 -translate-y-2 w-[82%] h-[calc(100%-24px)] bg-surface-light/40 dark:bg-surface-dark/40 rounded-[2.5rem] border border-white/5 z-0 pointer-events-none"></div>
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -translate-y-1 w-[82%] h-[calc(100%-24px)] bg-surface-light/70 dark:bg-surface-dark/70 rounded-[2.5rem] border border-white/5 z-10 shadow-lg backdrop-blur-sm pointer-events-none"></div>
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[calc(50%+8px)] w-[82%] h-[calc(100%-24px)] bg-surface-light/40 dark:bg-surface-dark/40 rounded-[2.5rem] border border-white/5 z-0 pointer-events-none"></div>
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[calc(50%+4px)] w-[82%] h-[calc(100%-24px)] bg-surface-light/70 dark:bg-surface-dark/70 rounded-[2.5rem] border border-white/5 z-10 shadow-lg backdrop-blur-sm pointer-events-none"></div>
 
           {/* Refreshing skeleton overlay */}
           {isRefreshing && currentTeam && (
@@ -544,13 +543,13 @@ const FindMatchScreen: React.FC = () => {
                 {index === 0 && (
                   <>
                     <div
-                      className="absolute top-8 left-8 z-30 border-4 border-green-500 rounded-lg px-4 py-1 transform -rotate-12 pointer-events-none transition-opacity"
+                      className="absolute top-8 left-8 z-30 border-4 border-green-500 rounded-[2.5rem] px-6 py-3 transform -rotate-12 pointer-events-none transition-opacity bg-white/95 dark:bg-surface-dark/95 backdrop-blur-md shadow-lg"
                       style={{ opacity: likeOpacity }}
                     >
                       <span className="text-4xl font-black text-green-500 uppercase tracking-widest">LIKE</span>
                     </div>
                     <div
-                      className="absolute top-8 right-8 z-30 border-4 border-red-500 rounded-lg px-4 py-1 transform rotate-12 pointer-events-none transition-opacity"
+                      className="absolute top-8 right-8 z-30 border-4 border-red-500 rounded-[2.5rem] px-6 py-3 transform rotate-12 pointer-events-none transition-opacity bg-white/95 dark:bg-surface-dark/95 backdrop-blur-md shadow-lg"
                       style={{ opacity: nopeOpacity }}
                     >
                       <span className="text-4xl font-black text-red-500 uppercase tracking-widest">NOPE</span>
@@ -641,10 +640,15 @@ const FindMatchScreen: React.FC = () => {
 
                   {/* Badges: Level + Members */}
                   <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-4">
-                    <div className="px-3 py-1 rounded-lg bg-primary/10 border border-primary/20 flex items-center gap-1.5">
-                      <Icon name="military_tech" className="text-primary text-[16px]" />
-                      <span className="text-primary text-xs font-bold uppercase tracking-wide">{team.level || '-'}</span>
-                    </div>
+                    {(() => {
+                      const levelColor = getLevelColor(team.level);
+                      return (
+                        <div className={`px-3 py-1 rounded-lg ${levelColor.bg} border ${levelColor.border} flex items-center gap-1.5`}>
+                          <Icon name={LEVEL_ICON} className={`${levelColor.main} text-[16px]`} />
+                          <span className={`${levelColor.main} text-xs font-bold uppercase tracking-wide`}>{team.level || '-'}</span>
+                        </div>
+                      );
+                    })()}
                     <div className="px-3 py-1 rounded-lg bg-white/5 border border-white/10 flex items-center gap-1.5">
                       <Icon name="groups" className="text-text-secondary text-[16px]" />
                       <span className="text-text-secondary text-xs font-bold">{team.membersCount || 0} Thành viên</span>
@@ -665,7 +669,7 @@ const FindMatchScreen: React.FC = () => {
                         <span className="text-[10px] text-text-secondary uppercase font-bold tracking-wider">Tấn công</span>
                         <span className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">{team.stats.attack}</span>
                         <div className="w-full h-1.5 bg-white/10 rounded-full mt-1 overflow-hidden">
-                          <div className="h-full bg-emerald-400 rounded-full" style={{ width: `${team.stats.attack}%` }}></div>
+                          <div className="h-full bg-red-400 rounded-full" style={{ width: `${team.stats.attack}%` }}></div>
                         </div>
                       </div>
                     )}
@@ -683,7 +687,7 @@ const FindMatchScreen: React.FC = () => {
                         <span className="text-[10px] text-text-secondary uppercase font-bold tracking-wider">Kỹ thuật</span>
                         <span className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">{team.stats.technique}</span>
                         <div className="w-full h-1.5 bg-white/10 rounded-full mt-1 overflow-hidden">
-                          <div className="h-full bg-purple-400 rounded-full" style={{ width: `${team.stats.technique}%` }}></div>
+                          <div className="h-full bg-primary rounded-full" style={{ width: `${team.stats.technique}%` }}></div>
                         </div>
                       </div>
                     )}

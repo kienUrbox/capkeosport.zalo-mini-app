@@ -912,6 +912,7 @@ const MatchScheduleScreen: React.FC = () => {
           <ConfirmMatchModal
             isOpen={!!confirmModalMatchId}
             matchId={confirmModalMatchId}
+            match={match}
             myTeam={currentTeam || { id: '', name: '', logo: '' }}
             opponentTeam={match.teamB || { id: '', name: '', logo: '' }}
             onClose={handleCloseConfirmModal}

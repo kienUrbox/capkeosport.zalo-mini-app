@@ -1,9 +1,9 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useMatchStore } from '@/stores/match.store';
+import { useNotificationStore } from '@/stores/notification.store';
+import { usePhoneInviteStore } from '@/stores/phone-invite.store';
 import { useUIStore } from '@/stores/ui.store';
 import { useHomeStore } from '@/stores/home.store';
-import { NotificationService, type Notification } from '@/services/api/notification.service';
-import { MatchService } from '@/services/api/match.service';
 
 // Default location: Ho Chi Minh City center
 const DEFAULT_LOCATION = {
@@ -13,7 +13,7 @@ const DEFAULT_LOCATION = {
 
 interface HomeDataState {
   // Data
-  pendingInvitations: Notification[];
+  pendingInvitations: any[]; // Can be Notification[] or PhoneInvite[]
   nearbyTeams: any[]; // Keep for backward compatibility but always empty
 
   // Loading states - separated by section
@@ -34,7 +34,7 @@ export const useHomeData = (): HomeDataState => {
   const { showToast } = useUIStore();
   const homeStore = useHomeStore();
 
-  const [pendingInvitations, setPendingInvitations] = useState<Notification[]>([]);
+  const [pendingInvitations, setPendingInvitations] = useState<any[]>([]);
   const [nearbyTeams, setNearbyTeams] = useState<any[]>([]);
 
   // Individual loading states
@@ -99,58 +99,42 @@ export const useHomeData = (): HomeDataState => {
       // Get user location first (no longer used for nearby teams)
       await getUserLocation();
 
-      // Fetch invitations separately
-      const invitationsPromise = NotificationService.getNotifications({
-        type: 'team_invitation',
-        unreadOnly: true,
-      })
-        .then((response) => {
-          if (response.success) {
-            const notifications = response.data || [];
-            setPendingInvitations(notifications);
-            return { success: true, data: notifications };
-          }
+      // Fetch invitations from store - use notification store for team invitations
+      const invitationsPromise = useNotificationStore.getState().fetchNotifications(
+        { type: 'team_invitation', unreadOnly: true },
+        isRefresh // forceRefresh on manual refresh
+      )
+        .then((notifications) => {
+          setPendingInvitations(notifications);
+          return { success: true, data: notifications };
+        })
+        .catch((err) => {
+          console.error('Failed to load invitations:', err);
           return { success: false, error: 'Failed to load invitations' };
         })
-        .catch((err) => ({ success: false, error: err }))
         .then((result) => {
           setIsLoadingInvitations(false);
           return result;
         });
 
-      // Fetch matches separately
-      const matchesPromise = MatchService.getMatches({
-        status: 'CONFIRMED',
-      })
-        .then((response) => {
-          if (response.success) {
-            const matches = Array.isArray(response.data) ? response.data : [];
-            setUpcomingMatches(matches);
-            return { success: true };
-          }
+      // Fetch matches from store
+      const matchesPromise = useMatchStore.getState().fetchUpcomingMatches(
+        undefined, // teamId - fetch for all teams
+        1, // page
+        isRefresh // forceRefresh on manual refresh
+      )
+        .then(() => {
+          // Store already handles updating upcomingMatches
+          return { success: true };
+        })
+        .catch((err) => {
+          console.error('Failed to load matches:', err);
           return { success: false, error: 'Failed to load matches' };
         })
-        .catch((err) => ({ success: false, error: err }))
         .then((result) => {
           setIsLoadingMatches(false);
           return result;
         });
-
-      // Fetch teams separately (requires location) - DISABLED
-      // const teamsPromise = DiscoveryService.discoverTeams(discoveryFilters)
-      //   .then((response) => {
-      //     if (response.success) {
-      //       const discoveredTeams = response.data?.teams || [];
-      //       setNearbyTeams(discoveredTeams);
-      //       return { success: true, data: discoveredTeams };
-      //     }
-      //     return { success: false, error: 'Failed to load teams' };
-      //   })
-      //   .catch((err) => ({ success: false, error: err }))
-      //   .then((result) => {
-      //     setIsLoadingTeams(false);
-      //     return result;
-      //   });
 
       // Wait for all to complete (excluding teams)
       const results = await Promise.all([invitationsPromise, matchesPromise]);
@@ -158,7 +142,7 @@ export const useHomeData = (): HomeDataState => {
 
       // Collect errors
       const errors: string[] = [];
-      let fetchedNotifications: Notification[] = [];
+      let fetchedNotifications: any[] = [];
 
       const invitationsResult = results[0];
       if ('data' in invitationsResult && invitationsResult.data) {

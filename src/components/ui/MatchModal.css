@@ -723,11 +723,6 @@
   animation: fadeIn 0.3s ease-out;
 }
 
-.match-request-modal-wrapper {
-  position: relative;
-  z-index: 20;
-}
-
 /* ============================================
    UTILITY ANIMATIONS
    ============================================ */

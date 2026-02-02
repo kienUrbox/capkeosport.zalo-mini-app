@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Icon, Button } from './';
 import { TeamAvatar } from './TeamAvatar';
-import { StadiumAutocomplete, type StadiumAutocompleteDto } from './StadiumAutocomplete';
+import { StadiumAutocomplete } from './StadiumAutocomplete';
+import type { StadiumAutocompleteDto } from '@/services/api/stadium.service';
 import { useMatchActions } from '@/stores/match.store';
 
 export interface OpponentTeamInfo {
@@ -12,8 +13,8 @@ export interface OpponentTeamInfo {
 }
 
 export interface MatchInfo {
-  scheduledDate?: string;
-  scheduledTime?: string;
+  date?: string;
+  time?: string;
 }
 
 export interface ConfirmMatchModalProps {
@@ -54,11 +55,11 @@ export const ConfirmMatchModal: React.FC<ConfirmMatchModalProps> = ({
 
   // Auto-fill date/time from match data
   useEffect(() => {
-    if (match?.scheduledDate) {
-      setDate(match.scheduledDate);
+    if (match?.date) {
+      setDate(match.date);
     }
-    if (match?.scheduledTime) {
-      setTime(match.scheduledTime);
+    if (match?.time) {
+      setTime(match.time);
     }
   }, [match]);
 

@@ -240,22 +240,20 @@ export const MatchModal: React.FC<MatchModalProps> = ({
         {showMatchRequestModal && (
           <div className="match-dim-overlay" />
         )}
-
-        {/* MatchRequestModal - Nested */}
-        {showMatchRequestModal && (
-          <div className="match-request-modal-wrapper">
-            <MatchRequestModal
-              isOpen={showMatchRequestModal}
-              mode="send"
-              matchId={actualMatchId}
-              myTeam={myTeamInfo}
-              opponentTeam={opponentTeamInfo}
-              onClose={handleInviteClose}
-              onSuccess={handleInviteSuccess}
-            />
-          </div>
-        )}
       </div>
+
+      {/* MatchRequestModal - Rendered outside match-modal-content for proper positioning */}
+      {showMatchRequestModal && (
+        <MatchRequestModal
+          isOpen={showMatchRequestModal}
+          mode="send"
+          matchId={actualMatchId}
+          myTeam={myTeamInfo}
+          opponentTeam={opponentTeamInfo}
+          onClose={handleInviteClose}
+          onSuccess={handleInviteSuccess}
+        />
+      )}
     </div>
   );
 };

@@ -4,8 +4,8 @@ import { Button, Icon, TeamAvatar, InvitationSkeleton, MatchCardSkeleton, NoMatc
 import { appRoutes } from '@/utils/navigation';
 import { useHomeData } from '@/hooks/useHomeData';
 import { useUser } from '@/stores/auth.store';
-import { useUpcomingMatches } from '@/stores/match.store';
-import PhoneInviteService from '@/services/api/phone-invite.service';
+import { useUpcomingMatches, useIsLoadingMatches } from '@/stores/match.store';
+import { usePhoneInviteActions } from '@/stores/phone-invite.store';
 import { PhoneInvite } from '@/types/api.types';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import { vi } from 'date-fns/locale';
@@ -19,12 +19,12 @@ const DashboardScreen: React.FC = () => {
   const navigate = useNavigate();
   const user = useUser();
   const upcomingMatches = useUpcomingMatches();
+  const isLoadingMatchesFromStore = useIsLoadingMatches();
 
   // Use custom hook for home data fetching with individual loading states
   const {
     pendingInvitations,
     isLoadingInvitations,
-    isLoadingMatches,
     isRefreshing,
     error,
     refresh,
@@ -81,9 +81,12 @@ const DashboardScreen: React.FC = () => {
     return <DashboardError error={error} onRetry={refresh} />;
   }
 
+  // Use phone invite actions from store
+  const phoneInviteActions = usePhoneInviteActions();
+
   const handleRejectInvite = async (id: string) => {
     try {
-      await PhoneInviteService.respondInvite(id, 'decline');
+      await phoneInviteActions.respondInvite(id, 'decline');
       // Refresh data after responding
       refresh();
     } catch (err) {
@@ -93,11 +96,11 @@ const DashboardScreen: React.FC = () => {
 
   const handleAcceptInvite = async (id: string) => {
     try {
-      const response = await PhoneInviteService.respondInvite(id, 'accept');
-      if (response.success && response.data?.team) {
-        // Navigate to team detail after accepting
-        navigate(appRoutes.teamDetail(response.data.team.id));
-      }
+      await phoneInviteActions.respondInvite(id, 'accept');
+      // Note: PhoneInviteStore's respondInvite updates the invite status
+      // We need to check if the response contains team info for navigation
+      // For now, just refresh and let user navigate manually
+      refresh();
     } catch (err) {
       console.error('Accept invitation error:', err);
     }
@@ -326,7 +329,7 @@ const DashboardScreen: React.FC = () => {
             </button>
           </div>
 
-          {isLoadingMatches ? (
+          {isLoadingMatchesFromStore ? (
             <MatchCardSkeleton />
           ) : upcomingMatches && upcomingMatches.length > 0 ? (
             upcomingMatches.slice(0, 1).map((match) => (
@@ -395,7 +398,7 @@ const DashboardScreen: React.FC = () => {
               </div>
             ))
           ) : (
-            <NoMatches onRefresh={refresh} />
+            <NoMatches onFindMatch={() => navigate(appRoutes.matchFind, { state: { openTeamSelector: true } })} />
           )}
         </section>
 

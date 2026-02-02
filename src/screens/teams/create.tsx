@@ -1,21 +1,17 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Header, Icon, Input } from '@/components/ui';
+import { StadiumAutocomplete } from '@/components/ui/StadiumAutocomplete';
+import { type StadiumAutocompleteDto } from '@/services/api/stadium.service';
 import { appRoutes } from '@/utils/navigation';
-import { TeamService, type CreateTeamDto } from '@/services/api/team.service';
+import { TeamService, type CreateTeamDto, type HomeStadiumRequest } from '@/services/api/team.service';
 import { FileService } from '@/services/api/file.service';
 import {
-  PITCH_TYPE_UI_VALUES,
+  PITCH_TYPE_VALUES,
   TEAM_LEVELS,
-  formatPitchForApi,
   formatGenderForApi,
+  getLevelColor,
 } from '@/constants/design';
-
-// Default location: Ho Chi Minh City center
-const DEFAULT_LOCATION = {
-  lat: 10.7769,
-  lng: 106.7009,
-};
 
 /**
  * CreateTeam Screen
@@ -29,9 +25,9 @@ const CreateTeamScreen: React.FC = () => {
   const [teamName, setTeamName] = useState('');
   const [level, setLevel] = useState('Mới chơi');
   const [gender, setGender] = useState('Nam');
-  const [pitchTypes, setPitchTypes] = useState<string[]>(['5']);
+  const [pitchTypes, setPitchTypes] = useState<string[]>(['Sân 5']);
   const [stats, setStats] = useState({ attack: 7, defense: 6.5, technique: 8 });
-  const [location, setLocation] = useState('');
+  const [selectedStadium, setSelectedStadium] = useState<StadiumAutocompleteDto | null>(null);
   const [description, setDescription] = useState('');
 
   // Image uploads
@@ -165,8 +161,7 @@ const CreateTeamScreen: React.FC = () => {
     if (teamName.length < 3 || teamName.length > 100) {
       return 'Tên đội bóng phải từ 3-100 ký tự';
     }
-    if (!location.trim()) return 'Vui lòng nhập khu vực hoạt động';
-    if (location.length < 5) return 'Địa chỉ phải từ 5 ký tự trở lên';
+    // Stadium is optional, no validation needed
     return null;
   };
 
@@ -191,27 +186,42 @@ const CreateTeamScreen: React.FC = () => {
     setUploadStatus('Đang tạo đội bóng...');
 
     try {
-      // Step 1: Create team with logo/banner URLs (already uploaded)
       const apiStats = {
         attack: Math.round(stats.attack * 10),
         defense: Math.round(stats.defense * 10),
         technique: Math.round(stats.technique * 10),
       };
 
-      const pitch = formatPitchForApi(pitchTypes);
+      // Prepare homeStadiumId or homeStadium object
+      let homeStadiumId: string | undefined = undefined;
+      let homeStadium: HomeStadiumRequest | undefined = undefined;
+
+      if (selectedStadium) {
+        // If existing stadium (not custom-), send ID
+        if (!selectedStadium.id.startsWith('custom-')) {
+          homeStadiumId = selectedStadium.id;
+        } else {
+          // New stadium needs to be created
+          homeStadium = {
+            name: selectedStadium.name,
+            mapUrl: selectedStadium.mapUrl,
+            address: selectedStadium.address,
+            district: selectedStadium.district,
+            city: selectedStadium.city,
+          };
+        }
+      }
 
       const teamData: CreateTeamDto = {
         name: teamName.trim(),
         gender: formatGenderForApi(gender),
         level: level,
-        location: {
-          ...DEFAULT_LOCATION,
-          address: location.trim(),
-        },
+        // Don't send location - backend will get it from stadium
+        homeStadiumId,      // Send if existing stadium selected
+        homeStadium,        // Send if creating new stadium
         stats: apiStats,
-        pitch: pitch.length > 0 ? pitch : undefined,
+        pitch: pitchTypes.length > 0 ? pitchTypes : undefined,
         description: description.trim() || undefined,
-        // Include pre-uploaded image URLs
         logo: logoUrl,
         banner: bannerUrl,
       };
@@ -370,20 +380,24 @@ const CreateTeamScreen: React.FC = () => {
           <div className="flex flex-col gap-2">
             <label className="text-sm font-medium text-gray-600 dark:text-text-secondary ml-1">Trình độ</label>
             <div className="grid grid-cols-2 gap-3">
-              {TEAM_LEVELS.map((l) => (
-                <button
-                  key={l}
-                  onClick={() => !isLoading && setLevel(l)}
-                  disabled={isLoading}
-                  className={`py-3 px-4 rounded-xl border text-sm font-semibold transition-all ${
-                    level === l
-                      ? 'bg-primary/20 border-primary text-primary'
-                      : 'bg-white dark:bg-surface-dark border-gray-200 dark:border-white/10 text-gray-500 hover:border-gray-400'
-                  }`}
-                >
-                  {l}
-                </button>
-              ))}
+              {TEAM_LEVELS.map((l) => {
+                const levelColor = getLevelColor(l);
+                const isSelected = level === l;
+                return (
+                  <button
+                    key={l}
+                    onClick={() => !isLoading && setLevel(l)}
+                    disabled={isLoading}
+                    className={`py-3 px-4 rounded-xl border text-sm font-semibold transition-all ${
+                      isSelected
+                        ? `${levelColor.bg} ${levelColor.border} ${levelColor.main}`
+                        : 'bg-white dark:bg-surface-dark border-gray-200 dark:border-white/10 text-gray-500 hover:border-gray-400'
+                    }`}
+                  >
+                    {l}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -417,7 +431,7 @@ const CreateTeamScreen: React.FC = () => {
           <div className="flex flex-col gap-2">
             <label className="text-sm font-medium text-gray-600 dark:text-text-secondary ml-1">Loại sân thường đá</label>
             <div className="flex gap-3">
-              {PITCH_TYPE_UI_VALUES.map((p) => (
+              {PITCH_TYPE_VALUES.map((p) => (
                 <button
                   key={p}
                   onClick={() => !isLoading && togglePitch(p)}
@@ -429,7 +443,7 @@ const CreateTeamScreen: React.FC = () => {
                   }`}
                 >
                   <Icon name="sports_soccer" className="text-lg" filled={pitchTypes.includes(p)} />
-                  <span>Sân {p}</span>
+                  <span>{p}</span>
                 </button>
               ))}
             </div>
@@ -494,14 +508,20 @@ const CreateTeamScreen: React.FC = () => {
             </div>
           </div>
 
-          <Input
-            label="Khu vực hoạt động"
-            placeholder="VD: Quận 7, TP.HCM"
-            icon="location_on"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            disabled={isLoading}
-          />
+          {/* Sân nhà - Home Stadium (Optional) */}
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-medium text-gray-600 dark:text-text-secondary ml-1">
+              Sân nhà
+            </label>
+            <StadiumAutocomplete
+              value={selectedStadium}
+              onChange={setSelectedStadium}
+              disabled={isLoading}
+            />
+            <p className="text-xs text-gray-500 ml-1">
+              Chọn sân nơi đội bóng thường xuyên hoạt động (Optional)
+            </p>
+          </div>
 
           <div className="flex flex-col gap-2">
             <label className="text-sm font-medium text-gray-600 dark:text-text-secondary ml-1">Giới thiệu ngắn</label>

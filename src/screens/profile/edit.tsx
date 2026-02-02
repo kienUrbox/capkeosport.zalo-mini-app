@@ -4,6 +4,7 @@ import { Header, Icon, Input, Button } from '@/components/ui';
 import { useUser, useAuthActions } from '@/stores/auth.store';
 import { useFileActions } from '@/stores/file.store';
 import type { FileEntity } from '@/types/api.types';
+import { STAT_COLORS, STAT_ICONS } from '@/constants/design';
 
 /**
  * EditProfile Screen
@@ -416,8 +417,8 @@ const EditProfileScreen: React.FC = () => {
                 {/* Attack */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2 text-red-500 font-bold text-sm">
-                      <Icon name="flash_on" className="text-sm" /> Tấn công
+                    <div className={`flex items-center gap-2 ${STAT_COLORS.attack.main} font-bold text-sm`}>
+                      <Icon name={STAT_ICONS.attack} className="text-sm" /> Tấn công
                     </div>
                     <span className="font-bold text-slate-900 dark:text-white">{stats.attack}</span>
                   </div>
@@ -428,15 +429,15 @@ const EditProfileScreen: React.FC = () => {
                     step="0.5"
                     value={stats.attack}
                     onChange={(e) => updateStat('attack', parseFloat(e.target.value))}
-                    className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-red-500"
+                    className={`w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer ${STAT_COLORS.attack.accent}`}
                   />
                 </div>
 
                 {/* Defense */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2 text-blue-500 font-bold text-sm">
-                      <Icon name="shield" className="text-sm" /> Phòng thủ
+                    <div className={`flex items-center gap-2 ${STAT_COLORS.defense.main} font-bold text-sm`}>
+                      <Icon name={STAT_ICONS.defense} className="text-sm" /> Phòng thủ
                     </div>
                     <span className="font-bold text-slate-900 dark:text-white">{stats.defense}</span>
                   </div>
@@ -447,15 +448,15 @@ const EditProfileScreen: React.FC = () => {
                     step="0.5"
                     value={stats.defense}
                     onChange={(e) => updateStat('defense', parseFloat(e.target.value))}
-                    className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                    className={`w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer ${STAT_COLORS.defense.accent}`}
                   />
                 </div>
 
                 {/* Technique */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2 text-primary font-bold text-sm">
-                      <Icon name="sports_soccer" className="text-sm" /> Kỹ thuật
+                    <div className={`flex items-center gap-2 ${STAT_COLORS.technique.main} font-bold text-sm`}>
+                      <Icon name={STAT_ICONS.technique} className="text-sm" /> Kỹ thuật
                     </div>
                     <span className="font-bold text-slate-900 dark:text-white">{stats.technique}</span>
                   </div>
@@ -466,7 +467,7 @@ const EditProfileScreen: React.FC = () => {
                     step="0.5"
                     value={stats.technique}
                     onChange={(e) => updateStat('technique', parseFloat(e.target.value))}
-                    className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-primary"
+                    className={`w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer ${STAT_COLORS.technique.accent}`}
                   />
                 </div>
               </div>

@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { Button, Header, Icon, Input } from '@/components/ui';
+import { StadiumAutocomplete } from '@/components/ui/StadiumAutocomplete';
+import { type StadiumAutocompleteDto } from '@/services/api/stadium.service';
 import { appRoutes } from '@/utils/navigation';
 import { TeamService } from '@/services/api/team.service';
 import type { Team, UpdateTeamDto } from '@/services/api/team.service';
 import {
-  PITCH_TYPE_UI_VALUES,
+  PITCH_TYPE_VALUES,
   TEAM_LEVELS,
-  formatPitchFromApi,
-  formatPitchForApi,
   formatGenderFromApi,
   formatGenderForApi,
+  getLevelColor,
 } from '@/constants/design';
 
 // Define location state type
@@ -40,7 +41,7 @@ const EditTeamScreen: React.FC = () => {
   const [gender, setGender] = useState('Nam'); // Must be 'Nam', 'Nữ', or 'Mixed'
   const [pitchTypes, setPitchTypes] = useState<string[]>(['5', '7']);
   const [stats, setStats] = useState({ attack: 7.5, defense: 6.0, technique: 8.5 });
-  const [locationAddress, setLocationAddress] = useState('');
+  const [selectedStadium, setSelectedStadium] = useState<StadiumAutocompleteDto | null>(null);
   const [description, setDescription] = useState('');
   const [isCalculating, setIsCalculating] = useState(false);
 
@@ -56,13 +57,24 @@ const EditTeamScreen: React.FC = () => {
         setName(data.name);
         setLevel(data.level);
         setGender(formatGenderFromApi(data.gender));
-        setPitchTypes(formatPitchFromApi(data.pitch || []));
+        setPitchTypes(data.pitch || []);
         setStats({
           attack: (data.stats?.attack || 75) / 10,
           defense: (data.stats?.defense || 70) / 10,
           technique: (data.stats?.technique || 72) / 10,
         });
-        setLocationAddress(data.location?.address || '');
+        // Load home stadium if exists
+        if (data.homeStadium) {
+          setSelectedStadium({
+            id: data.homeStadium.id,
+            name: data.homeStadium.name,
+            mapUrl: data.homeStadium.mapUrl,
+            address: data.homeStadium.address,
+            district: data.homeStadium.district,
+            city: data.homeStadium.city,
+            matchCount: data.homeStadium.matchCount || 0,
+          });
+        }
         setDescription(data.description || '');
         setIsLoading(false);
         return;
@@ -79,13 +91,24 @@ const EditTeamScreen: React.FC = () => {
           setName(data.name);
           setLevel(data.level);
           setGender(formatGenderFromApi(data.gender));
-          setPitchTypes(formatPitchFromApi(data.pitch || []));
+          setPitchTypes(data.pitch || []);
           setStats({
             attack: (data.stats?.attack || 75) / 10,
             defense: (data.stats?.defense || 70) / 10,
             technique: (data.stats?.technique || 72) / 10,
           });
-          setLocationAddress(data.location?.address || '');
+          // Load home stadium if exists
+          if (data.homeStadium) {
+            setSelectedStadium({
+              id: data.homeStadium.id,
+              name: data.homeStadium.name,
+              mapUrl: data.homeStadium.mapUrl,
+              address: data.homeStadium.address,
+              district: data.homeStadium.district,
+              city: data.homeStadium.city,
+              matchCount: data.homeStadium.matchCount || 0,
+            });
+          }
           setDescription(data.description || '');
         } else {
           setError('Không thể tải thông tin đội');
@@ -130,21 +153,39 @@ const EditTeamScreen: React.FC = () => {
       setIsSaving(true);
       setError(null);
 
+      // Prepare homeStadiumId or homeStadium for update
+      let homeStadiumId: string | undefined = undefined;
+      let homeStadium: { name: string; mapUrl: string; address?: string; district?: string; city?: string } | undefined = undefined;
+
+      if (selectedStadium) {
+        // If existing stadium (not custom-), send ID
+        if (!selectedStadium.id.startsWith('custom-')) {
+          homeStadiumId = selectedStadium.id;
+        } else {
+          // New stadium needs to be created
+          homeStadium = {
+            name: selectedStadium.name,
+            mapUrl: selectedStadium.mapUrl,
+            address: selectedStadium.address,
+            district: selectedStadium.district,
+            city: selectedStadium.city,
+          };
+        }
+      }
+
       const updateData: UpdateTeamDto = {
         name,
         gender: formatGenderForApi(gender),
         level,
-        pitch: formatPitchForApi(pitchTypes),
+        pitch: pitchTypes,
         stats: {
           attack: Math.round(stats.attack * 10),
           defense: Math.round(stats.defense * 10),
           technique: Math.round(stats.technique * 10),
         },
         description: description || undefined,
-        location: team?.location ? {
-          ...team.location,
-          address: locationAddress,
-        } : undefined,
+        homeStadiumId,
+        homeStadium,
       };
 
       const response = await TeamService.updateTeam(teamId, updateData);
@@ -247,19 +288,23 @@ const EditTeamScreen: React.FC = () => {
           <div className="flex flex-col gap-2">
             <label className="text-sm font-medium text-gray-600 dark:text-text-secondary ml-1">Trình độ</label>
             <div className="grid grid-cols-2 gap-3">
-              {TEAM_LEVELS.map((l) => (
-                <button
-                  key={l}
-                  onClick={() => setLevel(l)}
-                  className={`py-3 px-4 rounded-xl border text-sm font-semibold transition-all ${
-                    level === l
-                      ? 'bg-primary/20 border-primary text-primary'
-                      : 'bg-white dark:bg-surface-dark border-gray-200 dark:border-white/10 text-gray-500 hover:border-gray-400'
-                  }`}
-                >
-                  {l}
-                </button>
-              ))}
+              {TEAM_LEVELS.map((l) => {
+                const levelColor = getLevelColor(l);
+                const isSelected = level === l;
+                return (
+                  <button
+                    key={l}
+                    onClick={() => setLevel(l)}
+                    className={`py-3 px-4 rounded-xl border text-sm font-semibold transition-all ${
+                      isSelected
+                        ? `${levelColor.bg} ${levelColor.border} ${levelColor.main}`
+                        : 'bg-white dark:bg-surface-dark border-gray-200 dark:border-white/10 text-gray-500 hover:border-gray-400'
+                    }`}
+                  >
+                    {l}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -292,7 +337,7 @@ const EditTeamScreen: React.FC = () => {
           <div className="flex flex-col gap-2">
             <label className="text-sm font-medium text-gray-600 dark:text-text-secondary ml-1">Loại sân thường đá</label>
             <div className="flex gap-3">
-              {PITCH_TYPE_UI_VALUES.map((p) => (
+              {PITCH_TYPE_VALUES.map((p) => (
                 <button
                   key={p}
                   onClick={() => togglePitch(p)}
@@ -303,7 +348,7 @@ const EditTeamScreen: React.FC = () => {
                   }`}
                 >
                   <Icon name="sports_soccer" className="text-lg" filled={pitchTypes.includes(p)} />
-                  <span>Sân {p}</span>
+                  <span>{p}</span>
                 </button>
               ))}
             </div>
@@ -381,12 +426,20 @@ const EditTeamScreen: React.FC = () => {
             </div>
           </div>
 
-          <Input
-            label="Khu vực hoạt động"
-            value={locationAddress}
-            onChange={(e) => setLocationAddress(e.target.value)}
-            icon="location_on"
-          />
+          {/* Sân nhà - Home Stadium (Optional) */}
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-medium text-gray-600 dark:text-text-secondary ml-1">
+              Sân nhà
+            </label>
+            <StadiumAutocomplete
+              value={selectedStadium}
+              onChange={setSelectedStadium}
+              disabled={isSaving}
+            />
+            <p className="text-xs text-gray-500 ml-1">
+              Chọn sân nơi đội bóng thường xuyên hoạt động (Optional)
+            </p>
+          </div>
 
           <div className="flex flex-col gap-2">
             <label className="text-sm font-medium text-gray-600 dark:text-text-secondary ml-1">Giới thiệu ngắn</label>

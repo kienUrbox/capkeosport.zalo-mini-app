@@ -7,7 +7,7 @@ import { appRoutes } from '@/utils/navigation';
 import { MatchService, type RematchDto } from '@/services/api/match.service';
 import { useMatchActions } from '@/stores/match.store';
 import { toast } from '@/utils/toast';
-import { PITCH_TYPE_VALUES } from '@/constants/design';
+import { PITCH_TYPE_VALUES, getLevelColor } from '@/constants/design';
 
 /**
  * Rematch Screen
@@ -131,11 +131,14 @@ const RematchScreen: React.FC = () => {
                     </div>
                   )}
                 </div>
-                {opponentTeam.level && (
-                  <div className="absolute -bottom-2 -right-2 bg-primary text-black text-[10px] font-bold px-2 py-0.5 rounded-full border-2 border-white dark:border-surface-dark">
-                    {opponentTeam.level}
-                  </div>
-                )}
+                {opponentTeam.level && (() => {
+                  const levelColor = getLevelColor(opponentTeam.level);
+                  return (
+                    <div className={`absolute -bottom-2 -right-2 ${levelColor.bgSolid} text-black text-[10px] font-bold px-2 py-0.5 rounded-full border-2 border-white dark:border-surface-dark`}>
+                      {opponentTeam.level}
+                    </div>
+                  );
+                })()}
               </div>
               <div className="text-center">
                 <h2 className="text-xl font-bold text-slate-900 dark:text-white">{opponentTeam.name}</h2>

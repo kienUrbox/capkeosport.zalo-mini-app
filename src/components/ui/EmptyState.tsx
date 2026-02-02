@@ -61,13 +61,13 @@ export const NoInvitations: React.FC<{ onRefresh?: () => void }> = ({ onRefresh 
   </div>
 );
 
-export const NoMatches: React.FC<{ onRefresh?: () => void }> = ({ onRefresh }) => (
+export const NoMatches: React.FC<{ onRefresh?: () => void; onFindMatch?: () => void }> = ({ onRefresh, onFindMatch }) => (
   <EmptyState
     icon="sports_soccer"
     title="Chưa có trận đấu nào"
     description="Hãy cáp kèo với đội khác để có trận đấu thú vị"
-    actionLabel={onRefresh ? 'Cáp kèo ngay' : undefined}
-    onAction={onRefresh}
+    actionLabel={onFindMatch ? 'Cáp kèo ngay' : onRefresh ? 'Làm mới' : undefined}
+    onAction={onFindMatch || onRefresh}
     className="py-6"
   />
 );

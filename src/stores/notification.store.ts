@@ -137,14 +137,28 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
 
       set({ isLoading: true, error: null });
 
-      const response = await api.get<{ items: Notification[]; total: number; unread: number }>('/notifications', params);
+      const response = await api.get<{ items: Notification[]; total: number; unread: number } | Notification[]>('/notifications', params);
 
       if (response.success && response.data) {
-        const notifications = response.data.items || [];
+        // Handle both response formats:
+        // 1. Paginated: { items: [...], total: ..., unread: ... }
+        // 2. Direct array: [...]
+        let notifications: Notification[] = [];
+        let unread = 0;
+
+        if (Array.isArray(response.data)) {
+          // Direct array response
+          notifications = response.data;
+          unread = notifications.filter((n) => !n.isRead).length;
+        } else {
+          // Paginated response
+          notifications = response.data.items || [];
+          unread = response.data.unread || notifications.filter((n) => !n.isRead).length;
+        }
 
         set({
           notifications,
-          unreadCount: response.data.unread || notifications.filter((n) => !n.isRead).length,
+          unreadCount: unread,
           _fetched: true,
           error: null,
         });

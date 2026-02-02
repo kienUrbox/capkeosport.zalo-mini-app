@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { Button, Header, Icon, TeamAvatar, ErrorState } from '@/components/ui';
 import { appRoutes } from '@/utils/navigation';
+import { useMyTeams } from '@/stores/team.store';
 import type { TeamMember, Team } from '@/services/api/team.service';
+import { STAT_COLORS, STAT_ICONS } from '@/constants/design';
 
 /**
  * MemberProfile Screen
@@ -20,6 +22,11 @@ const MemberProfileScreen: React.FC = () => {
   // Get member and team from navigation state (passed from members list)
   const member = location.state?.member as TeamMember | undefined;
   const team = location.state?.team as Team | undefined;
+
+  // Check xem current user có phải là thành viên của đội này không
+  const myTeams = useMyTeams();
+  const currentTeam = myTeams.find(t => t.id === teamId);
+  const isTeamMember = currentTeam !== undefined;
 
   useEffect(() => {
     // Validate data
@@ -70,24 +77,21 @@ const MemberProfileScreen: React.FC = () => {
       <Header
         title="Thông tin thành viên"
         onBack={() => navigate(-1)}
-        rightAction={
-          <button className="p-2 text-gray-500 hover:text-slate-900 dark:hover:text-white">
-            <Icon name="more_vert" />
-          </button>
-        }
       />
 
       <div className="overflow-y-auto">
         {/* Banner */}
-        {member.user?.banner && (
+        {member.user?.banner ? (
           <div className="h-40 w-full overflow-hidden">
             <img src={member.user.banner} className="w-full h-full object-cover" alt="Banner" />
           </div>
+        ) : (
+          <div className="h-40 w-full bg-gradient-to-br from-primary/20 via-primary/10 to-background-light dark:from-primary/30 dark:via-primary/20 dark:to-background-dark" />
         )}
 
         <div className="p-4">
           {/* Profile Header */}
-          <div className={`flex flex-col items-center mb-8 ${!member.user?.banner ? 'pt-4' : '-mt-16'}`}>
+          <div className="flex flex-col items-center mb-8 -mt-16">
             <div className="relative mb-4">
               <div className="size-28 rounded-full border-4 border-white dark:border-surface-dark shadow-xl overflow-hidden bg-white dark:bg-surface-dark">
                 {member.user?.avatar ? (
@@ -154,9 +158,9 @@ const MemberProfileScreen: React.FC = () => {
                 {member.user.playerStats.attack !== undefined && member.user.playerStats.attack !== null && (
                   <div>
                     <div className="flex justify-between items-center mb-2">
-                      <div className="flex items-center gap-2 text-red-500 font-bold text-sm">
-                        <div className="p-1 bg-red-500/10 rounded">
-                          <Icon name="flash_on" className="text-sm" />
+                      <div className={`flex items-center gap-2 ${STAT_COLORS.attack.main} font-bold text-sm`}>
+                        <div className={`p-1 ${STAT_COLORS.attack.bg} rounded`}>
+                          <Icon name={STAT_ICONS.attack} className="text-sm" />
                         </div>
                         Tấn công
                       </div>
@@ -166,7 +170,7 @@ const MemberProfileScreen: React.FC = () => {
                     </div>
                     <div className="h-2.5 w-full bg-gray-100 dark:bg-black/20 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-red-500 rounded-full transition-all duration-500"
+                        className={`h-full bg-gradient-to-r ${STAT_COLORS.attack.gradient} rounded-full transition-all duration-500`}
                         style={{ width: `${member.user.playerStats.attack}%` }}
                       ></div>
                     </div>
@@ -177,9 +181,9 @@ const MemberProfileScreen: React.FC = () => {
                 {member.user.playerStats.defense !== undefined && member.user.playerStats.defense !== null && (
                   <div>
                     <div className="flex justify-between items-center mb-2">
-                      <div className="flex items-center gap-2 text-blue-500 font-bold text-sm">
-                        <div className="p-1 bg-blue-500/10 rounded">
-                          <Icon name="shield" className="text-sm" />
+                      <div className={`flex items-center gap-2 ${STAT_COLORS.defense.main} font-bold text-sm`}>
+                        <div className={`p-1 ${STAT_COLORS.defense.bg} rounded`}>
+                          <Icon name={STAT_ICONS.defense} className="text-sm" />
                         </div>
                         Phòng thủ
                       </div>
@@ -189,7 +193,7 @@ const MemberProfileScreen: React.FC = () => {
                     </div>
                     <div className="h-2.5 w-full bg-gray-100 dark:bg-black/20 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-blue-500 rounded-full transition-all duration-500"
+                        className={`h-full bg-gradient-to-r ${STAT_COLORS.defense.gradient} rounded-full transition-all duration-500`}
                         style={{ width: `${member.user.playerStats.defense}%` }}
                       ></div>
                     </div>
@@ -200,9 +204,9 @@ const MemberProfileScreen: React.FC = () => {
                 {member.user.playerStats.technique !== undefined && member.user.playerStats.technique !== null && (
                   <div>
                     <div className="flex justify-between items-center mb-2">
-                      <div className="flex items-center gap-2 text-primary font-bold text-sm">
-                        <div className="p-1 bg-primary/10 rounded">
-                          <Icon name="sports_soccer" className="text-sm" />
+                      <div className={`flex items-center gap-2 ${STAT_COLORS.technique.main} font-bold text-sm`}>
+                        <div className={`p-1 ${STAT_COLORS.technique.bg} rounded`}>
+                          <Icon name={STAT_ICONS.technique} className="text-sm" />
                         </div>
                         Kỹ thuật
                       </div>
@@ -212,7 +216,7 @@ const MemberProfileScreen: React.FC = () => {
                     </div>
                     <div className="h-2.5 w-full bg-gray-100 dark:bg-black/20 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-primary rounded-full transition-all duration-500"
+                        className={`h-full bg-gradient-to-r ${STAT_COLORS.technique.gradient} rounded-full transition-all duration-500`}
                         style={{ width: `${member.user.playerStats.technique}%` }}
                       ></div>
                     </div>
@@ -269,29 +273,31 @@ const MemberProfileScreen: React.FC = () => {
         </div>
       </div>
 
-      {/* Footer Actions */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 dark:bg-background-dark/95 backdrop-blur-md border-t border-gray-200 dark:border-white/5 z-40">
-        <div className="flex gap-3 max-w-md mx-auto">
-          <Button
-            variant="secondary"
-            className="flex-1"
-            icon="call"
-            onClick={() => member.user?.phone && window.open(`tel:${member.user.phone}`)}
-            disabled={!member.user?.phone}
-          >
-            Gọi điện
-          </Button>
-          <Button
-            variant="primary"
-            className="flex-[2]"
-            icon="chat"
-            onClick={() => member.user?.phone && window.open(`https://zalo.me/${member.user.phone}`)}
-            disabled={!member.user?.phone}
-          >
-            Nhắn tin
-          </Button>
+      {/* Footer Actions - Chỉ hiển thị khi là thành viên đội */}
+      {isTeamMember && (
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 dark:bg-background-dark/95 backdrop-blur-md border-t border-gray-200 dark:border-white/5 z-40">
+          <div className="flex gap-3 max-w-md mx-auto">
+            <Button
+              variant="secondary"
+              className="flex-1"
+              icon="call"
+              onClick={() => member.user?.phone && window.open(`tel:${member.user.phone}`)}
+              disabled={!member.user?.phone}
+            >
+              Gọi điện
+            </Button>
+            <Button
+              variant="primary"
+              className="flex-[2]"
+              icon="chat"
+              onClick={() => member.user?.phone && window.open(`https://zalo.me/${member.user.phone}`)}
+              disabled={!member.user?.phone}
+            >
+              Nhắn tin
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

@@ -1,21 +1,85 @@
 import React, { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { Icon } from '@/components/ui';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import { Icon, TeamAvatar } from '@/components/ui';
 import { Button } from '@/components/ui/Button';
 import { appRoutes } from '@/utils/navigation';
 import { useTeamDetail } from '@/hooks/useTeamDetail';
+import type { DiscoveredTeam } from '@/services/api/discovery.service';
+import { getLevelColor, LEVEL_ICON, STAT_COLORS, STAT_ICONS } from '@/constants/design';
+
+// Types for match data
+interface RecentMatch {
+  id: string;
+  date: string;
+  teamAId: string;
+  teamBId: string;
+  scoreA?: number;
+  scoreB?: number;
+  teamA?: { id: string; name: string };
+  teamB?: { id: string; name: string };
+}
+
+// Helper function to format last active time (pure function, outside component)
+const formatLastActive = (lastActive?: string) => {
+  if (!lastActive) return null;
+  const now = Date.now();
+  const lastActiveTime = new Date(lastActive).getTime();
+  const hoursDiff = (now - lastActiveTime) / (1000 * 60 * 60);
+  const isToday = new Date(lastActive).toDateString() === new Date().toDateString();
+
+  if (hoursDiff < 1) {
+    return { text: 'Đang hoạt động', isOnline: true };
+  } else if (hoursDiff < 24) {
+    return { text: `Hoạt động ${Math.floor(hoursDiff)}h trước`, isOnline: false };
+  } else if (isToday) {
+    return { text: 'Hoạt động hôm nay', isOnline: false };
+  } else if (hoursDiff < 48) {
+    return { text: 'Hoạt động hôm qua', isOnline: false };
+  } else {
+    return { text: `Hoạt động ${Math.floor(hoursDiff / 24)} ngày trước`, isOnline: false };
+  }
+};
 
 /**
- * OpponentDetail Screen
+ * OpponentDetail Screen - Tinder Style
  *
- * View opponent team details before inviting to match.
+ * Immersive full-screen profile with:
+ * - Hero gradient background
+ * - Large centered avatar
+ * - Compatibility score with animation
+ * - Quick info cards
+ * - Visual stats progress bars
+ * - Recent matches with result badges
+ * - Glassmorphism effects
  */
 const OpponentDetail: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { teamId } = useParams<{ teamId: string }>();
 
-  // Use hook for opponent detail with caching (includesRecentMatches)
-  const { team, isLoading, error, isRefreshing, refresh } = useTeamDetail(teamId, true);
+  // Get navigation state data from find match page
+  const navState = location.state as {
+    team?: DiscoveredTeam;
+    sortBy?: string;
+    compatibilityScore?: number;
+    qualityScore?: number;
+  } | undefined;
+
+  const teamFromState = navState?.team;
+  const compatibilityScoreFromState = navState?.compatibilityScore;
+  const qualityScoreFromState = navState?.qualityScore;
+
+  // Use hook for opponent detail with caching
+  const { team: teamFromApi, isLoading, error, isRefreshing, refresh } = useTeamDetail(teamId, true);
+
+  // Prioritize data from navigation state, fallback to API data
+  const team = teamFromState || teamFromApi;
+
+  // Use compatibility score from state or calculate from team quality
+  const compatibilityScore = compatibilityScoreFromState || Math.round(((team?.qualityScore || 0.5) * 100));
+
+  // Only show loading if we don't have state data AND still loading from API
+  const isLoadingFinal = !teamFromState && isLoading && !isRefreshing;
 
   // Pull-to-refresh state
   const [touchStart, setTouchStart] = useState(0);
@@ -31,14 +95,12 @@ const OpponentDetail: React.FC = () => {
     if (touchStart && window.scrollY === 0) {
       const distance = e.touches[0].clientY - touchStart;
       if (distance > 0) {
-        // Limit pull distance to 120px
         setPullDistance(Math.min(distance, 120));
       }
     }
   };
 
   const handleTouchEnd = async () => {
-    // Trigger refresh if pulled more than 80px
     if (pullDistance > 80) {
       await refresh();
     }
@@ -47,16 +109,14 @@ const OpponentDetail: React.FC = () => {
   };
 
   // Loading state
-  if (isLoading && !isRefreshing) {
+  if (isLoadingFinal) {
     return (
-      <div className="flex flex-col min-h-dvh bg-background-light dark:bg-background-dark">
-        {/* Header with back button */}
+      <div className="flex flex-col min-h-dvh bg-gradient-to-br from-primary/20 to-green-600/20">
         <div className="absolute top-0 left-0 right-0 z-50 p-4 flex justify-between items-center text-white safe-area-top">
           <button onClick={() => navigate(-1)} className="size-10 flex items-center justify-center rounded-full bg-black/30 backdrop-blur-md hover:bg-black/50 transition-colors">
             <Icon name="arrow_back" />
           </button>
         </div>
-        {/* Loading spinner */}
         <div className="flex-1 flex items-center justify-center">
           <div className="w-12 h-12 rounded-full border-4 border-primary/30 border-t-primary animate-spin" />
         </div>
@@ -74,37 +134,29 @@ const OpponentDetail: React.FC = () => {
         </div>
         <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Không tìm thấy đội bóng</h2>
         <p className="text-gray-500 mb-6 text-center">{error || 'Đội bóng này không tồn tại hoặc đã bị xóa.'}</p>
-        <Button
-          onClick={() => navigate(-1)}
-          variant="primary"
-        >
-          Quay lại
-        </Button>
+        <Button onClick={() => navigate(-1)} variant="primary">Quay lại</Button>
       </div>
     );
   }
 
-  // Get compatibility score from navigation state or calculate from team
-  const compatibilityScore = 85; // Default compatibility score - could be calculated from team stats later
-
-  // Get banner image or use gradient fallback
-  const bannerImage = team.banner;
-  const logoImage = team.logo;
+  const lastActiveInfo = formatLastActive(team.lastActive);
+  const qualityScore = qualityScoreFromState || (team.qualityScore || 0);
+  const isVerified = qualityScore >= 0.8;
 
   return (
     <div
-      className="flex flex-col min-h-dvh bg-background-light dark:bg-background-dark pb-24 animate-fade-in"
+      className="flex flex-col min-h-dvh bg-gradient-to-br from-primary/15 via-green-50/50 to-background-light dark:from-background-dark dark:to-surface-dark pb-safe animate-fade-in"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Custom Header with transparent background initially */}
-      <div className="absolute top-0 left-0 right-0 z-50 p-4 flex justify-between items-center text-white safe-area-top">
-        <button onClick={() => navigate(-1)} className="size-10 flex items-center justify-center rounded-full bg-black/30 backdrop-blur-md hover:bg-black/50 transition-colors">
+      {/* Header - Absolute positioned with glassmorphism */}
+      <div className="absolute top-0 left-0 right-0 z-50 p-4 flex justify-start items-center safe-area-top">
+        <button
+          onClick={() => navigate(-1)}
+          className="size-10 flex items-center justify-center rounded-full bg-black/30 backdrop-blur-md hover:bg-black/50 transition-colors text-white"
+        >
           <Icon name="arrow_back" />
-        </button>
-        <button className="size-10 flex items-center justify-center rounded-full bg-black/30 backdrop-blur-md hover:bg-black/50 transition-colors">
-          <Icon name="more_vert" />
         </button>
       </div>
 
@@ -138,147 +190,273 @@ const OpponentDetail: React.FC = () => {
         </div>
       )}
 
-      {/* Cover & Header Info */}
+      {/* Hero Section - Banner with avatar at bottom edge (half-in/half-out) */}
       <div className="relative">
-        <div className="h-64 w-full overflow-hidden relative">
-          {bannerImage ? (
-            <div className="w-full h-full bg-center bg-cover" style={{ backgroundImage: `url("${bannerImage}")` }}></div>
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-primary to-green-600"></div>
-          )}
-          <div className="absolute inset-0 bg-gradient-to-t from-background-light dark:from-background-dark via-transparent to-transparent"></div>
-        </div>
-        <div className="absolute -bottom-12 left-6 flex items-end gap-4">
-          <div className="size-24 rounded-2xl border-4 border-background-light dark:border-background-dark bg-surface-dark overflow-hidden shadow-xl">
-            {logoImage ? (
-              <img className="w-full h-full object-cover" src={logoImage} alt={team.name} />
+        {/* Banner image */}
+        <div className="relative h-[40vh] min-h-[280px]">
+          <div className="absolute inset-0 bg-gray-100 dark:bg-surface-dark">
+            {team.banner ? (
+              <img src={team.banner} className="w-full h-full object-cover" alt="Team Banner" />
+            ) : team.logo ? (
+              <div
+                className="absolute inset-0 bg-cover bg-center opacity-20 blur-xl"
+                style={{ backgroundImage: `url("${team.logo}")` }}
+              />
             ) : (
-              <div className="w-full h-full bg-gradient-to-br from-primary to-green-600 flex items-center justify-center">
-                <span className="text-white text-4xl font-bold">{team.name?.charAt(0) || 'T'}</span>
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-green-400/20 to-primary/20 dark:from-primary/20 dark:to-green-900/20" />
+            )}
+          </div>
+          {/* Gradient overlay for text readability */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-transparent" />
+        </div>
+
+        {/* Avatar at bottom edge of banner (half-in/half-out) */}
+        <div className="absolute -bottom-14 left-1/2 -translate-x-1/2">
+          <div className="relative">
+            {/* Glow effect */}
+            <div className="absolute inset-0 rounded-full bg-primary/20 blur-2xl animate-pulse" />
+            {/* Avatar */}
+            <div className="relative w-28 h-28 rounded-full p-1 bg-white/40 dark:bg-white/10 backdrop-blur-sm">
+              <TeamAvatar
+                src={team.logo || ''}
+                size="xl"
+                className="w-full h-full rounded-full border-4 border-white dark:border-surface-dark shadow-2xl"
+              />
+            </div>
+            {/* Online status indicator */}
+            {lastActiveInfo?.isOnline && (
+              <div className="absolute bottom-1 right-1 w-7 h-7 bg-emerald-400 rounded-full border-4 border-white dark:border-surface-dark flex items-center justify-center shadow-lg">
+                <div className="w-2.5 h-2.5 bg-white rounded-full animate-pulse" />
               </div>
             )}
           </div>
         </div>
       </div>
 
-      <div className="mt-14 px-6">
-        <div className="flex justify-between items-start">
-          <div>
-            <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white">{team.name}</h1>
-            <div className="flex items-center gap-2 mt-1 text-gray-500 dark:text-gray-400">
-              <Icon name="location_on" className="text-sm" />
-              <span className="text-sm font-medium">
-                {team.location?.address || '...'}
+      {/* Team info below avatar */}
+      <div className="mt-16 text-center px-4">
+        {/* Team name with verified badge */}
+        <div className="flex items-center justify-center gap-2 mb-2">
+          <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white">
+            {team.name}
+          </h1>
+          {isVerified && (
+            <Icon name="verified" className="text-primary text-xl" />
+          )}
+        </div>
+
+        {/* Compatibility badge */}
+        <div className="flex items-center justify-center gap-2 mb-3">
+          <div className="px-3 py-1 bg-primary/90 dark:bg-primary/80 backdrop-blur-sm border border-primary/50 rounded-full flex items-center gap-1.5 shadow-md">
+            <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+            <span className="text-xs font-bold text-white">
+              {compatibilityScore}% Hợp cạ
+            </span>
+          </div>
+
+          {/* Last active status */}
+          {lastActiveInfo && (
+            <div className="flex items-center gap-1">
+              <div className={`w-1.5 h-1.5 rounded-full ${lastActiveInfo.isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-gray-400'}`} />
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                {lastActiveInfo.text}
               </span>
             </div>
-          </div>
-          <div className="bg-primary/10 text-primary px-3 py-1 rounded-full text-xs font-bold border border-primary/20">
-            {compatibilityScore}% Hợp cạ
-          </div>
-        </div>
-
-        <p className="mt-4 text-gray-600 dark:text-gray-300 text-sm leading-relaxed">
-          {team.description || 'Chưa có mô tả về đội bóng.'}
-        </p>
-
-        {/* Tags */}
-        <div className="flex flex-wrap gap-2 mt-4">
-          {team.pitch?.map((p) => (
-            <span key={p} className="px-3 py-1 rounded-lg bg-gray-100 dark:bg-white/5 text-xs font-medium text-gray-600 dark:text-gray-300">{p}</span>
-          ))}
-          <span className="px-3 py-1 rounded-lg bg-gray-100 dark:bg-white/5 text-xs font-medium text-gray-600 dark:text-gray-300">{team.level || '-'}</span>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="px-6 mt-8">
-        <h3 className="font-bold text-lg mb-4 text-slate-900 dark:text-white">Chỉ số sức mạnh</h3>
-        <div className="bg-white dark:bg-surface-dark p-4 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm space-y-4">
-          {/* Attack */}
-          {team.stats?.attack && (
-            <div>
-              <div className="flex justify-between text-xs font-bold mb-1">
-                <span className="text-red-500">Tấn công</span>
-                <span className="text-slate-900 dark:text-white">{(team.stats.attack / 10).toFixed(1)}/10</span>
-              </div>
-              <div className="h-2 w-full bg-gray-100 dark:bg-black/20 rounded-full overflow-hidden">
-                <div className="h-full bg-red-500 rounded-full" style={{ width: `${team.stats.attack}%` }}></div>
-              </div>
-            </div>
-          )}
-          {/* Defense */}
-          {team.stats?.defense && (
-            <div>
-              <div className="flex justify-between text-xs font-bold mb-1">
-                <span className="text-blue-500">Phòng thủ</span>
-                <span className="text-slate-900 dark:text-white">{(team.stats.defense / 10).toFixed(1)}/10</span>
-              </div>
-              <div className="h-2 w-full bg-gray-100 dark:bg-black/20 rounded-full overflow-hidden">
-                <div className="h-full bg-blue-500 rounded-full" style={{ width: `${team.stats.defense}%` }}></div>
-              </div>
-            </div>
-          )}
-          {/* Technique */}
-          {team.stats?.technique && (
-            <div>
-              <div className="flex justify-between text-xs font-bold mb-1">
-                <span className="text-primary">Kỹ thuật</span>
-                <span className="text-slate-900 dark:text-white">{(team.stats.technique / 10).toFixed(1)}/10</span>
-              </div>
-              <div className="h-2 w-full bg-gray-100 dark:bg-black/20 rounded-full overflow-hidden">
-                <div className="h-full bg-primary rounded-full" style={{ width: `${team.stats.technique}%` }}></div>
-              </div>
-            </div>
           )}
         </div>
       </div>
 
-      {/* Recent Matches */}
-      {team.recentMatches && team.recentMatches.length > 0 && (
-        <div className="px-6 mt-8 mb-4">
-          <h3 className="font-bold text-lg mb-4 text-slate-900 dark:text-white">Trận đấu gần đây</h3>
-          <div className="space-y-3">
-            {team.recentMatches.map((match) => {
-              // Xác định đội hiện tại là teamA hay teamB
-              const isTeamA = match.teamAId === teamId;
-              const opponent = isTeamA ? match.teamB : match.teamA;
-              const myScore = isTeamA ? match.scoreA : match.scoreB;
-              const opponentScore = isTeamA ? match.scoreB : match.scoreA;
-              const isWin = myScore && opponentScore && myScore > opponentScore;
-              const isLoss = myScore && opponentScore && myScore < opponentScore;
+      {/* Content below hero */}
+      <div className="flex-1 px-4 space-y-4 pb-24">
+        {/* Quick Info Cards - Grid */}
+        <div className="grid grid-cols-2 gap-3">
+          {/* Members count */}
+          <div className="bg-white/80 dark:bg-surface-dark/80 backdrop-blur-sm rounded-2xl p-3 border border-gray-100 dark:border-white/5 shadow-sm">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                <Icon name="groups" className="text-primary text-lg" />
+              </div>
+              <div>
+                <p className="text-[10px] text-gray-500 uppercase font-bold">Thành viên</p>
+                <p className="text-sm font-bold text-slate-900 dark:text-white">{team.membersCount || 0}</p>
+              </div>
+            </div>
+          </div>
 
-              // Format date: dd/MM
-              const matchDate = new Date(match.date);
-              const dateStr = `${matchDate.getDate().toString().padStart(2, '0')}/${(matchDate.getMonth() + 1).toString().padStart(2, '0')}`;
-
-              return (
-                <div key={match.id} className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-white/5">
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs font-bold text-gray-400">{dateStr}</span>
-                    {isWin && <div className="bg-green-500 text-white text-xs font-bold px-1.5 py-0.5 rounded">W</div>}
-                    {isLoss && <div className="bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded">L</div>}
-                    {!isWin && !isLoss && <div className="bg-gray-400 text-white text-xs font-bold px-1.5 py-0.5 rounded">D</div>}
-                    <span className="text-sm font-semibold dark:text-white">vs {opponent?.name || '...'}</span>
+          {/* Level */}
+          {(() => {
+            const levelColor = getLevelColor(team.level);
+            return (
+              <div className="bg-white/80 dark:bg-surface-dark/80 backdrop-blur-sm rounded-2xl p-3 border border-gray-100 dark:border-white/5 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <div className={`w-8 h-8 rounded-full ${levelColor.bg} flex items-center justify-center`}>
+                    <Icon name={LEVEL_ICON} className={`${levelColor.main} text-lg`} />
                   </div>
-                  <span className="text-sm font-mono font-bold dark:text-white">{myScore ?? '-'} - {opponentScore ?? '-'}</span>
+                  <div>
+                    <p className="text-[10px] text-gray-500 uppercase font-bold">Trình độ</p>
+                    <p className="text-sm font-bold text-slate-900 dark:text-white">{team.level || '-'}</p>
+                  </div>
                 </div>
-              );
-            })}
+              </div>
+            );
+          })()}
+
+          {/* Location */}
+          <div className="bg-white/80 dark:bg-surface-dark/80 backdrop-blur-sm rounded-2xl p-3 border border-gray-100 dark:border-white/5 shadow-sm">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center">
+                <Icon name="location_on" className="text-blue-500 text-lg" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] text-gray-500 uppercase font-bold">Khu vực</p>
+                <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{team.location?.address || '...'}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Pitch types */}
+          <div className="bg-white/80 dark:bg-surface-dark/80 backdrop-blur-sm rounded-2xl p-3 border border-gray-100 dark:border-white/5 shadow-sm">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center">
+                <Icon name="sports_soccer" className="text-green-500 text-lg" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] text-gray-500 uppercase font-bold">Sân</p>
+                <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{team.pitch?.join(' & ') || '...'}</p>
+              </div>
+            </div>
           </div>
         </div>
-      )}
 
-      {/* Action Footer */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 dark:bg-background-dark/95 backdrop-blur-md border-t border-gray-200 dark:border-white/5 z-40">
-        <div className="flex gap-4 max-w-md mx-auto items-center">
+        {/* Stats Section with Visual Progress Bars */}
+        {team.stats && (team.stats.attack || team.stats.defense || team.stats.technique) && (
+          <div className="bg-white/80 dark:bg-surface-dark/80 backdrop-blur-sm rounded-2xl p-4 border border-gray-100 dark:border-white/5 shadow-sm">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-3">Chỉ số sức mạnh</h3>
+            <div className="space-y-3">
+              {team.stats.attack !== undefined && (
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <div className="flex items-center gap-1.5">
+                      <Icon name={STAT_ICONS.attack} className={`${STAT_COLORS.attack.main} text-sm`} />
+                      <span className="text-xs font-bold text-slate-900 dark:text-white">Tấn công</span>
+                    </div>
+                    <span className="text-xs font-bold text-slate-900 dark:text-white">{(team.stats.attack / 10).toFixed(1)}</span>
+                  </div>
+                  <div className="h-2 w-full bg-gray-100 dark:bg-black/20 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full bg-gradient-to-r ${STAT_COLORS.attack.gradient} rounded-full transition-all duration-500`}
+                      style={{ width: `${team.stats.attack}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+              {team.stats.defense !== undefined && (
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <div className="flex items-center gap-1.5">
+                      <Icon name={STAT_ICONS.defense} className={`${STAT_COLORS.defense.main} text-sm`} />
+                      <span className="text-xs font-bold text-slate-900 dark:text-white">Phòng thủ</span>
+                    </div>
+                    <span className="text-xs font-bold text-slate-900 dark:text-white">{(team.stats.defense / 10).toFixed(1)}</span>
+                  </div>
+                  <div className="h-2 w-full bg-gray-100 dark:bg-black/20 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full bg-gradient-to-r ${STAT_COLORS.defense.gradient} rounded-full transition-all duration-500`}
+                      style={{ width: `${team.stats.defense}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+              {team.stats.technique !== undefined && (
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <div className="flex items-center gap-1.5">
+                      <Icon name={STAT_ICONS.technique} className={`${STAT_COLORS.technique.main} text-sm`} />
+                      <span className="text-xs font-bold text-slate-900 dark:text-white">Kỹ thuật</span>
+                    </div>
+                    <span className="text-xs font-bold text-slate-900 dark:text-white">{(team.stats.technique / 10).toFixed(1)}</span>
+                  </div>
+                  <div className="h-2 w-full bg-gray-100 dark:bg-black/20 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full bg-gradient-to-r ${STAT_COLORS.technique.gradient} rounded-full transition-all duration-500`}
+                      style={{ width: `${team.stats.technique}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* About Section */}
+        {team.description && (
+          <div className="bg-white/80 dark:bg-surface-dark/80 backdrop-blur-sm rounded-2xl p-4 border border-gray-100 dark:border-white/5 shadow-sm">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-2">Giới thiệu</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">{team.description}</p>
+          </div>
+        )}
+
+        {/* Recent Matches */}
+        {team.recentMatches && team.recentMatches.length > 0 && (
+          <div className="bg-white/80 dark:bg-surface-dark/80 backdrop-blur-sm rounded-2xl p-4 border border-gray-100 dark:border-white/5 shadow-sm">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-3">Trận đấu gần đây</h3>
+            <div className="space-y-2">
+              {team.recentMatches.map((match: RecentMatch) => {
+                const isTeamA = match.teamAId === teamId;
+                const opponent = isTeamA ? match.teamB : match.teamA;
+                const myScore = isTeamA ? match.scoreA : match.scoreB;
+                const opponentScore = isTeamA ? match.scoreB : match.scoreA;
+                const isWin = myScore && opponentScore && myScore > opponentScore;
+                const isLoss = myScore && opponentScore && myScore < opponentScore;
+
+                const matchDate = new Date(match.date);
+                const dateStr = `${matchDate.getDate().toString().padStart(2, '0')}/${(matchDate.getMonth() + 1).toString().padStart(2, '0')}`;
+
+                return (
+                  <div
+                    key={match.id}
+                    className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/5"
+                  >
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <span className="text-[10px] font-bold text-gray-400">{dateStr}</span>
+                      {isWin && (
+                        <div className="bg-green-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md">W</div>
+                      )}
+                      {isLoss && (
+                        <div className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md">L</div>
+                      )}
+                      {!isWin && !isLoss && (
+                        <div className="bg-gray-400 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md">D</div>
+                      )}
+                      <span className="text-xs font-semibold text-slate-900 dark:text-white truncate">
+                        vs {opponent?.name || '...'}
+                      </span>
+                    </div>
+                    <span className="text-xs font-mono font-bold text-slate-900 dark:text-white ml-2">
+                      {myScore ?? '-'} - {opponentScore ?? '-'}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Action Footer - Glassmorphism */}
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 dark:bg-surface-dark/95 backdrop-blur-lg border-t border-gray-200 dark:border-white/5 z-40">
+        <div className="flex gap-3 max-w-md mx-auto items-center">
+          {/* X button */}
           <button
             onClick={() => navigate(-1)}
-            className="size-14 rounded-full bg-surface-dark border border-white/10 shadow-lg flex items-center justify-center text-red-500 hover:scale-110 transition-transform active:scale-95"
+            className="size-14 rounded-full bg-gradient-to-br from-red-500 to-red-600 shadow-lg shadow-red-500/30 flex items-center justify-center text-white hover:scale-105 transition-transform active:scale-95"
           >
-            <Icon name="close" className="text-3xl" />
+            <Icon name="close" className="text-2xl" />
           </button>
+
+          {/* Invite button */}
           <Button
-            className="flex-1 h-14 text-lg shadow-glow"
+            className="flex-1 h-14 text-base shadow-lg shadow-primary/30"
             variant="primary"
             icon="sports"
             onClick={() => navigate(appRoutes.matchInvite, {

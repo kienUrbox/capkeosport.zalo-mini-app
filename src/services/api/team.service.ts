@@ -21,6 +21,15 @@ export interface TeamStats {
   technique?: number; // 1-100
 }
 
+// Home Stadium Request - For creating/linking stadium when creating team
+export interface HomeStadiumRequest {
+  name: string; // Stadium name (required)
+  mapUrl: string; // Google Maps URL (required)
+  address?: string;
+  district?: string;
+  city?: string;
+}
+
 // Create Team Request DTO - Matches API documentation
 export interface CreateTeamDto {
   name: string; // 3-100 chars, required
@@ -28,7 +37,9 @@ export interface CreateTeamDto {
   banner?: string; // URL
   gender: TeamGender; // MALE | FEMALE | MIXED, required
   level: string; // 2-50 chars, required (e.g., "Người mới", "Trung bình", "Khá", "Giỏi")
-  location: TeamLocation; // required
+  location?: TeamLocation; // optional - backend will get from stadium
+  homeStadiumId?: string; // Option A: ID of existing stadium
+  homeStadium?: HomeStadiumRequest; // Option B: New stadium info
   stats?: TeamStats;
   pitch?: string[]; // Preferred pitch types e.g., ["Sân 7", "Sân 11"]
   description?: string;
@@ -42,10 +53,24 @@ export interface UpdateTeamDto {
   gender?: TeamGender;
   level?: string;
   location?: TeamLocation;
+  homeStadiumId?: string; // Option A: ID of existing stadium
+  homeStadium?: HomeStadiumRequest; // Option B: New stadium info
   stats?: TeamStats;
   pitch?: string[];
   description?: string;
   isActive?: boolean;
+}
+
+// Home Stadium Response - Stadium info in team response
+export interface HomeStadiumResponse {
+  id: string;
+  name: string;
+  mapUrl: string;
+  address?: string;
+  district?: string;
+  city?: string;
+  matchCount?: number;
+  homeTeamCount?: number;
 }
 
 // Team Response - Matches API documentation
@@ -56,7 +81,9 @@ export interface Team {
   banner?: string;
   gender: TeamGender;
   level: string;
-  location: TeamLocation;
+  location?: TeamLocation;
+  homeStadiumId?: string; // ID of home stadium
+  homeStadium?: HomeStadiumResponse; // Home stadium info
   stats?: TeamStats;
   pitch?: string[];
   description?: string;

@@ -297,11 +297,61 @@ export const FC_COLORS = {
   textSecondary: '#9db9ab',
 } as const
 
+// ============== STATS COLORS & ICONS ==============
+/**
+ * Stats Colors - Màu sắc cho 3 chỉ số đội bóng
+ * Tấn công: Red gradient, Phòng thủ: Blue gradient, Kỹ thuật: Green gradient
+ */
+export const STAT_COLORS = {
+  attack: {
+    main: 'text-red-500',
+    bg: 'bg-red-500/10',
+    bgSolid: 'bg-red-500',
+    gradient: 'from-red-500 to-orange-500',
+    accent: 'accent-red-500',
+  },
+  defense: {
+    main: 'text-blue-500',
+    bg: 'bg-blue-500/10',
+    bgSolid: 'bg-blue-500',
+    gradient: 'from-blue-500 to-cyan-500',
+    accent: 'accent-blue-500',
+  },
+  technique: {
+    main: 'text-primary', // #11d473
+    bg: 'bg-primary/10',
+    bgSolid: 'bg-primary',
+    gradient: 'from-primary to-green-500',
+    accent: 'accent-primary',
+  },
+} as const;
+
+/**
+ * Stat Icons - Icon cho 3 chỉ số
+ */
+export const STAT_ICONS = {
+  attack: 'flash_on',
+  defense: 'shield',
+  technique: 'sports_soccer',
+} as const;
+
+/**
+ * Lấy màu sắc cho chỉ số
+ */
+export const getStatColor = (stat: 'attack' | 'defense' | 'technique') => {
+  return STAT_COLORS[stat];
+};
+
+/**
+ * Lấy icon cho chỉ số
+ */
+export const getStatIcon = (stat: 'attack' | 'defense' | 'technique') => {
+  return STAT_ICONS[stat];
+};
+
 // ============== TEAM CONSTANTS ==============
 /**
  * Pitch Types - Loại sân bóng
- * API format: ["Sân 5", "Sân 7", "Sân 11"]
- * UI format: ["5", "7", "11"]
  */
 export const PITCH_TYPES = {
   FIVE: 'Sân 5',
@@ -310,9 +360,6 @@ export const PITCH_TYPES = {
 } as const
 
 export const PITCH_TYPE_VALUES = [PITCH_TYPES.FIVE, PITCH_TYPES.SEVEN, PITCH_TYPES.ELEVEN] as const;
-
-// UI values (without "Sân " prefix) for easier comparison
-export const PITCH_TYPE_UI_VALUES = ['5', '7', '11'] as const;
 
 /**
  * Team Levels - Trình độ đội bóng
@@ -336,24 +383,6 @@ export const TEAM_GENDER = {
 } as const;
 
 /**
- * Convert pitch type from API format to UI format
- * @param pitch - API format like ["Sân 5", "Sân 7", "Sân 11"]
- * @returns UI format like ["5", "7", "11"]
- */
-export const formatPitchFromApi = (pitch: string[]): string[] => {
-  return pitch.map(p => p.replace('Sân ', '').trim());
-};
-
-/**
- * Convert pitch type from UI format to API format
- * @param pitch - UI format like ["5", "7", "11"]
- * @returns API format like ["Sân 5", "Sân 7", "Sân 11"]
- */
-export const formatPitchForApi = (pitch: string[]): string[] => {
-  return pitch.map(p => `Sân ${p}`);
-};
-
-/**
  * Convert gender from API format to display format
  * API returns: "Nam", "Nữ", "Mixed" (already in correct format)
  * Legacy enum support: "MALE", "FEMALE", "MIXED"
@@ -375,4 +404,59 @@ export const formatGenderForApi = (gender: string): 'Nam' | 'Nữ' | 'Mixed' => 
   if (gender === 'Nam') return TEAM_GENDER.MALE;
   if (gender === 'Nữ') return TEAM_GENDER.FEMALE;
   return TEAM_GENDER.MIXED;
+};
+
+// ============== LEVEL COLORS & ICONS ==============
+/**
+ * Level Colors - Màu sắc cho trình độ đội bóng
+ * 2 mức màu: 3 level đầu (thường - gray) + 2 level cuối (đặc biệt - amber/gold)
+ */
+export const LEVEL_COLORS = {
+  // Levels thường (gray)
+  'Mới chơi': {
+    main: 'text-gray-600',
+    bg: 'bg-gray-500/10',
+    border: 'border-gray-500/20',
+    bgSolid: 'bg-gray-500',
+  },
+  'Trung bình': {
+    main: 'text-gray-600',
+    bg: 'bg-gray-500/10',
+    border: 'border-gray-500/20',
+    bgSolid: 'bg-gray-500',
+  },
+  'Nghiệp dư': {
+    main: 'text-gray-600',
+    bg: 'bg-gray-500/10',
+    border: 'border-gray-500/20',
+    bgSolid: 'bg-gray-500',
+  },
+  // Levels đặc biệt (amber/gold)
+  'Bán chuyên': {
+    main: 'text-amber-500',
+    bg: 'bg-amber-500/10',
+    border: 'border-amber-500/20',
+    bgSolid: 'bg-amber-500',
+  },
+  'Chuyên nghiệp': {
+    main: 'text-amber-600',
+    bg: 'bg-amber-500/10',
+    border: 'border-amber-500/20',
+    bgSolid: 'bg-amber-600',
+  },
+} as const;
+
+/**
+ * Level Icon - Icon cho trình độ
+ */
+export const LEVEL_ICON = 'military_tech';
+
+/**
+ * Lấy màu sắc cho trình độ
+ */
+export const getLevelColor = (level: string) => {
+  if (level in LEVEL_COLORS) {
+    return LEVEL_COLORS[level as keyof typeof LEVEL_COLORS];
+  }
+  return LEVEL_COLORS['Mới chơi'];
 };

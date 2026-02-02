@@ -67,6 +67,8 @@ export const useTeamDetail = (
     };
 
     fetchDetail();
+  // Note: store is stable reference from Zustand, don't include in deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teamId, isOpponent]);
 
   // Manual refresh function (for pull-to-refresh)
