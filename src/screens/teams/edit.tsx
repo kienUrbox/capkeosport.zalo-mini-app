@@ -6,12 +6,12 @@ import { type StadiumAutocompleteDto } from '@/services/api/stadium.service';
 import { appRoutes } from '@/utils/navigation';
 import { TeamService } from '@/services/api/team.service';
 import type { Team, UpdateTeamDto } from '@/services/api/team.service';
+import { useTeamStore } from '@/stores/team.store';
 import {
   PITCH_TYPE_VALUES,
   TEAM_LEVELS,
   formatGenderFromApi,
   formatGenderForApi,
-  getLevelColor,
 } from '@/constants/design';
 
 // Define location state type
@@ -29,6 +29,7 @@ const EditTeamScreen: React.FC = () => {
   const location = useLocation();
   const locationState = location.state as LocationState | undefined;
   const { teamId } = useParams<{ teamId: string }>();
+  const fetchTeamDetail = useTeamStore((state) => state.fetchTeamDetail);
 
   const [team, setTeam] = useState<Team | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -191,13 +192,15 @@ const EditTeamScreen: React.FC = () => {
       const response = await TeamService.updateTeam(teamId, updateData);
 
       if (response.success) {
+        // Refresh team detail cache to get updated data
+        await fetchTeamDetail(teamId, true);
         navigate(appRoutes.teamDetail(teamId));
       } else {
         setError('Không thể cập nhật thông tin đội');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to update team:', err);
-      setError(err?.message || 'Có lỗi xảy ra');
+      setError(err instanceof Error ? err.message : 'Có lỗi xảy ra');
     } finally {
       setIsSaving(false);
     }
@@ -289,7 +292,6 @@ const EditTeamScreen: React.FC = () => {
             <label className="text-sm font-medium text-gray-600 dark:text-text-secondary ml-1">Trình độ</label>
             <div className="grid grid-cols-2 gap-3">
               {TEAM_LEVELS.map((l) => {
-                const levelColor = getLevelColor(l);
                 const isSelected = level === l;
                 return (
                   <button
@@ -297,7 +299,7 @@ const EditTeamScreen: React.FC = () => {
                     onClick={() => setLevel(l)}
                     className={`py-3 px-4 rounded-xl border text-sm font-semibold transition-all ${
                       isSelected
-                        ? `${levelColor.bg} ${levelColor.border} ${levelColor.main}`
+                        ? 'bg-primary text-background-dark border-primary'
                         : 'bg-white dark:bg-surface-dark border-gray-200 dark:border-white/10 text-gray-500 hover:border-gray-400'
                     }`}
                   >

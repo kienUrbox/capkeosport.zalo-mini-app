@@ -75,6 +75,30 @@ const TeamDetailScreen: React.FC = () => {
     return 'wc';
   };
 
+  // Helper function to format stadium address
+  const formatStadiumAddress = (stadium: { address?: string; district?: string; city?: string }): string => {
+    const parts = [stadium.address, stadium.district, stadium.city].filter(Boolean);
+    return parts.join(', ') || 'Chưa có địa chỉ';
+  };
+
+  // Helper function to handle map click with Zalo Mini App deep link support
+  const handleMapClick = (mapUrl: string) => {
+    if (!mapUrl || !mapUrl.trim()) return;
+
+    // Try deep link first for Zalo Mini App
+    const deepLinkUrl = `comgooglemaps://?url=${encodeURIComponent(mapUrl.trim())}`;
+    const startTime = Date.now();
+
+    window.location.href = deepLinkUrl;
+
+    // Fallback to web URL
+    setTimeout(() => {
+      if (Date.now() - startTime < 600) {
+        window.open(mapUrl.trim(), '_blank');
+      }
+    }, 500);
+  };
+
   if (isLoading && !isRefreshing) {
     return (
       <>
@@ -195,11 +219,44 @@ const TeamDetailScreen: React.FC = () => {
       {/* Info Card */}
       <div className="px-4 mt-6">
         <div className="bg-white dark:bg-surface-dark rounded-xl p-4 border border-gray-100 dark:border-white/5 space-y-4 shadow-sm">
+          {/* Home Stadium Section */}
           <div className="flex gap-3">
-            <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0"><Icon name="location_on" className="text-lg" /></div>
-            <div>
-              <p className="text-xs text-gray-500 uppercase font-bold">Khu vực</p>
-              <p className="text-sm font-medium">{team.location?.address || 'Chưa cập nhật'}</p>
+            <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0"><Icon name="stadium" className="text-lg" /></div>
+            <div className="flex-1">
+              <p className="text-xs text-gray-500 uppercase font-bold">Sân nhà</p>
+              {team.homeStadium ? (
+                <div className="mt-1">
+                  <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                    {team.homeStadium.name}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    {formatStadiumAddress(team.homeStadium)}
+                  </p>
+                  <p className="text-xs italic text-gray-400 mt-0.5">
+                    Sân đội thường xuyên thi đấu
+                  </p>
+                  <div className="flex items-center gap-2 mt-2">
+                    {team.homeStadium.matchCount > 0 && (
+                      <span className="inline-flex items-center gap-1 text-xs text-gray-500">
+                        <Icon name="sports_soccer" className="text-xs" />
+                        {team.homeStadium.matchCount} trận
+                      </span>
+                    )}
+                    {team.homeStadium.mapUrl && (
+                      <button
+                        onClick={() => handleMapClick(team.homeStadium!.mapUrl)}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-xs font-medium hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+                        aria-label="Xem bản đồ trên Google Maps"
+                      >
+                        <Icon name="map" className="text-xs" />
+                        Xem bản đồ
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm font-medium text-gray-400">Chưa cập nhật sân nhà</p>
+              )}
             </div>
           </div>
           {team.pitch && team.pitch.length > 0 && (

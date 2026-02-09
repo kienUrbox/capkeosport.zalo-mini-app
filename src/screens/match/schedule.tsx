@@ -15,6 +15,7 @@ import {
   ActionBottomSheet,
   RematchBottomSheet,
   ConfirmMatchModal,
+  MatchBookingGuideModal,
   AttendanceBottomSheet,
   UpdateScoreModal,
 } from '@/components/ui';
@@ -22,6 +23,7 @@ import { appRoutes } from '@/utils/navigation';
 import { useScheduleData } from '@/hooks/useScheduleData';
 import { useMyTeams, useSelectedTeam, useTeamActions, useTeamStore, hasAdminPermission } from '@/stores/team.store';
 import { useMatchActions, useMatchStore } from '@/stores/match.store';
+import { useUIStore } from '@/stores/ui.store';
 import type { TabType } from '@/stores/match.store';
 import { toast } from '@/utils/toast';
 import { MatchService } from '@/services/api/match.service';
@@ -75,6 +77,9 @@ const MatchScheduleScreen: React.FC = () => {
   // Rematch modal state
   const [rematchModalMatchId, setRematchModalMatchId] = useState<string | null>(null);
 
+  // Booking guide modal state
+  const [showBookingGuide, setShowBookingGuide] = useState(false);
+
   // Confirm match modal state
   const [confirmModalMatchId, setConfirmModalMatchId] = useState<string | null>(null);
 
@@ -98,6 +103,9 @@ const MatchScheduleScreen: React.FC = () => {
 
   const { setSelectedTeam } = useTeamActions();
   const matchActions = useMatchActions();
+
+  // Check if guide should be shown
+  const hideMatchBookingGuide = useUIStore((state) => state.hideMatchBookingGuide);
 
   // Subscribe to activeTab changes from store
   const activeTab = useMatchStore((state) => {
@@ -361,7 +369,15 @@ const MatchScheduleScreen: React.FC = () => {
   };
 
   const handleConfirmMatch = (matchId: string) => {
+    // Show booking guide first if not hidden
+    if (!hideMatchBookingGuide) {
+      setShowBookingGuide(true);
+    }
     setConfirmModalMatchId(matchId);
+  };
+
+  const handleCloseBookingGuide = () => {
+    setShowBookingGuide(false);
   };
 
   const handleCloseConfirmModal = () => {
@@ -609,6 +625,7 @@ const MatchScheduleScreen: React.FC = () => {
                   onConfirm={handleConfirmMatch}
                   onSendRequest={handleSendRequest}
                   onEditRequest={handleEditRequest}
+                  onShowGuide={() => setShowBookingGuide(true)}
                 />
               ))
             )}
@@ -902,6 +919,12 @@ const MatchScheduleScreen: React.FC = () => {
           />
         ) : null;
       })()}
+
+      {/* Match Booking Guide Modal - Shows before ConfirmMatchModal */}
+      <MatchBookingGuideModal
+        isOpen={showBookingGuide}
+        onClose={handleCloseBookingGuide}
+      />
 
       {/* Confirm Match Modal */}
       {(() => {

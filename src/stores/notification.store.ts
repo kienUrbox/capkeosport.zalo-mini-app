@@ -15,45 +15,20 @@ interface NotificationState {
   isStatsLoading: boolean;
   error: string | null;
 
-  // Track fetched state to prevent duplicate requests
-  _fetched: boolean;
-  _fetchedStats: boolean;
-
-  // ========== State Management Actions ==========
+  // State Management Actions
   setNotifications: (notifications: Notification[]) => void;
   setStats: (stats: NotificationStats) => void;
   addNotification: (notification: Notification) => void;
   updateNotification: (notificationId: string, updates: Partial<Notification>) => void;
   removeNotification: (notificationId: string) => void;
   clearError: () => void;
-  setLoading: (loading: boolean) => void;
   setError: (error: string) => void;
 
-  // ========== API Methods ==========
-
-  /**
-   * Fetch notifications
-   * GET /notifications
-   */
-  fetchNotifications: (params?: NotificationQueryParams, forceRefresh?: boolean) => Promise<Notification[]>;
-
-  /**
-   * Mark notification as read
-   * PATCH /notifications/:id/read
-   */
+  // API Methods
+  fetchNotifications: (params?: NotificationQueryParams) => Promise<Notification[]>;
   markAsRead: (notificationId: string) => Promise<void>;
-
-  /**
-   * Mark all notifications as read
-   * POST /notifications/read-all
-   */
   markAllAsRead: () => Promise<void>;
-
-  /**
-   * Fetch notification stats
-   * GET /notifications/stats
-   */
-  fetchStats: (forceRefresh?: boolean) => Promise<NotificationStats>;
+  fetchStats: () => Promise<NotificationStats>;
 }
 
 export const useNotificationStore = create<NotificationState>((set, get) => ({
@@ -64,11 +39,8 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   isLoading: false,
   isStatsLoading: false,
   error: null,
-  _fetched: false,
-  _fetchedStats: false,
 
-  // ========== State Management Actions ==========
-
+  // State Management Actions
   setNotifications: (notifications) =>
     set({
       notifications,
@@ -108,30 +80,21 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     })),
 
   clearError: () => set({ error: null }),
-
-  setLoading: (isLoading) => set({ isLoading }),
-
   setError: (error) => set({ error }),
 
-  // ========== API Methods ==========
+  // API Methods - simplified without caching
 
   /**
    * Fetch notifications
    * GET /notifications
    */
-  fetchNotifications: async (params, forceRefresh = false) => {
+  fetchNotifications: async (params) => {
     try {
       const currentState = get();
 
       // Skip if already loading
       if (currentState.isLoading) {
         console.log('[NotificationStore] Skipping fetch - already loading');
-        return currentState.notifications;
-      }
-
-      // Skip if already fetched UNLESS forceRefresh
-      if (!forceRefresh && currentState._fetched) {
-        console.log('[NotificationStore] Skipping fetch - already fetched (use forceRefresh=true)');
         return currentState.notifications;
       }
 
@@ -159,7 +122,6 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         set({
           notifications,
           unreadCount: unread,
-          _fetched: true,
           error: null,
         });
 
@@ -255,17 +217,12 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
    * Fetch notification stats
    * GET /notifications/stats
    */
-  fetchStats: async (forceRefresh = false) => {
+  fetchStats: async () => {
     try {
       const currentState = get();
 
       // Skip if already loading
       if (currentState.isStatsLoading) {
-        return currentState.stats;
-      }
-
-      // Skip if already fetched UNLESS forceRefresh
-      if (!forceRefresh && currentState._fetchedStats) {
         return currentState.stats;
       }
 
@@ -277,7 +234,6 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         set({
           stats: response.data,
           unreadCount: response.data.unread,
-          _fetchedStats: true,
           error: null,
         });
 
@@ -311,7 +267,6 @@ export const useNotificationActions = () => {
     updateNotification: store.updateNotification,
     removeNotification: store.removeNotification,
     clearError: store.clearError,
-    setLoading: store.setLoading,
     setError: store.setError,
     // API methods
     fetchNotifications: store.fetchNotifications,

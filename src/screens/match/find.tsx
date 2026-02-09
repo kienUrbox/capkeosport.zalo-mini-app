@@ -6,7 +6,7 @@ import { useDiscovery } from '@/hooks/useDiscovery';
 import { useMyTeams, useSelectedTeam, useTeamActions, useTeamStore } from '@/stores/team.store';
 import { useDiscoveryStore } from '@/stores/discovery.store';
 import type { Team } from '@/types/api.types';
-import { getLevelColor, LEVEL_ICON, STAT_COLORS } from '@/constants/design';
+import { getLevelColor, LEVEL_ICON } from '@/constants/design';
 
 /**
  * FindMatch Screen
@@ -179,7 +179,7 @@ const FindMatchScreen: React.FC = () => {
   const getCardStyle = (index: number) => {
     const actualIndex = currentIndex + index;
     if (actualIndex >= allTeams.length) {
-      return { zIndex: 0, opacity: 0 };
+      return { zIndex: 0, opacity: 0, transformOrigin: 'center center' };
     }
 
     if (index === 0) {
@@ -189,19 +189,21 @@ const FindMatchScreen: React.FC = () => {
 
       return {
         transform: `translate(${xPos}px, ${dragDelta.y * 0.2}px) rotate(${rotate}deg)`,
+        transformOrigin: 'center center',
         transition: isDragging ? 'none' : 'transform 0.3s ease, opacity 0.3s ease',
         opacity: opacity,
-        zIndex: 10,
+        zIndex: 30,
       };
     } else if (index === 1) {
       // Next card - static style, no calculation during drag
       return {
         transform: 'scale(0.95) translateY(10px)',
-        zIndex: 9,
+        transformOrigin: 'center center',
+        zIndex: 20,
         opacity: 1,
       };
     }
-    return { zIndex: 0, opacity: 0 };
+    return { zIndex: 0, opacity: 0, transformOrigin: 'center center' };
   };
 
   // Overlay opacity for Like/Nope badges
@@ -505,7 +507,7 @@ const FindMatchScreen: React.FC = () => {
         </div>
 
         {/* Card Stack Area */}
-        <div className="flex-1 relative w-full flex flex-col items-center justify-center p-4 z-10 overflow-visible">
+        <div className="flex-1 relative w-full flex flex-col items-center justify-center p-4 z-10 overflow-hidden">
           {/* Decorative Stack Layers (To give depth feel) */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[calc(50%+8px)] w-[82%] h-[calc(100%-24px)] bg-surface-light/40 dark:bg-surface-dark/40 rounded-[2.5rem] border border-white/5 z-0 pointer-events-none"></div>
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[calc(50%+4px)] w-[82%] h-[calc(100%-24px)] bg-surface-light/70 dark:bg-surface-dark/70 rounded-[2.5rem] border border-white/5 z-10 shadow-lg backdrop-blur-sm pointer-events-none"></div>
@@ -530,7 +532,7 @@ const FindMatchScreen: React.FC = () => {
                 key={team.id}
                 ref={index === 0 ? cardRef : null}
                 style={getCardStyle(index)}
-                className="absolute w-full max-w-[360px] h-[calc(100dvh-200px)] sm:h-[calc(100dvh-180px)] max-h-[600px] sm:max-h-[660px] bg-surface-light dark:bg-surface-dark rounded-[2.5rem] shadow-card flex flex-col overflow-hidden border border-gray-200 dark:border-white/10 group cursor-grab active:cursor-grabbing select-none"
+                className="absolute left-0 right-0 mx-auto w-full max-w-[360px] h-[calc(100dvh-220px)] sm:h-[calc(100dvh-200px)] max-h-[580px] sm:max-h-[640px] bg-surface-light dark:bg-surface-dark rounded-[2.5rem] shadow-card flex flex-col overflow-hidden border border-gray-200 dark:border-white/10 group cursor-grab active:cursor-grabbing select-none will-change-transform"
                 onTouchStart={index === 0 ? handleTouchStart : undefined}
                 onTouchMove={index === 0 ? handleTouchMove : undefined}
                 onTouchEnd={index === 0 ? handleTouchEnd : undefined}
@@ -558,7 +560,7 @@ const FindMatchScreen: React.FC = () => {
                 )}
 
                 {/* Image */}
-                <div className="relative h-[35%] w-full bg-surface-light overflow-hidden shrink-0">
+                <div className="relative h-[160px] sm:h-[180px] w-full bg-surface-light overflow-hidden shrink-0">
                   {team.logo ? (
                     <div
                       className="absolute inset-0 bg-cover bg-center"
@@ -583,23 +585,23 @@ const FindMatchScreen: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Content */}
-                <div className="flex-1 flex flex-col pt-16 px-4 sm:px-6 pb-24 items-center text-center bg-surface-light dark:bg-surface-dark w-full overflow-y-auto no-scrollbar" onClick={handleClickCard}>
-                  {/* Circular Team Logo - Centered at top-[22%] */}
-                  <div className="absolute top-[22%] left-1/2 -translate-x-1/2 z-10">
-                    <div className="w-24 sm:w-28 h-24 sm:h-28 rounded-full p-1.5 bg-surface-light dark:bg-surface-dark shadow-2xl">
-                      <div className="w-full h-full rounded-full overflow-hidden bg-surface-light border border-gray-200 dark:border-white/10 relative">
-                        {team.logo ? (
-                          <img src={team.logo} className="w-full h-full object-cover" alt="logo" />
-                        ) : (
-                          <div className="w-full h-full bg-gradient-to-br from-primary to-green-600 flex items-center justify-center text-white font-bold text-2xl">
-                            {team.name?.charAt(0) || 'T'}
-                          </div>
-                        )}
-                      </div>
+                {/* Circular Team Logo - Positioned at boundary between image and content */}
+                <div className="absolute top-[140px] sm:top-[160px] left-1/2 -translate-x-1/2 z-20">
+                  <div className="w-20 sm:w-24 h-20 sm:h-24 rounded-full p-1.5 bg-surface-light dark:bg-surface-dark shadow-2xl">
+                    <div className="w-full h-full rounded-full overflow-hidden bg-surface-light border border-gray-200 dark:border-white/10 relative">
+                      {team.logo ? (
+                        <img src={team.logo} className="w-full h-full object-cover" alt="logo" />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-primary to-green-600 flex items-center justify-center text-white font-bold text-2xl">
+                          {team.name?.charAt(0) || 'T'}
+                        </div>
+                      )}
                     </div>
                   </div>
+                </div>
 
+                {/* Content */}
+                <div className="flex-1 flex flex-col px-4 sm:px-6 pt-14 pb-24 items-center text-center bg-surface-light dark:bg-surface-dark w-full" onClick={handleClickCard}>
                   {/* Team name + verified badge - CENTER */}
                   <div className="flex flex-col items-center gap-1 mb-2">
                     <h2 className="text-slate-900 dark:text-white text-2xl font-display font-bold tracking-tight flex items-center gap-2">

@@ -63,7 +63,7 @@ const MatchFound: React.FC = () => {
          {[...Array(15)].map((_, i) => (
             <div key={i} className="absolute w-2 h-2 rounded-full opacity-0 shadow-sm"
                  style={{
-                    backgroundColor: ['#11d473', '#FFD700', '#3b82f6'][i % 3], // Removed white, added blue for visibility on light mode
+                    backgroundColor: ['#3b82f6', '#FFD700', '#60a5fa'][i % 3], // Changed from #11d473
                     left: `${Math.random() * 100}%`,
                     top: `-20px`,
                     animation: `fall ${3 + Math.random() * 2}s linear infinite`,

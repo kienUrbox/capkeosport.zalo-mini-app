@@ -12,6 +12,7 @@ export interface StadiumAutocompleteDto {
   district?: string;
   city?: string;
   matchCount: number;
+  homeTeamCount: number;
 }
 
 /**
@@ -62,5 +63,25 @@ export const StadiumService = {
   getStadiumById: async (stadiumId: string) => {
     const response = await api.get<StadiumResponseDto>(`/stadiums/${stadiumId}`);
     return response;
+  },
+
+  /**
+   * PHASE 2: Book stadium slot
+   * POST /stadiums/:id/book
+   *
+   * @param stadiumId - Stadium ID
+   * @param data - Booking data (date, time, duration)
+   *
+   * TODO: Implement when stadium booking API is available
+   */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  bookStadiumSlot: async (stadiumId: string, data: {
+    date: string;
+    time: string;
+    duration: number;
+  }) => {
+    // Placeholder for Phase 2 implementation
+    console.warn('Stadium booking not yet implemented');
+    throw new Error('Stadium booking feature coming soon');
   },
 };

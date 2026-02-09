@@ -115,5 +115,42 @@ export type { StadiumAutocompleteProps } from './StadiumAutocomplete';
 export { ConfirmMatchModal } from './ConfirmMatchModal';
 export type { ConfirmMatchModalProps } from './ConfirmMatchModal';
 
+export { MatchBookingGuide } from './MatchBookingGuide';
+export type { MatchBookingGuideProps } from './MatchBookingGuide';
+
+export { MatchBookingGuideModal } from './MatchBookingGuideModal';
+export type { MatchBookingGuideModalProps } from './MatchBookingGuideModal';
+
 export { UpdateScoreModal } from './UpdateScoreModal';
 export type { UpdateScoreModalProps } from './UpdateScoreModal';
+
+export { ProfileBanner } from './ProfileBanner';
+export type { ProfileBannerProps } from './ProfileBanner';
+
+export { JerseyPositionBadge } from './JerseyPositionBadge';
+export type { JerseyPositionBadgeProps } from './JerseyPositionBadge';
+
+// Profile Page Enhancements
+export { QuickActionsBar } from './QuickActionsBar';
+export type { QuickActionsBarProps } from './QuickActionsBar';
+
+export { QuickActionButton } from './QuickActionButton';
+export type { QuickActionButtonProps } from './QuickActionButton';
+
+export { StatBarAnimated } from './StatBarAnimated';
+export type { StatBarAnimatedProps } from './StatBarAnimated';
+
+export { StatsSection } from './StatsSection';
+export type { StatsSectionProps, StatBarProps } from './StatsSection';
+
+export { QRCodeModal } from './QRCodeModal';
+export type { QRCodeModalProps } from './QRCodeModal';
+
+export { ShareSheet } from './ShareSheet';
+export type { ShareSheetProps, ShareOption } from './ShareSheet';
+
+export { SettingsSection } from './SettingsSection';
+export type { SettingsSectionProps } from './SettingsSection';
+
+export { SettingsMenuItem } from './SettingsMenuItem';
+export type { SettingsMenuItemProps } from './SettingsMenuItem';

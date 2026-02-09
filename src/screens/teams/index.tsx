@@ -124,11 +124,7 @@ const TeamsScreen: React.FC = () => {
   if (teamStore.isLoading && myTeams.length === 0) {
     return (
       <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark pb-safe-with-nav">
-        <Header title="Đội bóng của tôi" showBack={false} rightAction={
-          <button onClick={() => navigate(appRoutes.teamsCreate)} className="p-2 text-primary">
-            <Icon name="add_circle" className="text-2xl" />
-          </button>
-        } />
+        <Header title="Đội bóng của tôi" showBack={false} />
 
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
@@ -142,11 +138,7 @@ const TeamsScreen: React.FC = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark pb-safe-with-nav">
-      <Header title="Đội bóng của tôi" showBack={false} rightAction={
-        <button onClick={() => navigate(appRoutes.teamsCreate)} className="p-2 text-primary">
-          <Icon name="add_circle" className="text-2xl" />
-        </button>
-      } />
+      <Header title="Đội bóng của tôi" showBack={false} />
 
       {/* Pull-to-refresh indicator */}
       {pullState.isPulling && (
@@ -222,11 +214,10 @@ const TeamsScreen: React.FC = () => {
                   className="group bg-white dark:bg-surface-dark rounded-2xl p-4 border border-gray-100 dark:border-white/5 shadow-sm active:scale-[0.98] transition-all cursor-pointer relative overflow-hidden"
                 >
                   {/* Role Badge */}
-                  <div className={`absolute top-0 right-0 px-3 py-1 rounded-bl-xl text-[10px] font-bold uppercase tracking-wider ${
-                    team.userRole === 'admin'
-                      ? 'bg-primary/10 text-primary'
-                      : 'bg-gray-100 dark:bg-white/10 text-gray-500'
-                  }`}>
+                  <div className={`absolute top-0 right-0 px-3 py-1 rounded-bl-xl text-[10px] font-bold uppercase tracking-wider ${team.userRole === 'admin'
+                    ? 'bg-primary/10 text-primary'
+                    : 'bg-gray-100 dark:bg-white/10 text-gray-500'
+                    }`}>
                     {team.userRole === 'admin' ? 'Quản trị viên' : 'Thành viên'}
                   </div>
 

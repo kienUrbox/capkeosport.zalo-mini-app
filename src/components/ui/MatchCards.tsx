@@ -16,6 +16,7 @@ interface PendingMatchCardProps {
   onConfirm?: (id: string) => void;
   onSendRequest?: (id: string) => void;
   onEditRequest?: (id: string) => void;
+  onShowGuide?: () => void;
 }
 
 export const PendingMatchCard: React.FC<PendingMatchCardProps> = ({
@@ -28,6 +29,7 @@ export const PendingMatchCard: React.FC<PendingMatchCardProps> = ({
   onConfirm,
   onSendRequest,
   onEditRequest,
+  onShowGuide,
 }) => {
   const navigate = useNavigate();
 
@@ -173,6 +175,13 @@ export const PendingMatchCard: React.FC<PendingMatchCardProps> = ({
             >
               Chốt kèo
             </Button>
+            <Button
+              variant="secondary"
+              className="w-10 h-10 px-0"
+              icon="help_outline"
+              onClick={() => onShowGuide?.()}
+              title="Xem hướng dẫn chốt kèo"
+            />
           </div>
         );
       default:

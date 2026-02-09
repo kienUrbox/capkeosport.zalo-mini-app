@@ -79,6 +79,8 @@ export const ConfirmMatchModal: React.FC<ConfirmMatchModalProps> = ({
     setError(null);
 
     try {
+      // TODO: Phase 2 - Integrate with stadium booking API
+      // Call stadiumService.bookStadiumSlot() before confirming match
       await matchActions.confirmMatch(matchId, {
         date, // YYYY-MM-DD format from date input
         time, // HH:mm format from time input

@@ -3,7 +3,7 @@ import { Icon } from './Icon';
 import { Button } from './Button';
 import { useDiscoveryStore, getDefaultFilters } from '@/stores/discovery.store';
 import { useSelectedTeam } from '@/stores/team.store';
-import { TEAM_LEVELS, TEAM_GENDER, getLevelColor } from '@/constants/design';
+import { TEAM_LEVELS, TEAM_GENDER } from '@/constants/design';
 
 export interface FilterBottomSheetProps {
   isOpen: boolean;
@@ -28,7 +28,7 @@ export const FilterBottomSheet: React.FC<FilterBottomSheetProps> = ({
 }) => {
   console.log('FilterBottomSheet render, isOpen:', isOpen);
 
-  const { filters, setFilters, resetFilters } = useDiscoveryStore();
+  const { filters, setFilters } = useDiscoveryStore();
   const selectedTeam = useSelectedTeam();
 
   // Debug
@@ -151,14 +151,13 @@ export const FilterBottomSheet: React.FC<FilterBottomSheetProps> = ({
             <div className="flex flex-wrap gap-2">
               {TEAM_LEVELS.map((level) => {
                 const isSelected = localLevels.includes(level);
-                const levelColor = getLevelColor(level);
                 return (
                   <button
                     key={level}
                     onClick={() => toggleLevel(level)}
                     className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
                       isSelected
-                        ? `${levelColor.bgSolid} ${levelColor.main} text-background-dark`
+                        ? 'bg-primary text-background-dark'
                         : 'bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10'
                     }`}
                   >
@@ -209,7 +208,7 @@ export const FilterBottomSheet: React.FC<FilterBottomSheetProps> = ({
                 return (
                   <button
                     key={option.value}
-                    onClick={() => setLocalSortBy(option.value as any)}
+                    onClick={() => setLocalSortBy(option.value)}
                     className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
                       isSelected
                         ? 'bg-primary text-background-dark'

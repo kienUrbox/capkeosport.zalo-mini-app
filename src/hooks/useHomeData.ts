@@ -1,220 +1,73 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { useMatchStore } from '@/stores/match.store';
-import { useNotificationStore } from '@/stores/notification.store';
-import { usePhoneInviteStore } from '@/stores/phone-invite.store';
-import { useUIStore } from '@/stores/ui.store';
+import { useEffect, useCallback, useRef } from 'react';
 import { useHomeStore } from '@/stores/home.store';
 
-// Default location: Ho Chi Minh City center
-const DEFAULT_LOCATION = {
-  lat: 10.7769,
-  lng: 106.7009,
-};
-
-interface HomeDataState {
+export interface UseHomeDataReturn {
   // Data
-  pendingInvitations: any[]; // Can be Notification[] or PhoneInvite[]
+  pendingInvitations: any[];
   nearbyTeams: any[]; // Keep for backward compatibility but always empty
 
-  // Loading states - separated by section
-  isLoadingInvitations: boolean;
-  isLoadingTeams: boolean;
-  isLoadingMatches: boolean;
+  // Loading state
+  isLoading: boolean;
   isRefreshing: boolean;
 
-  // Error states
+  // Error state
   error: string | null;
 
   // Actions
   refresh: () => Promise<void>;
 }
 
-export const useHomeData = (): HomeDataState => {
-  const { setUpcomingMatches } = useMatchStore();
-  const { showToast } = useUIStore();
-  const homeStore = useHomeStore();
+/**
+ * Custom hook for home data
+ *
+ * Simplified - fetches data on every call, no caching
+ */
+export const useHomeData = (): UseHomeDataReturn => {
+  // Subscribe to store state using selectors
+  const pendingInvitations = useHomeStore((state) => state.pendingInvitations);
+  const isLoading = useHomeStore((state) => state.isLoading);
+  const error = useHomeStore((state) => state.error);
 
-  const [pendingInvitations, setPendingInvitations] = useState<any[]>([]);
-  const [nearbyTeams, setNearbyTeams] = useState<any[]>([]);
-
-  // Individual loading states
-  const [isLoadingInvitations, setIsLoadingInvitations] = useState(true);
-  const [isLoadingTeams, setIsLoadingTeams] = useState(true);
-  const [isLoadingMatches, setIsLoadingMatches] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Get store methods
+  const fetchHomeData = useHomeStore((state) => state.fetchHomeData);
 
   // Track if component is mounted
   const isMounted = useRef(true);
-  // Track if initial fetch has completed
-  const hasFetched = useRef(false);
 
-  // Get user's location
-  const getUserLocation = useCallback((): Promise<{ lat: number; lng: number }> => {
-    return new Promise((resolve) => {
-      if (!navigator.geolocation) {
-        console.warn('Geolocation not supported, using default location');
-        resolve(DEFAULT_LOCATION);
-        return;
-      }
-
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          resolve({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          });
-        },
-        (error) => {
-          console.warn('Geolocation error, using default location:', error.message);
-          resolve(DEFAULT_LOCATION);
-        },
-        { timeout: 5000, enableHighAccuracy: false }
-      );
-    });
-  }, []);
-
-  // Fetch all home data
-  const fetchData = useCallback(async (isRefresh = false) => {
-    // For initial load (not refresh), always fetch data
-    // For navigation back to home, use cache if available and fresh
-    if (!isRefresh && hasFetched.current && !homeStore.isDataStale()) {
-      // Already loaded before and cache is still fresh - use cached data
-      setPendingInvitations(homeStore.pendingInvitations);
-      setNearbyTeams([]);
-      setIsLoadingInvitations(false);
-      setIsLoadingTeams(false);
-      setIsLoadingMatches(false);
-      return;
-    }
-
-    // Set loading states for both initial load and refresh
-    setIsRefreshing(true);
-    setIsLoadingInvitations(true);
-    setIsLoadingTeams(true);
-    setIsLoadingMatches(true);
-    setError(null);
-
-    try {
-      // Get user location first (no longer used for nearby teams)
-      await getUserLocation();
-
-      // Fetch invitations from store - use notification store for team invitations
-      const invitationsPromise = useNotificationStore.getState().fetchNotifications(
-        { type: 'team_invitation', unreadOnly: true },
-        isRefresh // forceRefresh on manual refresh
-      )
-        .then((notifications) => {
-          setPendingInvitations(notifications);
-          return { success: true, data: notifications };
-        })
-        .catch((err) => {
-          console.error('Failed to load invitations:', err);
-          return { success: false, error: 'Failed to load invitations' };
-        })
-        .then((result) => {
-          setIsLoadingInvitations(false);
-          return result;
-        });
-
-      // Fetch matches from store
-      const matchesPromise = useMatchStore.getState().fetchUpcomingMatches(
-        undefined, // teamId - fetch for all teams
-        1, // page
-        isRefresh // forceRefresh on manual refresh
-      )
-        .then(() => {
-          // Store already handles updating upcomingMatches
-          return { success: true };
-        })
-        .catch((err) => {
-          console.error('Failed to load matches:', err);
-          return { success: false, error: 'Failed to load matches' };
-        })
-        .then((result) => {
-          setIsLoadingMatches(false);
-          return result;
-        });
-
-      // Wait for all to complete (excluding teams)
-      const results = await Promise.all([invitationsPromise, matchesPromise]);
-      setIsLoadingTeams(false); // Skip teams loading
-
-      // Collect errors
-      const errors: string[] = [];
-      let fetchedNotifications: any[] = [];
-
-      const invitationsResult = results[0];
-      if ('data' in invitationsResult && invitationsResult.data) {
-        fetchedNotifications = invitationsResult.data;
-      } else {
-        errors.push('Không thể tải lời mời');
-      }
-
-      const matchesResult = results[1];
-      if (!matchesResult.success) {
-        errors.push('Không thể tải trận đấu');
-      }
-
-      // Show error toast if there were errors
-      if (errors.length > 0 && isRefresh) {
-        showToast(errors.join('. '), 'error');
-      }
-
-      // Set error state if all failed
-      if (errors.length === 2) {
-        setError('Không thể tải dữ liệu. Vui lòng thử lại.');
-      }
-
-      // Save to Zustand store if at least partial success
-      if (errors.length < 2 && fetchedNotifications.length > 0) {
-        homeStore.setHomeData({
-          pendingInvitations: fetchedNotifications,
-          nearbyTeams: [],
-        });
-      }
-
-      hasFetched.current = true;
-    } catch (err: any) {
-      console.error('Home data fetch error:', err);
-      const errorMessage = err?.response?.data?.error?.message || err?.message || 'Có lỗi xảy ra';
-      setError(errorMessage);
-      if (isRefresh) {
-        showToast(errorMessage, 'error');
-      }
-    } finally {
-      if (isMounted.current) {
-        setIsRefreshing(false);
-      }
-    }
-  }, [getUserLocation, setUpcomingMatches, showToast, homeStore]);
-
-  // Refresh function
-  const refresh = useCallback(async () => {
-    await fetchData(true);
-  }, [fetchData]);
-
-  // Initial fetch on mount
+  // Fetch home data on mount
   useEffect(() => {
-    // Always fetch data - let the API handle authentication
-    // The axios interceptor will add the auth token automatically
-    fetchData(false);
+    if (!isMounted.current) return;
 
-    // Cleanup
+    const initializeHome = async () => {
+      try {
+        await fetchHomeData();
+      } catch (err) {
+        console.error('[useHomeData] Failed to fetch home data:', err);
+      }
+    };
+
+    initializeHome();
+
     return () => {
       isMounted.current = false;
     };
-    // Only run once on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fetchHomeData]);
+
+  // Manual refresh function
+  const refresh = useCallback(async () => {
+    try {
+      await fetchHomeData();
+    } catch (err) {
+      console.error('[useHomeData] Failed to refresh home data:', err);
+      throw err;
+    }
+  }, [fetchHomeData]);
 
   return {
     pendingInvitations,
-    nearbyTeams,
-    isLoadingInvitations,
-    isLoadingTeams,
-    isLoadingMatches,
-    isRefreshing,
+    nearbyTeams: [], // Feature disabled
+    isLoading,
+    isRefreshing: false, // Not used anymore
     error,
     refresh,
   };

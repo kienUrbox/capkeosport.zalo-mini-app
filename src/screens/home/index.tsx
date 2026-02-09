@@ -1,10 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Icon, TeamAvatar, InvitationSkeleton, MatchCardSkeleton, NoMatches, DashboardError } from '@/components/ui';
 import { appRoutes } from '@/utils/navigation';
-import { useHomeData } from '@/hooks/useHomeData';
 import { useUser } from '@/stores/auth.store';
-import { useUpcomingMatches, useIsLoadingMatches } from '@/stores/match.store';
+import { useUpcomingMatches } from '@/stores/match.store';
+import { usePendingInvitations, useHomeLoading, useHomeError, useHomeActions } from '@/stores/home.store';
 import { usePhoneInviteActions } from '@/stores/phone-invite.store';
 import { PhoneInvite } from '@/types/api.types';
 import { formatDistanceToNow, parseISO } from 'date-fns';
@@ -19,16 +19,24 @@ const DashboardScreen: React.FC = () => {
   const navigate = useNavigate();
   const user = useUser();
   const upcomingMatches = useUpcomingMatches();
-  const isLoadingMatchesFromStore = useIsLoadingMatches();
 
-  // Use custom hook for home data fetching with individual loading states
-  const {
-    pendingInvitations,
-    isLoadingInvitations,
-    isRefreshing,
-    error,
-    refresh,
-  } = useHomeData();
+  // Use store selectors directly for data and state
+  const pendingInvitations = usePendingInvitations();
+  const isLoading = useHomeLoading();
+  const error = useHomeError();
+  const { fetchHomeData } = useHomeActions();
+
+  // Initialize data fetch on first mount
+  useEffect(() => {
+    console.log('[Dashboard] 📥 Fetching home data...');
+    fetchHomeData();
+  }, [fetchHomeData]);
+
+  // Refresh function for pull-to-refresh
+  const refresh = useCallback(async () => {
+    console.log('[Dashboard] 🔄 Manual refresh triggered');
+    await fetchHomeData();
+  }, [fetchHomeData]);
 
   // Pull-to-refresh state
   const [pullState, setPullState] = useState({
@@ -45,6 +53,7 @@ const DashboardScreen: React.FC = () => {
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartY.current = e.touches[0].clientY;
     currentScrollTop.current = e.currentTarget.scrollTop;
+    console.log('[Dashboard] Touch start:', { startY: touchStartY.current, scrollTop: currentScrollTop.current });
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
@@ -56,6 +65,7 @@ const DashboardScreen: React.FC = () => {
 
     // Only respond to downward pull
     if (diff > 0) {
+      console.log('[Dashboard] Touch move:', { currentY, diff, shouldRefresh: diff > 100 });
       setPullState({
         isPulling: true,
         pullDistance: Math.min(diff * 0.5, 120), // Damping effect
@@ -65,6 +75,7 @@ const DashboardScreen: React.FC = () => {
   };
 
   const handleTouchEnd = async () => {
+    console.log('[Dashboard] Touch end:', { shouldRefresh: pullState.shouldRefresh });
     if (pullState.shouldRefresh) {
       await refresh();
     }
@@ -133,20 +144,20 @@ const DashboardScreen: React.FC = () => {
       )}
 
       {/* Pull to refresh indicator */}
-      {isRefreshing && (
+      {isLoading && (
         <div className="fixed top-0 left-0 right-0 z-50 bg-primary/10 py-2 text-center text-xs text-primary font-medium">
           Đang làm mới...
         </div>
       )}
 
       <div
-        className="flex flex-col gap-6 pb-safe-with-nav overflow-y-auto"
+        className="flex flex-col gap-6 pb-safe-with-nav overflow-y-auto h-screen-dvh"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
         {/* Header */}
-        <header className="px-5 flex items-start justify-between bg-gradient-to-b from-green-900/20 to-transparent safe-area-top">
+        <header className="px-5 flex items-start justify-between bg-gradient-to-b from-slate-800/50 to-transparent safe-area-top">
           <div className="flex flex-col">
             <span className="text-[10px] font-bold tracking-widest text-text-secondary uppercase mb-1">
               Trang quản lý
@@ -170,7 +181,7 @@ const DashboardScreen: React.FC = () => {
                   src={user.avatar}
                 />
               ) : (
-                <div className="h-full w-full bg-gradient-to-br from-primary to-green-600 flex items-center justify-center text-white font-bold text-lg">
+                <div className="h-full w-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold text-lg">
                   {user?.name?.charAt(0).toUpperCase() || 'U'}
                 </div>
               )}
@@ -180,7 +191,7 @@ const DashboardScreen: React.FC = () => {
         </header>
 
         {/* --- PENDING INVITATIONS SECTION --- */}
-        {(isLoadingInvitations || pendingInvitations.length > 0) && (
+        {(isLoading || pendingInvitations.length > 0) && (
           <section className="px-5">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
@@ -197,7 +208,7 @@ const DashboardScreen: React.FC = () => {
               </button>
             </div>
 
-            {isLoadingInvitations ? (
+            {isLoading ? (
               <InvitationSkeleton />
             ) : (
               pendingInvitations.map((invite) => {
@@ -221,7 +232,7 @@ const DashboardScreen: React.FC = () => {
                           size="md"
                         />
                       ) : (
-                        <div className="h-14 w-14 rounded-full bg-gradient-to-br from-primary to-green-600 flex items-center justify-center text-white font-bold text-lg border-2 border-white dark:border-white/10">
+                        <div className="h-14 w-14 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold text-lg border-2 border-white dark:border-white/10">
                           {teamName?.charAt(0).toUpperCase() || 'T'}
                         </div>
                       )}
@@ -329,7 +340,7 @@ const DashboardScreen: React.FC = () => {
             </button>
           </div>
 
-          {isLoadingMatchesFromStore ? (
+          {isLoading ? (
             <MatchCardSkeleton />
           ) : upcomingMatches && upcomingMatches.length > 0 ? (
             upcomingMatches.slice(0, 1).map((match) => (
@@ -339,7 +350,7 @@ const DashboardScreen: React.FC = () => {
                 className="group relative rounded-2xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-white/5 p-5 shadow-lg overflow-hidden cursor-pointer active:scale-[0.99] transition-transform mb-3"
               >
                 <div className="flex justify-between items-start mb-4">
-                  <div className="inline-flex items-center gap-1.5 bg-green-500/10 px-3 py-1 rounded-full border border-green-500/20">
+                  <div className="inline-flex items-center gap-1.5 bg-blue-500/10 px-3 py-1 rounded-full border border-blue-500/20">
                     <span className="relative flex h-2 w-2">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
@@ -365,7 +376,7 @@ const DashboardScreen: React.FC = () => {
                         src={match.teamA.logo}
                       />
                     ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-primary to-green-600 flex items-center justify-center text-white font-bold text-xl">
+                      <div className="w-full h-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold text-xl">
                         {match.teamA?.name?.charAt(0) || 'A'}
                       </div>
                     )}
@@ -431,7 +442,7 @@ const DashboardScreen: React.FC = () => {
                       className="mb-3"
                     />
                   ) : (
-                    <div className="h-14 w-14 rounded-full bg-gradient-to-br from-primary to-green-600 flex items-center justify-center text-white font-bold text-lg mb-3 border-2 border-white dark:border-white/10">
+                    <div className="h-14 w-14 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold text-lg mb-3 border-2 border-white dark:border-white/10">
                       {team.name?.charAt(0).toUpperCase() || 'T'}
                     </div>
                   )}

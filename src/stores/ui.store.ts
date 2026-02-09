@@ -34,6 +34,10 @@ interface UIState {
   bottomSheetContent: React.ReactNode | null;
   openBottomSheet: (content: React.ReactNode) => void;
   closeBottomSheet: () => void;
+
+  // Match Booking Guide Preference
+  hideMatchBookingGuide: boolean;
+  setHideMatchBookingGuide: (hide: boolean) => void;
 }
 
 export const useUIStore = create<UIState>()(
@@ -49,6 +53,7 @@ export const useUIStore = create<UIState>()(
       toast: null,
       isBottomSheetOpen: false,
       bottomSheetContent: null,
+      hideMatchBookingGuide: false,
 
       // Actions
       setActiveTab: (tab) => set({ activeTab: tab }),
@@ -102,12 +107,15 @@ export const useUIStore = create<UIState>()(
 
       closeBottomSheet: () =>
         set({ isBottomSheetOpen: false, bottomSheetContent: null }),
+
+      setHideMatchBookingGuide: (hide) => set({ hideMatchBookingGuide: hide }),
     }),
     {
       name: 'ui-storage',
       partialize: (state) => ({
         theme: state.theme,
         activeTab: state.activeTab,
+        hideMatchBookingGuide: state.hideMatchBookingGuide,
       }),
     }
   )

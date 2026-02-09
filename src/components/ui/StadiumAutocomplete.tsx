@@ -100,6 +100,13 @@ export const StadiumAutocomplete: React.FC<StadiumAutocompleteProps> = ({
   useEffect(() => {
     clearTimeout(searchTimeoutRef.current);
 
+    // Don't search if already selected a stadium from the list
+    if (value) {
+      setOptions([]);
+      setShowDropdown(false);
+      return;
+    }
+
     if (searchText.length < 2) {
       setOptions([]);
       setShowDropdown(false);
@@ -110,8 +117,10 @@ export const StadiumAutocomplete: React.FC<StadiumAutocompleteProps> = ({
     searchTimeoutRef.current = setTimeout(async () => {
       try {
         const response = await StadiumService.autocompleteStadiums(searchText, 10);
-        const results = response.data || []; // Handle undefined/null
-        setOptions(results);
+
+        console.log(response);
+
+        setOptions(response || []);
         // Always show dropdown (with or without results)
         setShowDropdown(true);
       } catch (err) {
@@ -124,12 +133,13 @@ export const StadiumAutocomplete: React.FC<StadiumAutocompleteProps> = ({
     }, 300);
 
     return () => clearTimeout(searchTimeoutRef.current);
-  }, [searchText]);
+  }, [searchText, value]);
 
   const handleSelectStadium = (stadium: StadiumAutocompleteDto) => {
     setSearchText(stadium.name);
     setMapUrl(stadium.mapUrl); // Auto-fill map URL
     setMapUrlError(null);
+    setOptions([]); // Clear options to prevent re-showing dropdown
     onChange(stadium);
     setShowDropdown(false);
   };
@@ -145,9 +155,11 @@ export const StadiumAutocomplete: React.FC<StadiumAutocompleteProps> = ({
       name: searchText.trim(),
       mapUrl: mapUrl.trim(),
       matchCount: 0,
+      homeTeamCount: 0,
     };
 
     setSearchText(newStadium.name);
+    setOptions([]); // Clear options to prevent re-showing dropdown
     onChange(newStadium);
     setShowDropdown(false);
   };
@@ -201,18 +213,18 @@ export const StadiumAutocomplete: React.FC<StadiumAutocompleteProps> = ({
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
           onFocus={() => {
-            if (searchText.length >= 2 && !value) {
+            // Only show dropdown if: has search text, NOT already selected a stadium, and has options
+            if (searchText.length >= 2 && !value && options.length > 0) {
               setShowDropdown(true);
             }
           }}
           onKeyDown={handleKeyDown}
           placeholder="Tìm kiếm sân bóng..."
           disabled={disabled}
-          className={`w-full px-4 py-3.5 rounded-xl bg-white dark:bg-surface-dark border pr-24 text-slate-900 dark:text-white placeholder:text-gray-400 focus:ring-2 focus:ring-primary focus:border-transparent transition-all ${
-            error
-              ? 'border-red-500 focus:ring-red-500'
-              : 'border-gray-200 dark:border-white/10'
-          } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+          className={`w-full px-4 py-3.5 rounded-xl bg-white dark:bg-surface-dark border pr-24 text-slate-900 dark:text-white placeholder:text-gray-400 focus:ring-2 focus:ring-primary focus:border-transparent transition-all ${error
+            ? 'border-red-500 focus:ring-red-500'
+            : 'border-gray-200 dark:border-white/10'
+            } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
         />
 
         {/* Clear Button */}
@@ -249,9 +261,8 @@ export const StadiumAutocomplete: React.FC<StadiumAutocompleteProps> = ({
             value={mapUrl}
             onChange={(e) => setMapUrl(e.target.value)}
             disabled={!!value}
-            className={`w-full px-4 py-3.5 rounded-xl bg-white dark:bg-surface-dark border text-slate-900 dark:text-white placeholder:text-gray-400 focus:ring-2 focus:ring-primary focus:border-transparent ${
-              value || disabled ? 'bg-gray-50 dark:bg-white/5 cursor-not-allowed opacity-50' : ''
-            } ${mapUrlError ? 'border-red-500' : 'border-gray-200 dark:border-white/10'}`}
+            className={`w-full px-4 py-3.5 rounded-xl bg-white dark:bg-surface-dark border text-slate-900 dark:text-white placeholder:text-gray-400 focus:ring-2 focus:ring-primary focus:border-transparent ${value || disabled ? 'bg-gray-50 dark:bg-white/5 cursor-not-allowed opacity-50' : ''
+              } ${mapUrlError ? 'border-red-500' : 'border-gray-200 dark:border-white/10'}`}
             required
           />
           {value && !disabled && (
@@ -294,8 +305,24 @@ export const StadiumAutocomplete: React.FC<StadiumAutocompleteProps> = ({
                         {stadium.name}
                       </p>
                       <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                        {stadium.address || 'Chưa có địa chỉ'} {stadium.matchCount > 0 && `• ${stadium.matchCount} trận`}
+                        {stadium.address || (stadium.district && stadium.city
+                          ? `${stadium.district}, ${stadium.city}`
+                          : 'Chưa có địa chỉ')}
                       </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        {stadium.matchCount > 0 && (
+                          <span className="inline-flex items-center gap-1 text-xs text-gray-500">
+                            <Icon name="sports_soccer" className="text-xs" />
+                            {stadium.matchCount} trận
+                          </span>
+                        )}
+                        {stadium.homeTeamCount > 0 && (
+                          <span className="inline-flex items-center gap-1 text-xs text-primary">
+                            <Icon name="home" className="text-xs" />
+                            {stadium.homeTeamCount} sân nhà
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </button>

@@ -241,6 +241,7 @@ export const ICONS = {
   delete: 'delete',
   check_circle: 'check_circle',
   star: 'star',
+  handshake: 'handshake',
 
   // Match & Sports
   calendar_today: 'calendar_today',
@@ -286,15 +287,15 @@ export const ICONS = {
 
 // ============== COLORS ==============
 export const FC_COLORS = {
-  primary: '#11d473',
-  primaryDark: '#0ea65a',
-  primaryLight: '#4ae19a',
+  primary: '#3b82f6',
+  primaryDark: '#2563eb',
+  primaryLight: '#60a5fa',
   bgLight: '#f6f8f7',
-  bgDark: '#102219',
-  surfaceDark: '#1c2721',
+  bgDark: '#0f172a',
+  surfaceDark: '#1e293b',
   surfaceLight: '#ffffff',
-  borderDark: '#2a3b32',
-  textSecondary: '#9db9ab',
+  borderDark: '#334155',
+  textSecondary: '#94a3b8',
 } as const
 
 // ============== STATS COLORS & ICONS ==============
@@ -318,11 +319,11 @@ export const STAT_COLORS = {
     accent: 'accent-blue-500',
   },
   technique: {
-    main: 'text-primary', // #11d473
-    bg: 'bg-primary/10',
-    bgSolid: 'bg-primary',
-    gradient: 'from-primary to-green-500',
-    accent: 'accent-primary',
+    main: 'text-blue-500',
+    bg: 'bg-blue-500/10',
+    bgSolid: 'bg-blue-500',
+    gradient: 'from-blue-500 to-cyan-500',
+    accent: 'accent-blue-500',
   },
 } as const;
 
@@ -460,3 +461,85 @@ export const getLevelColor = (level: string) => {
   }
   return LEVEL_COLORS['Mới chơi'];
 };
+
+// ============== ANIMATION DURATIONS ==============
+/**
+ * Animation duration constants for consistent timing
+ */
+export const ANIMATION_DURATION = {
+  fast: 150,      // Micro-interactions (button press, hover)
+  normal: 200,    // Default transitions
+  medium: 300,    // Page transitions, modal entrance
+  slow: 500,      // Complex animations
+} as const;
+
+// ============== QUICK ACTIONS ==============
+/**
+ * Quick action types for profile page
+ */
+export const QUICK_ACTIONS = {
+  SHARE: 'share',
+  QR_CODE: 'qr_code',
+  CONTACT: 'contact',
+  ADD_CONTACT: 'add_contact',
+  COPY_LINK: 'copy_link',
+} as const;
+
+export type QuickActionType = typeof QUICK_ACTIONS[keyof typeof QUICK_ACTIONS];
+
+/**
+ * Quick action configuration
+ */
+export const QUICK_ACTION_CONFIG = {
+  [QUICK_ACTIONS.SHARE]: {
+    icon: 'share',
+    label: 'Chia sẻ',
+    description: 'Chia sẻ hồ sơ của bạn',
+  },
+  [QUICK_ACTIONS.QR_CODE]: {
+    icon: 'qr_code_2',
+    label: 'Mã QR',
+    description: 'Hiển thị mã QR hồ sơ',
+  },
+  [QUICK_ACTIONS.CONTACT]: {
+    icon: 'chat_bubble',
+    label: 'Nhắn tin',
+    description: 'Gửi tin nhắn',
+  },
+  [QUICK_ACTIONS.ADD_CONTACT]: {
+    icon: 'person_add',
+    label: 'Lưu liên hệ',
+    description: 'Lưu vào danh bạ',
+  },
+  [QUICK_ACTIONS.COPY_LINK]: {
+    icon: 'link',
+    label: 'Sao chép',
+    description: 'Sao chép link hồ sơ',
+  },
+} as const;
+
+// ============== PARTICLE CONFIGURATION ==============
+/**
+ * Particle system configuration for banner animations
+ */
+export const PARTICLE_CONFIG = {
+  count: 25,           // Total number of particles
+  layers: 3,           // Number of layers (background, mid, foreground)
+  minSize: 2,          // Minimum particle size in px
+  maxSize: 16,         // Maximum particle size in px
+  minDuration: 4000,   // Minimum animation duration in ms
+  maxDuration: 8000,   // Maximum animation duration in ms
+} as const;
+
+// ============== STAGGER DELAYS ==============
+/**
+ * Stagger delay constants for sequential animations
+ */
+export const STAGGER_DELAY = {
+  xs: 50,
+  sm: 75,
+  md: 100,
+  lg: 150,
+  xl: 200,
+  '2xl': 300,
+} as const;

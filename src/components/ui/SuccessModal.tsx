@@ -140,7 +140,7 @@ export const SuccessModal: React.FC<SuccessModalProps> = ({
               key={i}
               className="absolute w-2 h-2 rounded-full"
               style={{
-                backgroundColor: ['#11d473', '#FFD700', '#3b82f6'][i % 3],
+                backgroundColor: ['#3b82f6', '#FFD700', '#60a5fa'][i % 3],
                 left: `${Math.random() * 100}%`,
                 top: '-20px',
                 animation: `fall ${2 + Math.random() * 2}s linear ${Math.random() * 0.5}s infinite`,
