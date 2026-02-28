@@ -1,12 +1,25 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon, TeamAvatar, FindMatchSkeleton, FilterBottomSheet, MatchModal, Button } from '@/components/ui';
+import type { LocationSource } from '@/components/ui/FilterBottomSheet';
 import { appRoutes } from '@/utils/navigation';
 import { useDiscovery } from '@/hooks/useDiscovery';
 import { useMyTeams, useSelectedTeam, useTeamActions, useTeamStore } from '@/stores/team.store';
 import { useDiscoveryStore } from '@/stores/discovery.store';
-import type { Team } from '@/types/api.types';
+import { toast } from '@/utils/toast';
 import { getLevelColor, LEVEL_ICON } from '@/constants/design';
+
+/**
+ * Flow States for Discovery
+ */
+type DiscoveryFlowState =
+  | 'loading'           // Initial loading state
+  | 'no-teams'          // User has no teams
+  | 'select-team'       // User needs to select a team (has multiple teams)
+  | 'select-filter'     // User needs to select filters
+  | 'select-location'   // User needs to select location source
+  | 'discovery'         // Main discovery swipe interface
+  | 'empty-results';    // No teams found
 
 /**
  * FindMatch Screen
@@ -18,6 +31,13 @@ import { getLevelColor, LEVEL_ICON } from '@/constants/design';
  * - Filter bottom sheet
  * - Team selector
  * - Match modal on successful match
+ *
+ * New Flow:
+ * 1. Check if user has teams
+ * 2. If yes, check if user needs to select team (multiple admin teams)
+ * 3. After team selection, show filter bottom sheet (required)
+ * 4. After filter selection, show location modal (3 options)
+ * 5. After location selection, start discovery API call
  */
 const FindMatchScreen: React.FC = () => {
   const navigate = useNavigate();
@@ -36,16 +56,23 @@ const FindMatchScreen: React.FC = () => {
     handleSwipe,
     refresh,
     closeMatchModal,
+    pendingSwipeCount,
+    canSwipe,
+    fetchWithLocation,
   } = useDiscovery();
 
-  // Get filters from discovery store
+  // Get filters and hasAppliedFilters from discovery store - use individual selectors to avoid cache issues
   const filters = useDiscoveryStore((state) => state.filters);
+  const hasAppliedFilters = useDiscoveryStore((state) => state.hasAppliedFilters);
+  const setHasAppliedFilters = useDiscoveryStore((state) => state.setHasAppliedFilters);
 
   // Team selection
   const myTeams = useMyTeams();
   const selectedTeam = useSelectedTeam();
-  const { setSelectedTeam } = useTeamActions();
-
+  const { setSelectedTeam } = useTeamStore();
+  const isTeamsLoading = useTeamStore((state) => state.isLoading);
+  const teamDetailsCache = useTeamStore((state) => state.teamDetailsCache);
+  const getTeamById = useTeamStore((state) => state.getTeamById);
 
   // Filter teams where user is admin
   const adminTeams = myTeams.filter(team => team.userRole === 'admin');
@@ -61,63 +88,229 @@ const FindMatchScreen: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
-  // Flow state tracking
-  const flowState = useMemo(() => {
-    // Case 1: No teams at all
+  // Track if we've initialized the flow
+  const flowInitializedRef = useRef(false);
+  // Track if we've auto-fetched with saved filters (to prevent duplicate calls)
+  const autoFetchedRef = useRef(false);
+
+  /**
+   * NEW FLOW STATE LOGIC
+   *
+   * Flow:
+   * 1. loading → Check if teams loaded
+   * 2. no-teams → User has no teams, show create team CTA
+   * 3. select-team → User has multiple admin teams, show team selector
+   * 4. select-filter → User hasn't applied filters yet, show filter sheet (required)
+   * 5. discovery → Main swipe interface
+   * 6. empty-results → No teams found
+   */
+  const flowState: DiscoveryFlowState = useMemo(() => {
+    // Loading state - check if teams are still loading
+    if (isTeamsLoading) {
+      return 'loading';
+    }
+
+    // No teams
     if (myTeams.length === 0) {
       return 'no-teams';
     }
-    // Case 2: Has teams but no admin teams
+
+    // No admin teams
     if (adminTeams.length === 0) {
-      return 'has-teams-not-admin';
+      return 'no-teams'; // Reuse no-teams state with different message
     }
-    // Case 3: Has exactly 1 admin team
-    if (adminTeams.length === 1) {
-      return 'single-admin-team';
-    }
-    // Case 4: Has multiple admin teams
-    return 'multiple-admin-teams';
-  }, [myTeams.length, adminTeams.length]);
 
-  // Show team selector for multiple admin teams - only when no team is selected yet
+    // Need to select team (multiple admin teams, none selected)
+    if (adminTeams.length > 1 && !selectedTeam) {
+      return 'select-team';
+    }
+
+    // Need to apply filters (team selected but filters not applied)
+    if (selectedTeam && !hasAppliedFilters) {
+      return 'select-filter';
+    }
+
+    // If we have teams but no current team in discovery, it means we haven't fetched yet
+    // This is handled by loading state or empty results
+    if (hasAppliedFilters && selectedTeam) {
+      if (!isLoading && allTeams.length === 0 && !isRefreshing) {
+        return 'empty-results';
+      }
+      return 'discovery';
+    }
+
+    // Default to loading
+    return 'loading';
+  }, [isTeamsLoading, myTeams.length, adminTeams.length, selectedTeam, hasAppliedFilters, allTeams.length, isLoading, isRefreshing]);
+
+  // Initialize flow - auto-select team if single admin team
   useEffect(() => {
-    // Only auto-show selector if user has multiple admin teams AND hasn't selected any team yet
-    if (flowState === 'multiple-admin-teams' && !selectedTeam) {
-      // Auto-select first admin team
-      console.log('[FindMatch] Auto-selecting first admin team');
-      setSelectedTeam(adminTeams[0]);
-      // Don't show selector automatically - let user discover with auto-selected team first
-      // User can still open selector by clicking header or "Chọn đội khác" button
-    }
-  }, [flowState, selectedTeam, adminTeams, setSelectedTeam]);
+    if (flowInitializedRef.current) return;
 
-  // Handle team change
-  const handleTeamChange = (teamId: string) => {
-    const team = adminTeams.find((t) => t.id === teamId);
-    if (team) {
-      setSelectedTeam(team);
-      setShowTeamSelector(false);
-      // Refresh with new team filters
-      refresh();
+    if (!isTeamsLoading && adminTeams.length === 1 && !selectedTeam) {
+      console.log('[FindMatch] Auto-selecting single admin team');
+      setSelectedTeam(adminTeams[0]);
+      flowInitializedRef.current = true;
+    } else if (!isTeamsLoading && adminTeams.length > 1 && !selectedTeam) {
+      // Don't auto-select, let user choose
+      flowInitializedRef.current = true;
+    }
+  }, [isTeamsLoading, adminTeams.length, selectedTeam, setSelectedTeam]);
+
+  // Show filter sheet when flow state is select-filter (first time only)
+  useEffect(() => {
+    if (flowState === 'select-filter' && !showFilterSheet) {
+      console.log('[FindMatch] Flow: Showing filter sheet (required first time)');
+      setShowFilterSheet(true);
+    }
+  }, [flowState]);
+
+  // Auto-fetch when filters are already applied from previous session
+  useEffect(() => {
+    if (hasAppliedFilters && selectedTeam && !isLoading && allTeams.length === 0 && !isRefreshing && !autoFetchedRef.current) {
+      // Get saved location source from localStorage
+      const savedLocationSource = localStorage.getItem('discovery-location-source') as LocationSource | null;
+      const savedStadiumLocation = localStorage.getItem('discovery-stadium-location');
+
+      let stadiumLocation;
+      if (savedLocationSource === 'stadium' && savedStadiumLocation) {
+        stadiumLocation = JSON.parse(savedStadiumLocation);
+      }
+
+      // Use saved location source or default to 'default'
+      const locationSource = savedLocationSource || 'default';
+      autoFetchedRef.current = true;
+      fetchWithLocation(locationSource, stadiumLocation, selectedTeam?.id);
+    }
+  }, [hasAppliedFilters, selectedTeam, isLoading, allTeams.length, isRefreshing]);
+
+  // Helper to get stadium location from selected team
+  const getStadiumLocationFromTeam = async (team: { id: string } | null): Promise<{ lat: number; lng: number } | undefined> => {
+    if (!team) return undefined;
+
+    // Check cache first
+    let teamDetail = teamDetailsCache[team.id];
+
+    // If not in cache, fetch team detail
+    if (!teamDetail) {
+      try {
+        teamDetail = await getTeamById(team.id);
+      } catch (error) {
+        console.error('[FindMatch] Failed to fetch team detail for stadium location:', error);
+        return { lat: 10.7769, lng: 106.7009 }; // Fallback to default
+      }
+    }
+
+    // Extract location from team detail
+    if (teamDetail?.location) {
+      return { lat: teamDetail.location.lat, lng: teamDetail.location.lng };
+    }
+
+    return { lat: 10.7769, lng: 106.7009 }; // Fallback to default
+  };
+
+  // Handle first-time filter apply - mark as applied and call API with location source
+  const handleFilterApply = async (locationSource: LocationSource) => {
+    setHasAppliedFilters(true);
+    setShowFilterSheet(false);
+    autoFetchedRef.current = true; // Mark as fetched to prevent duplicate calls
+
+    // Save location source to localStorage for next time
+    localStorage.setItem('discovery-location-source', locationSource);
+
+    let stadiumLocation;
+    if (locationSource === 'stadium') {
+      stadiumLocation = await getStadiumLocationFromTeam(selectedTeam);
+      localStorage.setItem('discovery-stadium-location', JSON.stringify(stadiumLocation));
+    } else {
+      localStorage.removeItem('discovery-stadium-location');
+    }
+
+    await fetchWithLocation(locationSource, stadiumLocation, selectedTeam?.id);
+  };
+
+  // Handle filter change (not first time) - apply with new location source
+  const handleFilterChange = async (locationSource: LocationSource) => {
+    setShowFilterSheet(false);
+    autoFetchedRef.current = true; // Mark as fetched to prevent duplicate calls
+
+    // Save location source to localStorage for next time
+    localStorage.setItem('discovery-location-source', locationSource);
+
+    let stadiumLocation;
+    if (locationSource === 'stadium') {
+      stadiumLocation = await getStadiumLocationFromTeam(selectedTeam);
+      localStorage.setItem('discovery-stadium-location', JSON.stringify(stadiumLocation));
+    } else {
+      localStorage.removeItem('discovery-stadium-location');
+    }
+
+    // Fetch with new location source
+    await fetchWithLocation(locationSource, stadiumLocation, selectedTeam?.id);
+  };
+
+  // Handle team change - select a different team
+  const handleTeamChange = async (teamId: string) => {
+    const newTeam = adminTeams.find(t => t.id === teamId);
+    if (!newTeam) return;
+
+    console.log('[FindMatch] handleTeamChange: Changing to team', newTeam.name, 'hasAppliedFilters:', hasAppliedFilters);
+
+    // Close the team selector modal if open
+    setShowTeamSelector(false);
+
+    // Check if user already has filters applied from before
+    if (hasAppliedFilters) {
+      // Get saved location source from localStorage
+      const savedLocationSource = localStorage.getItem('discovery-location-source') as LocationSource | null;
+      const savedStadiumLocation = localStorage.getItem('discovery-stadium-location');
+
+      let stadiumLocation: { lat: number; lng: number } | undefined;
+      if (savedLocationSource === 'stadium' && savedStadiumLocation) {
+        stadiumLocation = JSON.parse(savedStadiumLocation);
+      }
+
+      // Use saved location source or default to 'default'
+      const locationSource = savedLocationSource || 'default';
+      console.log('[FindMatch] handleTeamChange: Fetching with locationSource', locationSource);
+
+      // Select the new team and defer fetch to next tick to avoid hook errors
+      setSelectedTeam(newTeam);
+      setTimeout(() => {
+        fetchWithLocation(locationSource, stadiumLocation, teamId);
+      }, 0);
+    } else {
+      // First time, show filter sheet
+      console.log('[FindMatch] handleTeamChange: Showing filter sheet');
+      // Select the new team
+      setSelectedTeam(newTeam);
+      setTimeout(() => {
+        setShowFilterSheet(true);
+      }, 0);
     }
   };
 
   // Swipe action handlers
-  const removeCard = async (direction: 'left' | 'right') => {
-    // Block swipe if user is not admin
-    if (!currentTeam || selectedTeam?.userRole !== 'admin') {
-      // Shake animation feedback
+  const removeCard = (direction: 'left' | 'right') => {
+    // Block swipe if user is not admin OR if swipe limit reached
+    if (!currentTeam || selectedTeam?.userRole !== 'admin' || !canSwipe) {
+      // Show shake feedback for limit reached
+      if (!canSwipe) {
+        toast.error('Đang xử lý quá nhiều thao tác, vui lòng đợi trong giây lát');
+      }
+      // Shake animation feedback for non-admin
       return;
     }
 
     setSwipeDirection(direction);
 
-    // Wait for animation, then handle swipe
-    setTimeout(async () => {
-      await handleSwipe(direction);
+    // Optimistic: handleSwipe will advance card immediately
+    // Short delay for animation to start
+    setTimeout(() => {
+      handleSwipe(direction);
       setSwipeDirection(null);
       setDragDelta({ x: 0, y: 0 });
-    }, 300);
+    }, 100);
   };
 
   // Gesture handlers
@@ -218,24 +411,16 @@ const FindMatchScreen: React.FC = () => {
     return `${km.toFixed(1)}km`;
   };
 
-  // Get loading state from team store
-  const { isLoading: isTeamsLoading } = useTeamStore();
+  // ========== FLOW STATE RENDERING ==========
 
-  // Loading state - check team store first, then discovery
-  if (isTeamsLoading) {
-    console.log('[FindMatch] Loading skeleton: isTeamsLoading =', isTeamsLoading);
+  // Loading state
+  if (flowState === 'loading') {
+    console.log('[FindMatch] Flow: Loading skeleton');
     return <FindMatchSkeleton />;
   }
 
-  // Loading state - only show skeleton if discovery is loading AND we don't have current team yet
-  // Don't show skeleton when refreshing (isRefreshing) - use overlay instead
-  if (isLoading && !currentTeam && !isRefreshing) {
-    console.log('[FindMatch] Loading skeleton: isLoading =', isLoading, ', currentTeam =', currentTeam, ', isRefreshing =', isRefreshing);
-    return <FindMatchSkeleton />;
-  }
-
-  // Error state
-  if (error && !currentTeam) {
+  // Error state - show but allow retry
+  if (error && !currentTeam && flowState === 'discovery') {
     return (
       <div className="flex flex-col h-dvh bg-background-light dark:bg-background-dark items-center justify-center p-6 text-center">
         <div className="size-24 rounded-full bg-red-100 dark:bg-red-900/20 flex items-center justify-center mb-4">
@@ -244,7 +429,11 @@ const FindMatchScreen: React.FC = () => {
         <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Có lỗi xảy ra</h2>
         <p className="text-gray-500 mb-6">{error}</p>
         <button
-          onClick={refresh}
+          onClick={() => {
+            // Retry by showing filter sheet again
+            setHasAppliedFilters(false);
+            setShowFilterSheet(true);
+          }}
           className="px-6 py-3 rounded-xl bg-primary text-background-dark font-bold"
         >
           Thử lại
@@ -253,9 +442,136 @@ const FindMatchScreen: React.FC = () => {
     );
   }
 
-  // Empty state - no more teams (only if we've fetched data with admin team and got no results)
-  const hasFetchedWithAdminTeam = selectedTeam?.userRole === 'admin' && !isLoading && !isRefreshing;
-  if (!hasMoreCards && hasFetchedWithAdminTeam && allTeams.length === 0) {
+  // Empty state - no teams at all
+  if (flowState === 'no-teams') {
+    // Check if user has teams but no admin teams
+    const hasTeamsNoAdmin = myTeams.length > 0 && adminTeams.length === 0;
+
+    return (
+      <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark pb-safe-with-nav">
+        {/* Header */}
+        <div className="safe-area-top px-4 pb-2 flex items-center">
+          <button
+            onClick={() => navigate(appRoutes.dashboard)}
+            className="size-10 flex items-center justify-center rounded-full bg-white/10 backdrop-blur-md hover:bg-white/20 transition-colors mr-4"
+          >
+            <Icon name="arrow_back" />
+          </button>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white">Tìm kèo</h1>
+        </div>
+
+        {/* Empty State */}
+        <div className="flex flex-col items-center justify-center flex-1 p-6">
+          {hasTeamsNoAdmin ? (
+            <>
+              <div className="w-24 h-24 rounded-full bg-amber-500/10 flex items-center justify-center mb-6">
+                <Icon name="admin_panel_settings" className="text-amber-500 text-5xl" />
+              </div>
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
+                Cần quyền quản trị viên
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 text-center mb-6 max-w-sm">
+                Bạn đang tham gia {myTeams.length} đội nhưng chưa là quản trị viên của đội nào. Hãy tạo đội mới hoặc liên hệ quản trị viên để được cấp quyền tìm kèo.
+              </p>
+              <div className="flex flex-col gap-3 w-full max-w-xs">
+                <Button
+                  icon="add"
+                  onClick={() => navigate(appRoutes.teamsCreate)}
+                >
+                  Tạo đội mới
+                </Button>
+                <button
+                  onClick={() => navigate(appRoutes.teams)}
+                  className="px-6 py-3 rounded-xl bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 font-bold"
+                >
+                  Xem đội của tôi
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-6">
+                <Icon name="groups" className="text-primary text-5xl" />
+              </div>
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
+                Chưa có đội bóng
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 text-center mb-6 max-w-sm">
+                Bạn cần tạo đội để tìm kèo đấu. Hãy tạo đội mới của bạn và bắt đầu kết nối với các đội bóng khác.
+              </p>
+              <Button
+                icon="add"
+                onClick={() => navigate(appRoutes.teamsCreate)}
+              >
+                Tạo đội ngay
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Team Selection State
+  if (flowState === 'select-team') {
+    return (
+      <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark pb-safe-with-nav">
+        {/* Header */}
+        <div className="safe-area-top px-4 pb-2 flex items-center">
+          <button
+            onClick={() => navigate(appRoutes.dashboard)}
+            className="size-10 flex items-center justify-center rounded-full bg-white/10 backdrop-blur-md hover:bg-white/20 transition-colors mr-4"
+          >
+            <Icon name="arrow_back" />
+          </button>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white">Chọn đội</h1>
+        </div>
+
+        {/* Team Selection */}
+        <div className="flex flex-col items-center flex-1 p-6">
+          <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-6">
+            <Icon name="groups" className="text-primary text-4xl" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2 text-center">
+            Chọn đội để tìm kèo
+          </h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 text-center mb-6 max-w-sm">
+            Bạn là quản trị viên của {adminTeams.length} đội. Chọn đội bạn muốn dùng để tìm kèo.
+          </p>
+
+          <div className="w-full max-w-sm space-y-3">
+            {adminTeams.map((team) => (
+              <button
+                key={team.id}
+                onClick={() => handleTeamChange(team.id)}
+                className="w-full flex items-center gap-4 p-4 rounded-2xl bg-surface-light dark:bg-surface-dark border border-gray-200 dark:border-white/5 hover:border-primary transition-all active:scale-[0.98]"
+              >
+                <TeamAvatar src={team.logo} />
+                <div className="flex-1 text-left">
+                  <h3 className="font-bold text-slate-900 dark:text-white">{team.name}</h3>
+                  <p className="text-xs text-gray-500">Quản trị viên</p>
+                </div>
+                <Icon name="chevron_right" className="text-gray-400" />
+              </button>
+            ))}
+
+            <button
+              onClick={() => {
+                navigate(appRoutes.teamsCreate);
+              }}
+              className="w-full flex items-center justify-center gap-2 p-4 rounded-2xl border border-dashed border-gray-300 dark:border-gray-600 text-gray-500 hover:text-primary hover:border-primary transition-colors"
+            >
+              <Icon name="add" />
+              <span className="font-medium">Tạo đội mới</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Empty results state - no teams found after search
+  if (flowState === 'empty-results') {
     return (
       <>
         <div className="flex flex-col h-dvh bg-background-light dark:bg-background-dark items-center justify-center p-6 text-center">
@@ -293,37 +609,26 @@ const FindMatchScreen: React.FC = () => {
           </div>
         </div>
 
-        {/* Filter Bottom Sheet - must be rendered outside overflow-hidden container */}
-        <FilterBottomSheet
-          isOpen={showFilterSheet}
-          onClose={() => setShowFilterSheet(false)}
-          onApply={refresh}
-        />
-
-        {/* Team Selector - for switching teams when no more matches */}
+        {/* Team Selector Modal */}
         {showTeamSelector && (
           <div className="fixed inset-0 z-50 flex items-end justify-center">
-            {/* Backdrop */}
             <div
               className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in"
               onClick={() => setShowTeamSelector(false)}
             />
-
-            {/* Sheet */}
             <div className="relative w-full max-w-md bg-white dark:bg-surface-dark rounded-t-3xl p-6 pb-safe animate-slide-up shadow-2xl">
               <div className="w-12 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-6" />
-
               <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Chọn đội đi "cáp kèo"</h3>
-
               <div className="space-y-3 max-h-[60vh] overflow-y-auto no-scrollbar">
                 {adminTeams.map((team) => (
                   <button
                     key={team.id}
                     onClick={() => handleTeamChange(team.id)}
-                    className={`w-full flex items-center gap-4 p-3 rounded-2xl border transition-all active:scale-[0.98] ${selectedTeam?.id === team.id
-                      ? 'bg-primary/10 border-primary'
-                      : 'bg-gray-50 dark:bg-white/5 border-transparent hover:bg-gray-100 dark:hover:bg-white/10'
-                      }`}
+                    className={`w-full flex items-center gap-4 p-3 rounded-2xl border transition-all active:scale-[0.98] ${
+                      selectedTeam?.id === team.id
+                        ? 'bg-primary/10 border-primary'
+                        : 'bg-gray-50 dark:bg-white/5 border-transparent hover:bg-gray-100 dark:hover:bg-white/10'
+                    }`}
                   >
                     <TeamAvatar src={team.logo} />
                     <div className="flex-1 text-left">
@@ -339,8 +644,6 @@ const FindMatchScreen: React.FC = () => {
                     )}
                   </button>
                 ))}
-
-                {/* Add new team option */}
                 <button
                   onClick={() => {
                     setShowTeamSelector(false);
@@ -356,99 +659,16 @@ const FindMatchScreen: React.FC = () => {
           </div>
         )}
 
-        {/* Match Modal - must be rendered outside overflow-hidden container */}
-        <MatchModal
-          isOpen={!!matchedTeam}
-          matchedTeam={matchedTeam}
-          myTeamLogo={selectedTeam?.logo}
-          myTeamName={selectedTeam?.name}
-          myTeamId={selectedTeam?.id}
-          matchId={matchedMatch?.id}
-          onKeepSwiping={closeMatchModal}
+        {/* Filter Bottom Sheet */}
+        <FilterBottomSheet
+          isOpen={showFilterSheet}
+          onClose={() => setShowFilterSheet(false)}
+          onApply={handleFilterApply}
+          onChange={handleFilterChange}
+          isChange={true}
+          required={false}
         />
       </>
-    );
-  }
-
-  // Empty state - no teams at all
-  if (flowState === 'no-teams') {
-    return (
-      <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark pb-safe-with-nav">
-        {/* Header */}
-        <div className="safe-area-top px-4 pb-2 flex items-center">
-          <button
-            onClick={() => navigate(appRoutes.dashboard)}
-            className="size-10 flex items-center justify-center rounded-full bg-white/10 backdrop-blur-md hover:bg-white/20 transition-colors mr-4"
-          >
-            <Icon name="arrow_back" />
-          </button>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-white">Tìm kèo</h1>
-        </div>
-
-        {/* Empty State */}
-        <div className="flex flex-col items-center justify-center flex-1 p-6">
-          <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-6">
-            <Icon name="groups" className="text-primary text-5xl" />
-          </div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
-            Chưa có đội bóng
-          </h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 text-center mb-6 max-w-sm">
-            Bạn cần tạo đội để tìm kèo đấu. Hãy tạo đội mới của bạn và bắt đầu kết nối với các đội bóng khác.
-          </p>
-          <Button
-            icon="add"
-            onClick={() => navigate(appRoutes.teamsCreate)}
-          >
-            Tạo đội ngay
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  // Empty state - has teams but not admin of any
-  if (flowState === 'has-teams-not-admin') {
-    return (
-      <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark pb-safe-with-nav">
-        {/* Header */}
-        <div className="safe-area-top px-4 pb-2 flex items-center">
-          <button
-            onClick={() => navigate(appRoutes.dashboard)}
-            className="size-10 flex items-center justify-center rounded-full bg-white/10 backdrop-blur-md hover:bg-white/20 transition-colors mr-4"
-          >
-            <Icon name="arrow_back" />
-          </button>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-white">Tìm kèo</h1>
-        </div>
-
-        {/* Empty State */}
-        <div className="flex flex-col items-center justify-center flex-1 p-6">
-          <div className="w-24 h-24 rounded-full bg-amber-500/10 flex items-center justify-center mb-6">
-            <Icon name="admin_panel_settings" className="text-amber-500 text-5xl" />
-          </div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
-            Cần quyền quản trị viên
-          </h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 text-center mb-6 max-w-sm">
-            Bạn đang tham gia {myTeams.length} đội nhưng chưa là quản trị viên của đội nào. Hãy tạo đội mới hoặc liên hệ quản trị viên để được cấp quyền tìm kèo.
-          </p>
-          <div className="flex flex-col gap-3 w-full max-w-xs">
-            <Button
-              icon="add"
-              onClick={() => navigate(appRoutes.teamsCreate)}
-            >
-              Tạo đội mới
-            </Button>
-            <button
-              onClick={() => navigate(appRoutes.teams)}
-              className="px-6 py-3 rounded-xl bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 font-bold"
-            >
-              Xem đội của tôi
-            </button>
-          </div>
-        </div>
-      </div>
     );
   }
 
@@ -462,6 +682,18 @@ const FindMatchScreen: React.FC = () => {
         {isRefreshing && (
           <div className="fixed top-4 left-0 right-0 z-50 bg-primary/10 py-2 text-center text-xs text-primary font-medium safe-area-top">
             Đang làm mới...
+          </div>
+        )}
+
+        {/* Pending swipe indicator */}
+        {pendingSwipeCount > 0 && (
+          <div className="fixed top-12 left-0 right-0 z-40 flex justify-center px-4 safe-area-top">
+            <div className="flex items-center gap-2 bg-white/90 dark:bg-surface-dark/90 backdrop-blur-sm px-4 py-2 rounded-full shadow-lg border border-gray-200 dark:border-white/10">
+              <div className="w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+              <span className="text-xs text-gray-600 dark:text-gray-400">
+                Đang lưu {pendingSwipeCount} swipe{pendingSwipeCount > 1 ? 's' : ''}...
+              </span>
+            </div>
           </div>
         )}
 
@@ -509,15 +741,17 @@ const FindMatchScreen: React.FC = () => {
         {/* Card Stack Area */}
         <div className="flex-1 relative w-full flex flex-col items-center justify-center p-4 z-10 overflow-hidden">
           {/* Decorative Stack Layers (To give depth feel) */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[calc(50%+8px)] w-[82%] h-[calc(100%-24px)] bg-surface-light/40 dark:bg-surface-dark/40 rounded-[2.5rem] border border-white/5 z-0 pointer-events-none"></div>
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[calc(50%+4px)] w-[82%] h-[calc(100%-24px)] bg-surface-light/70 dark:bg-surface-dark/70 rounded-[2.5rem] border border-white/5 z-10 shadow-lg backdrop-blur-sm pointer-events-none"></div>
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[calc(50%+8px)] w-[82%] h-[calc(100dvh-220px)] sm:h-[calc(100dvh-200px)] max-h-[580px] sm:max-h-[640px] bg-surface-light/40 dark:bg-surface-dark/40 rounded-[2.5rem] border border-white/5 z-0 pointer-events-none"></div>
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[calc(50%+4px)] w-[82%] h-[calc(100dvh-220px)] sm:h-[calc(100dvh-200px)] max-h-[580px] sm:max-h-[640px] bg-surface-light/70 dark:bg-surface-dark/70 rounded-[2.5rem] border border-white/5 z-10 shadow-lg backdrop-blur-sm pointer-events-none"></div>
 
-          {/* Refreshing skeleton overlay */}
-          {isRefreshing && currentTeam && (
-            <div className="absolute w-full max-w-[360px] h-[72vh] max-h-[660px] bg-surface-light/90 dark:bg-surface-dark/90 rounded-[2.5rem] z-50 flex flex-col items-center justify-center backdrop-blur-sm animate-fade-in">
+          {/* Refreshing skeleton overlay - show when refreshing OR when loading after filter/team change */}
+          {(isRefreshing || (isLoading && !currentTeam)) && (
+            <div className="absolute w-full max-w-[360px] h-[calc(100dvh-220px)] sm:h-[calc(100dvh-200px)] max-h-[580px] sm:max-h-[640px] bg-surface-light/90 dark:bg-surface-dark/90 rounded-[2.5rem] z-50 flex flex-col items-center justify-center backdrop-blur-sm animate-fade-in">
               <div className="flex flex-col items-center gap-4">
                 <div className="w-16 h-16 rounded-full border-4 border-primary/30 border-t-primary animate-spin" />
-                <p className="text-sm font-medium text-slate-900 dark:text-white">Đang tìm kèo mới...</p>
+                <p className="text-sm font-medium text-slate-900 dark:text-white">
+                  {isRefreshing ? 'Đang tìm kèo mới...' : 'Đang tìm kèo...'}
+                </p>
                 <p className="text-xs text-gray-500">Đang áp dụng bộ lọc</p>
               </div>
             </div>
@@ -559,9 +793,14 @@ const FindMatchScreen: React.FC = () => {
                   </>
                 )}
 
-                {/* Image */}
+                {/* Image - Banner priority over logo */}
                 <div className="relative h-[160px] sm:h-[180px] w-full bg-surface-light overflow-hidden shrink-0">
-                  {team.logo ? (
+                  {team.banner ? (
+                    <div
+                      className="absolute inset-0 bg-cover bg-center"
+                      style={{ backgroundImage: `url('${team.banner}')` }}
+                    />
+                  ) : team.logo ? (
                     <div
                       className="absolute inset-0 bg-cover bg-center"
                       style={{ backgroundImage: `url('${team.logo}')` }}
@@ -574,14 +813,21 @@ const FindMatchScreen: React.FC = () => {
                   <div className="absolute inset-0 bg-surface-light/60 dark:bg-surface-dark/60 backdrop-blur-[2px]" />
                   <div className="absolute inset-0 bg-gradient-to-t from-surface-light dark:from-surface-dark via-transparent to-transparent" />
 
-                  {/* Compatibility Badge - Top Left - Using qualityScore */}
-                  <div className="absolute top-4 left-4 flex flex-col gap-1 items-start">
-                    <div className="px-3 py-1 bg-primary/20 backdrop-blur-md border border-primary/30 rounded-lg flex items-center gap-1.5">
-                      <div className="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
-                      <span className="text-slate-900 dark:text-white text-xs font-bold uppercase tracking-wide">
-                        {Math.round((team.qualityScore || 0) * 100)}% Hợp cạ
-                      </span>
-                    </div>
+                  {/* Score Badges - Top Left: Compatibility Only */}
+                  <div className="absolute top-4 left-4 flex flex-col gap-1.5 items-start">
+                    {/* Compatibility Score - Điểm tương thích */}
+                    {(() => {
+                      const compatibilityScore = Math.round((team.compatibilityScore || 0) * 100);
+                      const compatibilityColor = compatibilityScore >= 80 ? 'bg-pink-500' : compatibilityScore >= 60 ? 'bg-amber-500' : 'bg-gray-500';
+                      return (
+                        <div className="px-3 py-1 bg-white/20 dark:bg-black/20 backdrop-blur-md border border-white/30 dark:border-white/10 rounded-lg flex items-center gap-1.5">
+                          <Icon name="favorite" className={`${compatibilityColor} text-[14px]`} />
+                          <span className="text-slate-900 dark:text-white text-xs font-bold uppercase tracking-wide">
+                            {compatibilityScore}% Hợp cạ
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
 
@@ -661,7 +907,7 @@ const FindMatchScreen: React.FC = () => {
                   <p className="text-gray-400 text-sm leading-relaxed line-clamp-2 px-2 mb-6">
                     {team.description
                       ? team.description
-                      : `Tham gia CapKeoSport từ ${new Date((team as unknown as Team).createdAt || '').toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })}`}
+                      : `Tham gia CapKeoSport từ ${new Date((team as { createdAt?: string }).createdAt || '').toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })}`}
                   </p>
 
                   {/* Stats Grid với Progress Bars - 3 cols */}
@@ -831,8 +1077,17 @@ const FindMatchScreen: React.FC = () => {
       {/* Filter Bottom Sheet - outside overflow-hidden container */}
       <FilterBottomSheet
         isOpen={showFilterSheet}
-        onClose={() => setShowFilterSheet(false)}
-        onApply={refresh}
+        onClose={() => {
+          // Only allow closing if not in required mode (select-filter flow)
+          if (flowState !== 'select-filter') {
+            setShowFilterSheet(false);
+          }
+        }}
+        onApply={handleFilterApply}
+        onChange={handleFilterChange}
+        isChange={hasAppliedFilters}
+        required={flowState === 'select-filter'}
+        requiredText="Bắt buộc chọn bộ lọc để tiếp tục"
       />
 
       {/* Match Modal - outside overflow-hidden container */}

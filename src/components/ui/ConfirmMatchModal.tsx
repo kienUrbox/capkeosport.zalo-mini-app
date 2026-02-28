@@ -2,7 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Icon, Button } from './';
 import { TeamAvatar } from './TeamAvatar';
 import { StadiumAutocomplete } from './StadiumAutocomplete';
-import type { StadiumAutocompleteDto } from '@/services/api/stadium.service';
+import { StadiumLocationPermissionModal } from './StadiumLocationPermissionModal';
+import { useLocationPermission } from '@/hooks/useLocationPermission';
+import type {
+  StadiumAutocompleteDto,
+  GoongPlaceDetailDto,
+  StadiumSource
+} from '@/services/api/stadium.service';
 import { useMatchActions } from '@/stores/match.store';
 
 export interface OpponentTeamInfo {
@@ -44,10 +50,32 @@ export const ConfirmMatchModal: React.FC<ConfirmMatchModalProps> = ({
 }) => {
   const matchActions = useMatchActions();
 
+  // Location permission for stadium search
+  const {
+    showPermissionModal: showLocationPermission,
+    getLocation,
+    handlePermissionResponse: handleLocationPermissionResponse,
+  } = useLocationPermission({
+    storageKey: 'confirm_match_location_permission',
+    showExplanation: true,
+  });
+
+  // Request location when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      getLocation().catch(() => {
+        // Silently fail - user can still search manually
+      });
+    }
+  }, [isOpen]);
+
   // Form state
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [selectedStadium, setSelectedStadium] = useState<StadiumAutocompleteDto | null>(null);
+  const [confirmedCoordinates, setConfirmedCoordinates] = useState<{ lat: number; lng: number } | null>(null);
+  const [stadiumSource, setStadiumSource] = useState<StadiumSource | 'custom' | null>(null);
+  const [placeDetail, setPlaceDetail] = useState<GoongPlaceDetailDto | null>(null);
 
   // UI state
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -75,19 +103,49 @@ export const ConfirmMatchModal: React.FC<ConfirmMatchModalProps> = ({
       return;
     }
 
+    if (!confirmedCoordinates) {
+      setError('Vui lòng xác nhận vị trí sân trên bản đồ');
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
 
     try {
-      // TODO: Phase 2 - Integrate with stadium booking API
-      // Call stadiumService.bookStadiumSlot() before confirming match
-      await matchActions.confirmMatch(matchId, {
-        date, // YYYY-MM-DD format from date input
-        time, // HH:mm format from time input
-        stadiumName: selectedStadium.name,
-        mapUrl: selectedStadium.mapUrl,
-        // lat/lng is optional - backend already has it for known stadiums
-      });
+      // Prepare confirm data based on stadium source
+      let confirmData: any = {
+        date,
+        time,
+      };
+
+      if (stadiumSource === 'database' && selectedStadium?.id && !selectedStadium.id.startsWith('goong_')) {
+        // Option 1: Database stadium with ID
+        confirmData.stadiumId = selectedStadium.id;
+        // If user re-confirmed location, send the updated coordinates
+        if (confirmedCoordinates?.lat && confirmedCoordinates?.lng) {
+          confirmData.stadiumLat = confirmedCoordinates.lat;
+          confirmData.stadiumLng = confirmedCoordinates.lng;
+        }
+      } else if (stadiumSource === 'goong_places') {
+        // Option 2: Goong Place
+        confirmData.goongPlaceId = selectedStadium?.placeId;
+        confirmData.stadiumName = placeDetail?.name || selectedStadium?.name;
+        confirmData.stadiumLat = confirmedCoordinates.lat;
+        confirmData.stadiumLng = confirmedCoordinates.lng;
+        confirmData.stadiumAddress = placeDetail?.formattedAddress || selectedStadium?.address;
+        confirmData.stadiumDistrict = placeDetail?.district || selectedStadium?.district;
+        confirmData.stadiumCity = placeDetail?.city || selectedStadium?.city;
+      } else {
+        // Option 3: Custom stadium
+        confirmData.stadiumName = selectedStadium?.name;
+        confirmData.stadiumLat = confirmedCoordinates.lat;
+        confirmData.stadiumLng = confirmedCoordinates.lng;
+        confirmData.stadiumAddress = selectedStadium?.address;
+        confirmData.stadiumDistrict = selectedStadium?.district;
+        confirmData.stadiumCity = selectedStadium?.city;
+      }
+
+      await matchActions.confirmMatch(matchId, confirmData);
 
       onSuccess();
     } catch (err: any) {
@@ -206,7 +264,14 @@ export const ConfirmMatchModal: React.FC<ConfirmMatchModalProps> = ({
             </label>
             <StadiumAutocomplete
               value={selectedStadium}
-              onChange={setSelectedStadium}
+              onChange={(stadium, coordinates, detail) => {
+                setSelectedStadium(stadium);
+                setStadiumSource(stadium?.source || 'custom');
+                setPlaceDetail(detail || null);
+                if (coordinates) {
+                  setConfirmedCoordinates(coordinates);
+                }
+              }}
               error={error && !selectedStadium ? 'Vui lòng chọn sân thi đấu' : undefined}
             />
           </div>
@@ -262,6 +327,15 @@ export const ConfirmMatchModal: React.FC<ConfirmMatchModalProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Location Permission Modal */}
+      {showLocationPermission && (
+        <StadiumLocationPermissionModal
+          isOpen={showLocationPermission}
+          onAllow={() => handleLocationPermissionResponse(true)}
+          onDeny={() => handleLocationPermissionResponse(false)}
+        />
+      )}
     </div>
   );
 };

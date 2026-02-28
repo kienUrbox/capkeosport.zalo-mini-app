@@ -51,6 +51,10 @@ const MatchScheduleScreen: React.FC = () => {
   const [requestMode, setRequestMode] = useState<'send' | 'edit'>('send');
   const [updateScoreMatchId, setUpdateScoreMatchId] = useState<string | null>(null);
 
+  // Quick filter state for pending tab - API based
+  type PendingFilterType = 'all' | 'matched' | 'requested';
+  const [activeFilter, setActiveFilter] = useState<PendingFilterType>('all');
+
   // Action bottom sheet state
   const [actionSheet, setActionSheet] = useState<{
     isOpen: boolean;
@@ -113,6 +117,10 @@ const MatchScheduleScreen: React.FC = () => {
     return state._activeTabs[currentTeam?.id] || 'pending';
   });
 
+  const isLoading = useMatchStore((state) => {
+    return state.isLoading;
+  });
+
   // Check if current team can edit the request (only team who sent can edit)
   const canEditRequest = (match: { requestedByTeam?: string }): boolean => {
     return match.requestedByTeam === currentTeam?.id;
@@ -133,6 +141,7 @@ const MatchScheduleScreen: React.FC = () => {
     refreshTab,
     resetAll,
     hasMore,
+    setPendingFilter,
   } = useScheduleData(currentTeam?.id);
 
   // Refs for infinite scroll and pull-to-refresh
@@ -145,6 +154,13 @@ const MatchScheduleScreen: React.FC = () => {
     { id: 'pending' as const, label: 'Chờ kèo' },
     { id: 'upcoming' as const, label: 'Lịch đấu' },
     { id: 'history' as const, label: 'Lịch sử' },
+  ];
+
+  // Quick filter options for pending tab - API based filtering
+  const pendingFilterOptions = [
+    { id: 'all' as const, label: 'Tất cả', icon: 'inbox' },
+    { id: 'matched' as const, label: 'Đã match', icon: 'handshake' },
+    { id: 'requested' as const, label: 'Cần trả lời', icon: 'notifications_active' },
   ];
 
   // Handle tab change with lazy loading
@@ -540,11 +556,10 @@ const MatchScheduleScreen: React.FC = () => {
             <button
               key={tab.id}
               onClick={() => handleTabChange(tab.id)}
-              className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
-                activeTab === tab.id
-                  ? 'bg-white dark:bg-background-dark text-primary shadow-sm'
-                  : 'text-gray-500 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
+              className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === tab.id
+                ? 'bg-white dark:bg-background-dark text-primary shadow-sm'
+                : 'text-gray-500 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
             >
               {tab.label}
             </button>
@@ -582,7 +597,39 @@ const MatchScheduleScreen: React.FC = () => {
         {/* PENDING TAB */}
         {activeTab === 'pending' && (
           <div className="space-y-4 animate-fade-in">
-            {isLoadingPending ? (
+            {/* Quick Filter Chips - Show during loading and when there are matches */}
+            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 -mx-1 px-1">
+              {pendingFilterOptions.map((filter) => {
+                const isActive = activeFilter === filter.id;
+
+                return (
+                  <button
+                    key={filter.id}
+                    onClick={() => {
+                      if (isLoading) return;
+                      // Clear old data before fetch so skeleton shows during API call
+                      matchActions.setPendingMatches([]);
+                      setActiveFilter(filter.id);
+                      setPendingFilter(filter.id === 'all' ? undefined : filter.id);
+                      matchActions.fetchPendingMatches(currentTeam?.id || '', 1, true, filter.id === 'all' ? undefined : filter.id);
+                    }}
+                    className={`
+                        filter-chip flex items-center gap-1.5 px-3 py-2 rounded-full border text-xs font-medium whitespace-nowrap
+                        ${isActive
+                        ? 'bg-primary text-white border-primary shadow-md'
+                        : 'bg-white dark:bg-surface-dark text-gray-600 dark:text-gray-400 border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/10'
+                      }
+                      `}
+                  >
+                    <Icon name={filter.icon as any} size="xs" />
+                    <span>{filter.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+
+            {isLoadingPending || isLoading ? (
               <>
                 <SchedulePendingSkeleton />
                 <SchedulePendingSkeleton />
@@ -600,6 +647,20 @@ const MatchScheduleScreen: React.FC = () => {
                   Thử lại
                 </Button>
               </div>
+            ) : activeFilter !== 'all' && pendingMatches.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10">
+                <Icon name="filter_alt" className="text-4xl mb-2 text-gray-400" />
+                <p className="text-sm text-gray-500">
+                  Không có kèo nào trong bộ lọc này
+                </p>
+                <Button
+                  variant="ghost"
+                  className="mt-2 text-primary"
+                  onClick={() => setActiveFilter('all')}
+                >
+                  Xem tất cả
+                </Button>
+              </div>
             ) : pendingMatches.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10">
                 <Icon name="inbox" className="text-4xl mb-2 text-gray-400" />
@@ -613,10 +674,11 @@ const MatchScheduleScreen: React.FC = () => {
                 </Button>
               </div>
             ) : (
-              pendingMatches.map((match) => (
+              pendingMatches.map((match, index) => (
                 <PendingMatchCard
                   key={match.id}
                   match={match}
+                  index={index}
                   isAdmin={hasAdminPermission(currentTeam?.userRole)}
                   canEditRequest={canEditRequest(match)}
                   onAccept={handleAcceptMatch}
@@ -654,7 +716,7 @@ const MatchScheduleScreen: React.FC = () => {
         {/* UPCOMING TAB */}
         {activeTab === 'upcoming' && (
           <div className="space-y-4 animate-fade-in">
-            {isLoadingUpcoming ? (
+            {isLoadingUpcoming || isLoading ? (
               <>
                 <ScheduleUpcomingSkeleton />
                 <ScheduleUpcomingSkeleton />
@@ -726,7 +788,7 @@ const MatchScheduleScreen: React.FC = () => {
         {/* HISTORY TAB */}
         {activeTab === 'history' && (
           <div className="space-y-4 animate-fade-in">
-            {isLoadingHistory ? (
+            {isLoadingHistory || isLoading ? (
               <>
                 <ScheduleHistorySkeleton />
                 <ScheduleHistorySkeleton />
@@ -810,20 +872,18 @@ const MatchScheduleScreen: React.FC = () => {
                     setSelectedTeam(team);
                     setShowTeamSelector(false);
                   }}
-                  className={`w-full flex items-center gap-4 p-3 rounded-2xl border transition-all active:scale-[0.98] ${
-                    currentTeam?.id === team.id
-                      ? 'bg-primary/10 border-primary'
-                      : 'bg-gray-50 dark:bg-white/5 border-transparent hover:bg-gray-100 dark:hover:bg-white/10'
-                  }`}
+                  className={`w-full flex items-center gap-4 p-3 rounded-2xl border transition-all active:scale-[0.98] ${currentTeam?.id === team.id
+                    ? 'bg-primary/10 border-primary'
+                    : 'bg-gray-50 dark:bg-white/5 border-transparent hover:bg-gray-100 dark:hover:bg-white/10'
+                    }`}
                 >
                   <TeamAvatar src={team.logo} />
                   <div className="flex-1 text-left">
                     <h4
-                      className={`font-bold ${
-                        currentTeam?.id === team.id
-                          ? 'text-primary'
-                          : 'text-slate-900 dark:text-white'
-                      }`}
+                      className={`font-bold ${currentTeam?.id === team.id
+                        ? 'text-primary'
+                        : 'text-slate-900 dark:text-white'
+                        }`}
                     >
                       {team.name}
                     </h4>

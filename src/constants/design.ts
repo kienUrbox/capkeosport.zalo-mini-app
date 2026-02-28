@@ -543,3 +543,52 @@ export const STAGGER_DELAY = {
   xl: 200,
   '2xl': 300,
 } as const;
+
+// ============== ONBOARDING COLORS ==============
+/**
+ * Onboarding-specific colors for energetic sports theme
+ * Used for long-scroll onboarding page
+ */
+export const ONBOARDING_COLORS = {
+  // Primary - Match finding feature (DOMINANT)
+  match: {
+    main: '#11D473',           // Vibrant green
+    gradient: 'from-primary to-emerald-400',
+    bg: 'bg-primary',
+    text: 'text-primary',
+    bgLight: 'bg-primary/10',
+  },
+  // Secondary - Team management
+  team: {
+    main: '#0068FF',           // Electric blue (Zalo)
+    gradient: 'from-blue-500 to-blue-600',
+    bg: 'bg-blue-500',
+    text: 'text-blue-500',
+    bgLight: 'bg-blue-500/10',
+  },
+  // Accent - Memories & achievements
+  memories: {
+    main: '#F59E0B',           // Gold/amber
+    gradient: 'from-amber-500 to-yellow-500',
+    bg: 'bg-amber-500',
+    text: 'text-amber-500',
+    bgLight: 'bg-amber-500/10',
+  },
+} as const;
+
+// ============== ONBOARDING ANIMATIONS ==============
+/**
+ * Onboarding animation configuration
+ */
+export const ONBOARDING_ANIMATIONS = {
+  durations: {
+    fast: 200,
+    normal: 400,
+    slow: 600,
+  },
+  easings: {
+    enter: 'cubic-bezier(0.34, 1.56, 0.64, 1)',  // Bounce
+    exit: 'cubic-bezier(0.4, 0, 0.2, 1)',        // Smooth
+    scroll: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)', // Scroll
+  },
+} as const;

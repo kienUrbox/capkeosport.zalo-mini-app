@@ -441,6 +441,7 @@ export interface DiscoveredTeam extends Team {
   lastActive?: string;
   mutualFriends?: string[];
   commonInterests?: string[];
+  banner?: string; // Team banner image URL
 }
 
 export interface DiscoveryResponse {

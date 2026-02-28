@@ -16,7 +16,7 @@ export const ThemeSwitch: React.FC = () => {
       className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-white/5 active:bg-gray-50 dark:active:bg-white/5 cursor-pointer animate-slide-in-right"
     >
       <div className="flex items-center gap-3">
-        <div className="p-2 rounded-xl bg-gray-100 dark:bg-white/10">
+        <div className="p-2 pb-1 rounded-xl bg-gray-100 dark:bg-white/10">
           <Icon name={isDarkMode ? 'dark_mode' : 'light_mode'} className="text-gray-500 text-lg" />
         </div>
         <span className="font-medium text-slate-900 dark:text-white">Chế độ hiển thị</span>

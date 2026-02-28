@@ -105,10 +105,16 @@ export interface UpdateMatchRequestDto {
 export interface ConfirmMatchDto {
   date: string;        // YYYY-MM-DD
   time: string;        // HH:mm
-  stadiumName: string;
-  mapUrl: string;
-  lat?: number;        // Optional - backend may already have it
-  lng?: number;        // Optional - backend may already have it
+  // Option 1: Stadium from database
+  stadiumId?: string;
+  // Option 2: Goong Place
+  goongPlaceId?: string;
+  stadiumName?: string;
+  stadiumLat?: number;
+  stadiumLng?: number;
+  stadiumAddress?: string;
+  stadiumDistrict?: string;
+  stadiumCity?: string;
 }
 
 export interface FinishMatchDto {

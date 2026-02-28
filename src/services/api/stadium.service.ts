@@ -1,18 +1,55 @@
 import { api } from './index';
 
 /**
+ * Stadium Source Type
+ */
+export type StadiumSource = 'database' | 'goong_places';
+
+/**
  * Stadium Autocomplete DTO
  * Response from GET /stadiums/autocomplete
  */
 export interface StadiumAutocompleteDto {
-  id: string;
+  id: string;                          // stadium UUID hoặc "goong_{placeId}"
   name: string;
-  mapUrl: string;
+  source: StadiumSource;               // Nguồn dữ liệu
+  placeId?: string;                    // Goong Place ID (khi source = goong_places) hoặc database place ID
+  mapUrl?: string;                     // Map URL (chỉ khi source = database)
   address?: string;
   district?: string;
   city?: string;
-  matchCount: number;
-  homeTeamCount: number;
+  lat?: number;
+  lng?: number;
+  matchCount?: number;                 // Số trận đã diễn ra (chỉ khi source = database)
+  homeTeamCount?: number;              // Số đội chọn làm sân nhà (chỉ khi source = database)
+  description: string;                 // Mô tả đầy đủ
+  sessionToken?: string;               // Session token (chỉ khi source = goong_places)
+}
+
+/**
+ * Goong Place Detail Response DTO
+ * Response from GET /stadiums/place-detail/:placeId
+ */
+export interface GoongPlaceDetailDto {
+  name: string;
+  formattedAddress: string;
+  lat: number;
+  lng: number;
+  placeId: string;
+  addressComponents: any[];
+  types: string[];
+  district?: string;
+  city?: string;
+}
+
+/**
+ * Stadium Place Detail Response DTO
+ * Full response from GET /stadiums/place-detail/:placeId
+ */
+export interface StadiumPlaceDetailResponseDto {
+  result: GoongPlaceDetailDto | null;
+  status: 'OK' | 'SESSION_ERROR' | 'NOT_FOUND' | 'ERROR';
+  error?: string;
 }
 
 /**
@@ -63,6 +100,21 @@ export const StadiumService = {
   getStadiumById: async (stadiumId: string) => {
     const response = await api.get<StadiumResponseDto>(`/stadiums/${stadiumId}`);
     return response;
+  },
+
+  /**
+   * Get Goong Place Detail
+   * GET /stadiums/place-detail/:placeId
+   *
+   * @param placeId - Goong Place ID
+   * @param sessionToken - Optional session token from autocomplete response
+   */
+  getPlaceDetail: async (placeId: string, sessionToken?: string) => {
+    const params = sessionToken ? { sessionToken } : undefined;
+    return api.get<StadiumPlaceDetailResponseDto>(
+      `/stadiums/place-detail/${placeId}`,
+      params ? { params } : undefined
+    );
   },
 
   /**

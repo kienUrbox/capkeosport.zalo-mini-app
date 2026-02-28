@@ -1,10 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { Button, Header, Icon, Input } from '@/components/ui';
 import { StadiumAutocomplete } from '@/components/ui/StadiumAutocomplete';
-import { type StadiumAutocompleteDto } from '@/services/api/stadium.service';
+import type {
+  StadiumAutocompleteDto,
+  GoongPlaceDetailDto,
+  StadiumSource
+} from '@/services/api/stadium.service';
 import { appRoutes } from '@/utils/navigation';
 import { TeamService } from '@/services/api/team.service';
+import { FileService } from '@/services/api/file.service';
 import type { Team, UpdateTeamDto } from '@/services/api/team.service';
 import { useTeamStore } from '@/stores/team.store';
 import {
@@ -36,6 +41,17 @@ const EditTeamScreen: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Image uploads
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoUrl, setLogoUrl] = useState<string | undefined>(undefined);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+  const [bannerUrl, setBannerUrl] = useState<string | undefined>(undefined);
+  const [bannerUploading, setBannerUploading] = useState(false);
+
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
+
   // Form state
   const [name, setName] = useState('');
   const [level, setLevel] = useState('Mới chơi');
@@ -43,6 +59,9 @@ const EditTeamScreen: React.FC = () => {
   const [pitchTypes, setPitchTypes] = useState<string[]>(['5', '7']);
   const [stats, setStats] = useState({ attack: 7.5, defense: 6.0, technique: 8.5 });
   const [selectedStadium, setSelectedStadium] = useState<StadiumAutocompleteDto | null>(null);
+  const [confirmedCoordinates, setConfirmedCoordinates] = useState<{ lat: number; lng: number } | null>(null);
+  const [stadiumSource, setStadiumSource] = useState<StadiumSource | 'custom' | null>(null);
+  const [placeDetail, setPlaceDetail] = useState<GoongPlaceDetailDto | null>(null);
   const [description, setDescription] = useState('');
   const [isCalculating, setIsCalculating] = useState(false);
 
@@ -69,12 +88,16 @@ const EditTeamScreen: React.FC = () => {
           setSelectedStadium({
             id: data.homeStadium.id,
             name: data.homeStadium.name,
+            source: 'database', // Existing stadium from database
             mapUrl: data.homeStadium.mapUrl,
             address: data.homeStadium.address,
             district: data.homeStadium.district,
             city: data.homeStadium.city,
             matchCount: data.homeStadium.matchCount || 0,
+            homeTeamCount: 0,
+            description: data.homeStadium.address || '',
           });
+          setStadiumSource('database');
         }
         setDescription(data.description || '');
         setIsLoading(false);
@@ -103,12 +126,16 @@ const EditTeamScreen: React.FC = () => {
             setSelectedStadium({
               id: data.homeStadium.id,
               name: data.homeStadium.name,
+              source: 'database', // Existing stadium from database
               mapUrl: data.homeStadium.mapUrl,
               address: data.homeStadium.address,
               district: data.homeStadium.district,
               city: data.homeStadium.city,
               matchCount: data.homeStadium.matchCount || 0,
+              homeTeamCount: 0,
+              description: data.homeStadium.address || '',
             });
+            setStadiumSource('database');
           }
           setDescription(data.description || '');
         } else {
@@ -135,6 +162,102 @@ const EditTeamScreen: React.FC = () => {
     setStats(prev => ({ ...prev, [key]: val }));
   };
 
+  // Handle logo file selection
+  const handleLogoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        setError('Logo phải là file ảnh (JPG, PNG, WEBP)');
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        setError('Logo không được vượt quá 5MB');
+        return;
+      }
+
+      setError(null);
+
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => setLogoPreview(reader.result as string);
+      reader.readAsDataURL(file);
+
+      // Upload immediately
+      setLogoUploading(true);
+      try {
+        const response = await FileService.uploadFile(
+          {
+            file,
+            fileType: 'logo',
+          },
+          (progress: number) => {
+            console.log(`Logo upload progress: ${progress}%`);
+          }
+        );
+
+        if (response.success && response.data) {
+          setLogoUrl(response.data.publicUrl);
+          console.log('Logo uploaded successfully:', response.data.publicUrl);
+        } else {
+          setError('Không thể tải lên logo. Vui lòng thử lại.');
+        }
+      } catch (err) {
+        console.error('Logo upload error:', err);
+        setError('Không thể tải lên logo. Vui lòng thử lại.');
+      } finally {
+        setLogoUploading(false);
+      }
+    }
+  };
+
+  // Handle banner file selection
+  const handleBannerSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        setError('Banner phải là file ảnh (JPG, PNG, WEBP)');
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        setError('Banner không được vượt quá 5MB');
+        return;
+      }
+
+      setError(null);
+
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => setBannerPreview(reader.result as string);
+      reader.readAsDataURL(file);
+
+      // Upload immediately
+      setBannerUploading(true);
+      try {
+        const response = await FileService.uploadFile(
+          {
+            file,
+            fileType: 'banner',
+          },
+          (progress: number) => {
+            console.log(`Banner upload progress: ${progress}%`);
+          }
+        );
+
+        if (response.success && response.data) {
+          setBannerUrl(response.data.publicUrl);
+          console.log('Banner uploaded successfully:', response.data.publicUrl);
+        } else {
+          setError('Không thể tải lên ảnh bìa. Vui lòng thử lại.');
+        }
+      } catch (err) {
+        console.error('Banner upload error:', err);
+        setError('Không thể tải lên ảnh bìa. Vui lòng thử lại.');
+      } finally {
+        setBannerUploading(false);
+      }
+    }
+  };
+
   const calculateAverageStats = () => {
     setIsCalculating(true);
     setTimeout(() => {
@@ -154,22 +277,37 @@ const EditTeamScreen: React.FC = () => {
       setIsSaving(true);
       setError(null);
 
-      // Prepare homeStadiumId or homeStadium for update
-      let homeStadiumId: string | undefined = undefined;
-      let homeStadium: { name: string; mapUrl: string; address?: string; district?: string; city?: string } | undefined = undefined;
+      // Prepare home stadium data based on source
+      let stadiumData: any = {};
 
       if (selectedStadium) {
-        // If existing stadium (not custom-), send ID
-        if (!selectedStadium.id.startsWith('custom-')) {
-          homeStadiumId = selectedStadium.id;
+        if (stadiumSource === 'database' && !selectedStadium.id.startsWith('goong_') && !selectedStadium.id.startsWith('custom-')) {
+          // Option A: Database stadium with ID
+          stadiumData.homeStadiumId = selectedStadium.id;
+          // If user re-confirmed location, send the updated coordinates
+          if (confirmedCoordinates?.lat && confirmedCoordinates?.lng) {
+            stadiumData.confirmedLat = confirmedCoordinates.lat;
+            stadiumData.confirmedLng = confirmedCoordinates.lng;
+          }
+        } else if (stadiumSource === 'goong_places') {
+          // Option B: Goong Place
+          stadiumData.goongPlaceId = selectedStadium.placeId;
+          stadiumData.stadiumName = placeDetail?.name || selectedStadium.name;
+          stadiumData.confirmedLat = confirmedCoordinates?.lat;
+          stadiumData.confirmedLng = confirmedCoordinates?.lng;
+          stadiumData.stadiumAddress = placeDetail?.formattedAddress || selectedStadium.address;
+          stadiumData.stadiumDistrict = placeDetail?.district || selectedStadium.district;
+          stadiumData.stadiumCity = placeDetail?.city || selectedStadium.city;
         } else {
-          // New stadium needs to be created
-          homeStadium = {
+          // Option C: Custom stadium (backward compatible)
+          stadiumData.homeStadium = {
             name: selectedStadium.name,
-            mapUrl: selectedStadium.mapUrl,
+            mapUrl: selectedStadium.mapUrl || '',
             address: selectedStadium.address,
             district: selectedStadium.district,
             city: selectedStadium.city,
+            lat: confirmedCoordinates?.lat,
+            lng: confirmedCoordinates?.lng,
           };
         }
       }
@@ -185,8 +323,9 @@ const EditTeamScreen: React.FC = () => {
           technique: Math.round(stats.technique * 10),
         },
         description: description || undefined,
-        homeStadiumId,
-        homeStadium,
+        logo: logoUrl || team?.logo, // Use new uploaded URL or existing
+        banner: bannerUrl || team?.banner, // Use new uploaded URL or existing
+        ...stadiumData,     // Spread stadium data (homeStadiumId, goongPlaceId, homeStadium, etc.)
       };
 
       const response = await TeamService.updateTeam(teamId, updateData);
@@ -194,7 +333,8 @@ const EditTeamScreen: React.FC = () => {
       if (response.success) {
         // Refresh team detail cache to get updated data
         await fetchTeamDetail(teamId, true);
-        navigate(appRoutes.teamDetail(teamId));
+        // Navigate back to previous screen
+        navigate(-1);
       } else {
         setError('Không thể cập nhật thông tin đội');
       }
@@ -236,44 +376,119 @@ const EditTeamScreen: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark pb-safe">
+    <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark">
       <Header title="Chỉnh sửa thông tin đội" onBack={() => navigate(-1)} />
 
-      <div className="p-4 flex flex-col gap-6 overflow-y-auto pb-24">
+      {/* Scrollable content area */}
+      <div className="flex-1 p-4 flex flex-col gap-6 overflow-y-auto pb-4">
 
         {/* Images Section */}
         <div className="flex flex-col gap-4">
           {/* Banner Upload */}
-          <div className="relative w-full h-36 rounded-xl overflow-hidden bg-gray-800 border-2 border-gray-300 dark:border-gray-600 cursor-pointer group">
-            {team?.banner ? (
-              <img src={team.banner} className="w-full h-full object-cover opacity-75 group-hover:opacity-50 transition-opacity" alt="Banner" />
+          <div
+            className="relative w-full h-36 rounded-xl bg-gray-100 dark:bg-surface-dark border-2 border-dashed border-gray-300 dark:border-gray-600 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-200 dark:hover:bg-white/5 transition-colors group overflow-hidden"
+            onClick={() => !isSaving && !bannerUploading && bannerInputRef.current?.click()}
+          >
+            {bannerPreview || team?.banner ? (
+              <>
+                <img src={bannerPreview || team?.banner} alt="Banner" className="w-full h-full object-cover" />
+                {bannerUploading && (
+                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                    <div className="text-center">
+                      <span className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin block mx-auto mb-2"></span>
+                      <p className="text-white text-xs font-bold">Đang tải lên...</p>
+                    </div>
+                  </div>
+                )}
+                {(bannerUrl || team?.banner) && !bannerUploading && (
+                  <div className="absolute top-2 right-2 bg-green-500 rounded-full p-1 shadow-lg flex items-center justify-center">
+                    <span className="material-icons text-white select-none leading-none" style={{ fontSize: '14px' }}>
+                      check
+                    </span>
+                  </div>
+                )}
+              </>
             ) : (
-              <div className="w-full h-full bg-gradient-to-br from-primary/20 to-green-600/20" />
-            )}
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="bg-black/50 p-2 rounded-full border border-white/20">
-                <Icon name="add_photo_alternate" className="text-white text-xl" />
+              <div className="flex flex-col items-center gap-2 text-gray-400 group-hover:text-primary transition-colors">
+                <Icon name="add_photo_alternate" className="text-3xl" />
+                <span className="text-xs font-bold uppercase tracking-wide">Ảnh bìa (Banner)</span>
               </div>
-            </div>
+            )}
+            <input
+              ref={bannerInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={handleBannerSelect}
+              disabled={isSaving || bannerUploading}
+            />
           </div>
 
           {/* Logo Upload */}
-          <div className="flex items-center gap-4 px-2 -mt-10 relative z-10">
-            <div className="relative size-24 rounded-full bg-surface-dark border-4 border-background-light dark:border-background-dark shadow-xl overflow-hidden group cursor-pointer">
-              {team?.logo ? (
-                <img src={team.logo} className="w-full h-full object-cover" alt="Logo" />
-              ) : (
-                <div className="w-full h-full bg-gradient-to-br from-primary to-green-600 flex items-center justify-center text-white font-bold text-2xl">
-                  {name.charAt(0)}
+          <div className="flex items-center gap-4 px-2">
+            <div
+              className="relative size-24 shrink-0"
+            >
+              {/* Logo container */}
+              <div
+                className="relative w-full h-full rounded-full bg-gray-100 dark:bg-surface-dark border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center overflow-hidden"
+                onClick={() => !isSaving && !logoUploading && logoInputRef.current?.click()}
+              >
+                {logoPreview || team?.logo ? (
+                  <>
+                    <img src={logoPreview || team?.logo} alt="Logo" className="w-full h-full object-cover" />
+                    {logoUploading && (
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                        <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin block"></span>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <Icon name="add_a_photo" className="text-2xl text-gray-400" />
+                )}
+              </div>
+
+              {/* Edit button - positioned at bottom right, slightly outside */}
+              {!logoUploading && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    logoInputRef.current?.click();
+                  }}
+                  className="absolute bottom-0 right-0 bg-primary hover:bg-primary-dark rounded-full p-1.5 shadow-lg border-2 border-background-light dark:border-background-dark transition-all z-10 flex items-center justify-center"
+                  aria-label="Thay đổi logo"
+                  type="button"
+                >
+                  <span className="material-icons text-white select-none leading-none" style={{ fontSize: '14px' }}>
+                    edit
+                  </span>
+                </button>
+              )}
+
+              {/* Upload success indicator - positioned at top right */}
+              {(logoUrl || team?.logo) && !logoUploading && (
+                <div className="absolute top-0 right-0 bg-green-500 rounded-full p-1 shadow-lg z-10 flex items-center justify-center" aria-hidden="true">
+                  <span className="material-icons text-white select-none leading-none" style={{ fontSize: '12px' }}>
+                    check
+                  </span>
                 </div>
               )}
-              <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                <Icon name="edit" className="text-white text-lg" />
-              </div>
+
+              {/* Hidden file input */}
+              <input
+                ref={logoInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={handleLogoSelect}
+                disabled={isSaving || logoUploading}
+              />
             </div>
-            <div className="pt-6">
+            <div className="flex-1">
               <p className="text-sm font-bold text-slate-900 dark:text-white mb-1">Logo đội bóng</p>
-              <p className="text-xs text-gray-500">Chạm để thay đổi</p>
+              <p className="text-xs text-gray-500">
+                {logoUploading ? 'Đang tải lên...' : 'Nên dùng ảnh vuông, tối đa 5MB'}
+              </p>
             </div>
           </div>
         </div>
@@ -435,7 +650,14 @@ const EditTeamScreen: React.FC = () => {
             </label>
             <StadiumAutocomplete
               value={selectedStadium}
-              onChange={setSelectedStadium}
+              onChange={(stadium, coordinates, detail) => {
+                setSelectedStadium(stadium);
+                setStadiumSource(stadium?.source || 'custom');
+                setPlaceDetail(detail || null);
+                if (coordinates) {
+                  setConfirmedCoordinates(coordinates);
+                }
+              }}
               disabled={isSaving}
             />
             <p className="text-xs text-gray-500 ml-1">
@@ -455,19 +677,27 @@ const EditTeamScreen: React.FC = () => {
         </div>
       </div>
 
-      <div className="mt-auto p-4 border-t border-gray-200 dark:border-white/5 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur z-20">
+      {/* Fixed bottom bar with status messages and button */}
+      <div className="mt-auto border-t border-gray-200 dark:border-white/5 bg-background-light dark:bg-background-dark pb-safe z-20">
+        {/* Error message */}
         {error && (
-          <div className="mb-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+          <div className="p-4 border-b border-gray-100 dark:border-white/5">
+            <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
+              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+            </div>
           </div>
         )}
-        <Button
-          fullWidth
-          onClick={handleSave}
-          disabled={isSaving}
-        >
-          {isSaving ? 'Đang lưu...' : 'LƯU THAY ĐỔI'}
-        </Button>
+
+        {/* Button */}
+        <div className="p-4">
+          <Button
+            fullWidth
+            onClick={handleSave}
+            disabled={isSaving}
+          >
+            {isSaving ? 'ĐANG LƯU...' : 'LƯU THAY ĐỔI'}
+          </Button>
+        </div>
       </div>
     </div>
   );

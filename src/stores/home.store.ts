@@ -1,8 +1,10 @@
 import { create } from 'zustand';
 import type { Notification } from '@/types/api.types';
+import { NotificationType } from '@/types/api.types';
 
 interface HomeStore {
   // State
+  _hasFetched: boolean;
   pendingInvitations: Notification[];
   isLoading: boolean;
   error: string | null;
@@ -17,6 +19,7 @@ interface HomeStore {
 
 export const useHomeStore = create<HomeStore>()((set, get) => ({
   // Initial state
+  _hasFetched: false,
   pendingInvitations: [],
   isLoading: false,
   error: null,
@@ -26,13 +29,14 @@ export const useHomeStore = create<HomeStore>()((set, get) => ({
 
   clearHomeData: () => {
     set({
+      _hasFetched: false,
       pendingInvitations: [],
       error: null,
     });
   },
 
-  // API Method - simplified without caching
-  fetchHomeData: async () => {
+  // API Method - with caching support
+  fetchHomeData: async (forceRefresh: boolean = false) => {
     try {
       const currentState = get();
 
@@ -42,27 +46,44 @@ export const useHomeStore = create<HomeStore>()((set, get) => ({
         return;
       }
 
+      // Guard: Skip if already fetched and not forcing refresh
+      if (!forceRefresh && currentState._hasFetched) {
+        console.log('[HomeStore] ✋ Already fetched, use forceRefresh=true to refresh');
+        return;
+      }
+
       console.log('[HomeStore] 📥 Fetching home data...');
       set({ isLoading: true, error: null });
 
-      // Fetch invitations and matches in parallel
-      const { fetchNotifications } = await import('@/stores/notification.store');
-      const { fetchUpcomingMatches } = await import('@/stores/match.store');
+      // Fetch invitations and matches in parallel using store methods
+      const notificationModule = await import('@/stores/notification.store');
+      const matchModule = await import('@/stores/match.store');
 
-      const [invitations] = await Promise.all([
-        fetchNotifications({ type: 'team_invitation', unreadOnly: true }),
-        fetchUpcomingMatches(undefined, 1),
-      ]);
+      // Get the store state directly (not using hooks)
+      const notificationState = notificationModule.useNotificationStore.getState();
+      const matchState = matchModule.useMatchStore.getState();
+
+      // Call the store methods directly
+      // Fetch new match notifications (which represent match opportunities/invitations)
+      const invitations = await notificationState.fetchNotifications({ type: NotificationType.NEW_MATCH, unreadOnly: true });
+      console.log('[HomeStore] 📬 Fetched invitations:', invitations);
+      console.log('[HomeStore] 📊 Invitations count:', invitations.length);
+      console.log('[HomeStore] 🔍 First invitation:', invitations[0]);
+      // Don't await match fetching since we don't store the results
+      matchState.fetchUpcomingMatches(undefined, 1).catch(err => {
+        console.error('[HomeStore] Failed to fetch upcoming matches:', err);
+      });
 
       // Update store with fetched data
       set({
+        _hasFetched: true,
         pendingInvitations: invitations,
         isLoading: false,
         error: null,
       });
 
       console.log('[HomeStore] ✅ Successfully fetched home data');
-      console.log('[HomeStore] 📊 Invitations:', invitations.length);
+      console.log('[HomeStore] 📦 Store state after update:', get());
     } catch (error: any) {
       console.error('[HomeStore] ❌ Fetch home data error:', error);
       const errorMessage = error.error?.message || error.message || 'Không thể tải dữ liệu';

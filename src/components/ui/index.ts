@@ -112,6 +112,9 @@ export type { LocationPickerProps, LocationValue } from './LocationPicker';
 export { StadiumAutocomplete } from './StadiumAutocomplete';
 export type { StadiumAutocompleteProps } from './StadiumAutocomplete';
 
+export { StadiumMapPicker } from './StadiumMapPicker';
+export type { StadiumMapPickerProps } from './StadiumMapPicker';
+
 export { ConfirmMatchModal } from './ConfirmMatchModal';
 export type { ConfirmMatchModalProps } from './ConfirmMatchModal';
 
@@ -154,3 +157,13 @@ export type { SettingsSectionProps } from './SettingsSection';
 
 export { SettingsMenuItem } from './SettingsMenuItem';
 export type { SettingsMenuItemProps } from './SettingsMenuItem';
+
+// Animation Components
+export { AnimateOnScroll } from './AnimateOnScroll';
+
+// Location Permission
+export { LocationPermissionModal } from './LocationPermissionModal';
+export type { LocationPermissionModalProps } from './LocationPermissionModal';
+
+export { StadiumLocationPermissionModal } from './StadiumLocationPermissionModal';
+export type { StadiumLocationPermissionModalProps } from './StadiumLocationPermissionModal';

@@ -305,12 +305,18 @@ export default function LaunchingScreen() {
 
     const initializeApp = async () => {
       try {
-        // Step 1: Load fonts
+        // Step 1: Load fonts first (needed for Material Icons)
         setStatus('loading');
         await launchingService.loadFonts();
         if (!mounted) return;
         setFontsLoaded();
         setLoadingProgress(30);
+
+        // Add a small delay to ensure fonts are fully rendered
+        // This prevents icons from not showing on login screen
+        await new Promise(resolve => setTimeout(resolve, 800));
+        if (!mounted) return;
+        setLoadingProgress(50);
 
         // Step 2: Check auth and load data
         setStatus('auth_checking');
@@ -321,6 +327,10 @@ export default function LaunchingScreen() {
 
         if (result.success) {
           if (result.shouldNavigate) {
+            // Add a small delay before navigation for smooth transition
+            await new Promise(resolve => setTimeout(resolve, 300));
+            if (!mounted) return;
+
             if (result.navigateTo === 'login') {
               navigate('/login', { replace: true });
             } else if (result.navigateTo === 'dashboard') {

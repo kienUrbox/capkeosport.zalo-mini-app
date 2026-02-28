@@ -58,7 +58,7 @@ export const ProfileBanner: React.FC<ProfileBannerProps> = ({
       {/* Banner Section */}
       <div className="relative w-full">
         {/* Banner Image - Fixed 192px height */}
-        <div className="h-48 w-full bg-cover bg-center bg-gray-200 dark:bg-transparent" style={{ backgroundImage: bannerUrl ? `url("${bannerUrl}")` : undefined }}>
+        <div className="h-64 w-full bg-cover bg-center bg-gray-200 dark:bg-transparent" style={{ backgroundImage: bannerUrl ? `url("${bannerUrl}")` : undefined }}>
           {/* Gradient Overlay */}
           <div className="absolute inset-0 bottom-[-1px] bg-gradient-to-t from-background-dark to-transparent dark:from-background-dark dark:to-transparent" />
           <div className="absolute inset-0 bottom-[-1px] bg-gradient-to-t from-white/80 to-transparent dark:from-transparent" />

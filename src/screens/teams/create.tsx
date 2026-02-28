@@ -1,10 +1,16 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Header, Icon, Input } from '@/components/ui';
+import { Button, Header, Icon, Input, StadiumLocationPermissionModal } from '@/components/ui';
 import { StadiumAutocomplete } from '@/components/ui/StadiumAutocomplete';
-import { type StadiumAutocompleteDto } from '@/services/api/stadium.service';
+import { useLocationPermission } from '@/hooks/useLocationPermission';
+import { useTeamActions } from '@/stores/team.store';
+import type {
+  StadiumAutocompleteDto,
+  GoongPlaceDetailDto,
+  StadiumSource
+} from '@/services/api/stadium.service';
+import type { CreateTeamDto } from '@/types/api.types';
 import { appRoutes } from '@/utils/navigation';
-import { TeamService, type CreateTeamDto, type HomeStadiumRequest } from '@/services/api/team.service';
 import { FileService } from '@/services/api/file.service';
 import {
   PITCH_TYPE_VALUES,
@@ -20,6 +26,24 @@ import {
  */
 const CreateTeamScreen: React.FC = () => {
   const navigate = useNavigate();
+  const teamActions = useTeamActions();
+
+  // Location permission for stadium search
+  const {
+    showPermissionModal: showLocationPermission,
+    getLocation,
+    handlePermissionResponse: handleLocationPermissionResponse,
+  } = useLocationPermission({
+    storageKey: 'create_team_location_permission',
+    showExplanation: true,
+  });
+
+  // Request location on mount
+  useEffect(() => {
+    getLocation().catch(() => {
+      // Silently fail - user can still search manually
+    });
+  }, []);
 
   // Form state
   const [teamName, setTeamName] = useState('');
@@ -28,6 +52,9 @@ const CreateTeamScreen: React.FC = () => {
   const [pitchTypes, setPitchTypes] = useState<string[]>(['Sân 5']);
   const [stats, setStats] = useState({ attack: 7, defense: 6.5, technique: 8 });
   const [selectedStadium, setSelectedStadium] = useState<StadiumAutocompleteDto | null>(null);
+  const [confirmedCoordinates, setConfirmedCoordinates] = useState<{ lat: number; lng: number } | null>(null);
+  const [stadiumSource, setStadiumSource] = useState<StadiumSource | 'custom' | null>(null);
+  const [placeDetail, setPlaceDetail] = useState<GoongPlaceDetailDto | null>(null);
   const [description, setDescription] = useState('');
 
   // Image uploads
@@ -161,7 +188,9 @@ const CreateTeamScreen: React.FC = () => {
     if (teamName.length < 3 || teamName.length > 100) {
       return 'Tên đội bóng phải từ 3-100 ký tự';
     }
-    // Stadium is optional, no validation needed
+    if (!selectedStadium) {
+      return 'Vui lòng chọn sân nhà để các đội bóng khác có thể tìm đến bạn';
+    }
     return null;
   };
 
@@ -192,22 +221,42 @@ const CreateTeamScreen: React.FC = () => {
         technique: Math.round(stats.technique * 10),
       };
 
-      // Prepare homeStadiumId or homeStadium object
-      let homeStadiumId: string | undefined = undefined;
-      let homeStadium: HomeStadiumRequest | undefined = undefined;
+      // Prepare home stadium data based on source
+      let stadiumData: any = {};
 
       if (selectedStadium) {
-        // If existing stadium (not custom-), send ID
-        if (!selectedStadium.id.startsWith('custom-')) {
-          homeStadiumId = selectedStadium.id;
+        if (stadiumSource === 'database' && !selectedStadium.id.startsWith('goong_') && !selectedStadium.id.startsWith('custom-')) {
+          // Option A: Database stadium with ID
+          stadiumData.homeStadiumId = selectedStadium.id;
+          // If user re-confirmed location, send the updated coordinates
+          if (confirmedCoordinates?.lat && confirmedCoordinates?.lng) {
+            stadiumData.confirmedLat = confirmedCoordinates.lat;
+            stadiumData.confirmedLng = confirmedCoordinates.lng;
+          }
+        } else if (stadiumSource === 'goong_places') {
+          // Option B: Goong Place
+          stadiumData.goongPlaceId = selectedStadium.placeId;
+          stadiumData.stadiumName = placeDetail?.name || selectedStadium.name;
+          stadiumData.confirmedLat = confirmedCoordinates?.lat;
+          stadiumData.confirmedLng = confirmedCoordinates?.lng;
+          stadiumData.stadiumAddress = placeDetail?.formattedAddress || selectedStadium.address;
+          stadiumData.stadiumDistrict = placeDetail?.district || selectedStadium.district;
+          stadiumData.stadiumCity = placeDetail?.city || selectedStadium.city;
         } else {
-          // New stadium needs to be created
-          homeStadium = {
+          // Option C: Custom stadium (backward compatible)
+          const mapUrl =
+            confirmedCoordinates?.lat && confirmedCoordinates?.lng
+              ? `https://www.google.com/maps?q=${confirmedCoordinates.lat},${confirmedCoordinates.lng}`
+              : '';
+
+          stadiumData.homeStadium = {
             name: selectedStadium.name,
-            mapUrl: selectedStadium.mapUrl,
+            mapUrl,
             address: selectedStadium.address,
             district: selectedStadium.district,
             city: selectedStadium.city,
+            lat: confirmedCoordinates?.lat,
+            lng: confirmedCoordinates?.lng,
           };
         }
       }
@@ -217,8 +266,7 @@ const CreateTeamScreen: React.FC = () => {
         gender: formatGenderForApi(gender),
         level: level,
         // Don't send location - backend will get it from stadium
-        homeStadiumId,      // Send if existing stadium selected
-        homeStadium,        // Send if creating new stadium
+        ...stadiumData,     // Spread stadium data (homeStadiumId, goongPlaceId, homeStadium, etc.)
         stats: apiStats,
         pitch: pitchTypes.length > 0 ? pitchTypes : undefined,
         description: description.trim() || undefined,
@@ -226,20 +274,18 @@ const CreateTeamScreen: React.FC = () => {
         banner: bannerUrl,
       };
 
-      // Create team
-      const createResponse = await TeamService.createTeam(teamData);
+      // Create team using store (automatically adds to myTeams)
+      await teamActions.createTeam(teamData);
 
-      if (!createResponse.success || !createResponse.data) {
-        throw new Error(createResponse.error?.message || 'Không thể tạo đội bóng');
-      }
-
-      const team = createResponse.data;
       setUploadProgress(100);
       setUploadStatus('Hoàn tất!');
 
-      // Navigate to team detail
+      // Refresh my teams list from server to ensure data is up-to-date
+      await teamActions.fetchMyTeams(true);
+
+      // Navigate back to previous screen
       setTimeout(() => {
-        navigate(appRoutes.teamDetail(team.id));
+        navigate(-1);
       }, 500);
     } catch (err: any) {
       console.error('Create team error:', err);
@@ -252,30 +298,12 @@ const CreateTeamScreen: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark pb-safe">
+    <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark">
       <Header title="Tạo đội bóng mới" onBack={() => navigate(appRoutes.teams)} />
 
       {/* Error message */}
-      {error && (
-        <div className="mx-4 mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
-          <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-        </div>
-      )}
-
-      {/* Upload status */}
-      {isLoading && uploadStatus && (
-        <div className="mx-4 mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl">
-          <p className="text-sm text-blue-600 dark:text-blue-400 mb-2">{uploadStatus}</p>
-          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-            <div
-              className="bg-primary h-2 rounded-full transition-all duration-300"
-              style={{ width: `${uploadProgress}%` }}
-            />
-          </div>
-        </div>
-      )}
-
-      <div className="p-4 flex flex-col gap-6 overflow-y-auto pb-24">
+      {/* Scrollable content area */}
+      <div className="flex-1 p-4 flex flex-col gap-6 overflow-y-auto pb-4">
 
         {/* Images Section */}
         <div className="flex flex-col gap-4">
@@ -296,8 +324,10 @@ const CreateTeamScreen: React.FC = () => {
                   </div>
                 )}
                 {bannerUrl && !bannerUploading && (
-                  <div className="absolute top-2 right-2 bg-green-500 rounded-full p-1">
-                    <Icon name="check" className="text-white text-sm" />
+                  <div className="absolute top-2 right-2 bg-green-500 rounded-full p-1 shadow-lg flex items-center justify-center">
+                    <span className="material-icons text-white select-none leading-none" style={{ fontSize: '14px' }}>
+                      check
+                    </span>
                   </div>
                 )}
               </>
@@ -320,28 +350,54 @@ const CreateTeamScreen: React.FC = () => {
           {/* Logo Upload */}
           <div className="flex items-center gap-4 px-2">
             <div
-              className="relative size-24 rounded-full bg-gray-100 dark:bg-surface-dark border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center cursor-pointer hover:bg-gray-200 dark:hover:bg-white/5 transition-colors group shrink-0 overflow-hidden"
-              onClick={() => !isLoading && !logoUploading && logoInputRef.current?.click()}
+              className="relative size-24 shrink-0"
             >
-              {logoPreview ? (
-                <>
-                  <img src={logoPreview} alt="Logo" className="w-full h-full object-cover" />
-                  {logoUploading && (
-                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                      <div className="text-center">
-                        <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin block mx-auto"></span>
+              {/* Logo container */}
+              <div
+                className="relative w-full h-full rounded-full bg-gray-100 dark:bg-surface-dark border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center overflow-hidden"
+                onClick={() => !isLoading && !logoUploading && logoInputRef.current?.click()}
+              >
+                {logoPreview ? (
+                  <>
+                    <img src={logoPreview} alt="Logo" className="w-full h-full object-cover" />
+                    {logoUploading && (
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                        <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin block"></span>
                       </div>
-                    </div>
-                  )}
-                  {logoUrl && !logoUploading && (
-                    <div className="absolute top-1 right-1 bg-green-500 rounded-full p-1">
-                      <Icon name="check" className="text-white text-xs" />
-                    </div>
-                  )}
-                </>
-              ) : (
-                <Icon name="add_a_photo" className="text-2xl text-gray-400 group-hover:text-primary transition-colors" />
+                    )}
+                  </>
+                ) : (
+                  <Icon name="add_a_photo" className="text-2xl text-gray-400" />
+                )}
+              </div>
+
+              {/* Edit button - positioned at bottom right, slightly outside */}
+              {!logoUploading && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    logoInputRef.current?.click();
+                  }}
+                  className="absolute bottom-0 right-0 bg-primary hover:bg-primary-dark rounded-full p-1.5 shadow-lg border-2 border-background-light dark:border-background-dark transition-all z-10 flex items-center justify-center"
+                  aria-label="Thay đổi logo"
+                  type="button"
+                >
+                  <span className="material-icons text-white select-none leading-none" style={{ fontSize: '14px' }}>
+                    edit
+                  </span>
+                </button>
               )}
+
+              {/* Upload success indicator - positioned at top right */}
+              {logoUrl && !logoUploading && (
+                <div className="absolute top-0 right-0 bg-green-500 rounded-full p-1 shadow-lg z-10 flex items-center justify-center" aria-hidden="true">
+                  <span className="material-icons text-white select-none leading-none" style={{ fontSize: '12px' }}>
+                    check
+                  </span>
+                </div>
+              )}
+
+              {/* Hidden file input */}
               <input
                 ref={logoInputRef}
                 type="file"
@@ -350,11 +406,6 @@ const CreateTeamScreen: React.FC = () => {
                 onChange={handleLogoSelect}
                 disabled={isLoading || logoUploading}
               />
-              {!logoUploading && (
-                <div className="absolute bottom-0 right-0 bg-primary rounded-full p-1.5 shadow-lg border-2 border-background-light dark:border-background-dark">
-                  <Icon name="edit" className="text-white text-xs" />
-                </div>
-              )}
             </div>
             <div className="flex-1">
               <p className="text-sm font-bold text-slate-900 dark:text-white mb-1">Logo đội bóng</p>
@@ -381,7 +432,6 @@ const CreateTeamScreen: React.FC = () => {
             <label className="text-sm font-medium text-gray-600 dark:text-text-secondary ml-1">Trình độ</label>
             <div className="grid grid-cols-2 gap-3">
               {TEAM_LEVELS.map((l) => {
-                const levelColor = getLevelColor(l);
                 const isSelected = level === l;
                 return (
                   <button
@@ -390,7 +440,7 @@ const CreateTeamScreen: React.FC = () => {
                     disabled={isLoading}
                     className={`py-3 px-4 rounded-xl border text-sm font-semibold transition-all ${
                       isSelected
-                        ? `${levelColor.bg} ${levelColor.border} ${levelColor.main}`
+                        ? 'bg-primary/20 border-primary text-primary'
                         : 'bg-white dark:bg-surface-dark border-gray-200 dark:border-white/10 text-gray-500 hover:border-gray-400'
                     }`}
                   >
@@ -508,19 +558,44 @@ const CreateTeamScreen: React.FC = () => {
             </div>
           </div>
 
-          {/* Sân nhà - Home Stadium (Optional) */}
+          {/* Sân nhà - Home Stadium */}
           <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-gray-600 dark:text-text-secondary ml-1">
-              Sân nhà
-            </label>
+            <div className="flex items-center gap-2 ml-1">
+              <label className="text-sm font-bold text-slate-900 dark:text-white">
+                Sân nhà <span className="text-red-500">*</span>
+              </label>
+            </div>
+
+            {/* Info box explaining the purpose */}
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-3 mb-1">
+              <div className="flex items-start gap-2">
+                <Icon name="info" className="text-blue-500 text-lg mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-xs text-blue-700 dark:text-blue-300 font-semibold mb-1">
+                    Để các đội bóng khác có thể tìm đến bạn
+                  </p>
+                  <p className="text-xs text-blue-600 dark:text-blue-400 leading-relaxed">
+                    Chọn sân nơi đội bóng thường xuyên hoạt động để các đội khác trong khu vực dễ dàng tìm thấy và gửi lời mời giao lưu.
+                  </p>
+                  <p className="text-xs text-blue-600 dark:text-blue-400 leading-relaxed mt-1">
+                    💡 <span className="font-medium">Chưa có sân nhà?</span> Hãy tìm và chọn 1 sân trong khu vực của bạn!
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <StadiumAutocomplete
               value={selectedStadium}
-              onChange={setSelectedStadium}
+              onChange={(stadium, coordinates, detail) => {
+                setSelectedStadium(stadium);
+                setStadiumSource(stadium?.source || 'custom');
+                setPlaceDetail(detail || null);
+                if (coordinates) {
+                  setConfirmedCoordinates(coordinates);
+                }
+              }}
               disabled={isLoading}
             />
-            <p className="text-xs text-gray-500 ml-1">
-              Chọn sân nơi đội bóng thường xuyên hoạt động (Optional)
-            </p>
           </div>
 
           <div className="flex flex-col gap-2">
@@ -536,11 +611,46 @@ const CreateTeamScreen: React.FC = () => {
         </div>
       </div>
 
-      <div className="mt-auto p-4 border-t border-gray-200 dark:border-white/5 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur z-20">
-        <Button fullWidth onClick={handleCreate} disabled={isLoading}>
-          {isLoading ? 'ĐANG TẠO...' : 'TẠO ĐỘI BÓNG'}
-        </Button>
+      {/* Fixed bottom bar with status messages and button */}
+      <div className="mt-auto border-t border-gray-200 dark:border-white/5 bg-background-light dark:bg-background-dark pb-safe z-20">
+        {/* Error message */}
+        {error && (
+          <div className="p-4 border-b border-gray-100 dark:border-white/5">
+            <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
+              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Upload status */}
+        {isLoading && uploadStatus && (
+          <div className="p-4 border-b border-gray-100 dark:border-white/5">
+            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl">
+              <p className="text-sm text-blue-600 dark:text-blue-400 mb-2">{uploadStatus}</p>
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div
+                  className="bg-primary h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Button */}
+        <div className="p-4">
+          <Button fullWidth onClick={handleCreate} disabled={isLoading}>
+            {isLoading ? 'ĐANG TẠO...' : 'TẠO ĐỘI BÓNG'}
+          </Button>
+        </div>
       </div>
+
+      {/* Location Permission Modal */}
+      <StadiumLocationPermissionModal
+        isOpen={showLocationPermission}
+        onAllow={() => handleLocationPermissionResponse(true)}
+        onDeny={() => handleLocationPermissionResponse(false)}
+      />
     </div>
   );
 };

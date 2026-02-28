@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { Icon, TeamAvatar } from '@/components/ui';
 import { Button } from '@/components/ui/Button';
-import { appRoutes } from '@/utils/navigation';
 import { useTeamDetail } from '@/hooks/useTeamDetail';
 import type { DiscoveredTeam } from '@/services/api/discovery.service';
 import { getLevelColor, LEVEL_ICON, STAT_COLORS, STAT_ICONS } from '@/constants/design';
@@ -40,6 +39,13 @@ const formatLastActive = (lastActive?: string) => {
   }
 };
 
+// Helper function to format stadium address
+const formatStadiumAddress = (stadium?: { address?: string; district?: string; city?: string }): string => {
+  if (!stadium) return '...';
+  const parts = [stadium.address, stadium.district, stadium.city].filter(Boolean);
+  return parts.join(', ') || '...';
+};
+
 /**
  * OpponentDetail Screen - Tinder Style
  *
@@ -63,11 +69,13 @@ const OpponentDetail: React.FC = () => {
     sortBy?: string;
     compatibilityScore?: number;
     qualityScore?: number;
+    activityScore?: number;
   } | undefined;
 
   const teamFromState = navState?.team;
   const compatibilityScoreFromState = navState?.compatibilityScore;
   const qualityScoreFromState = navState?.qualityScore;
+  const activityScoreFromState = navState?.activityScore;
 
   // Use hook for opponent detail with caching
   const { team: teamFromApi, isLoading, error, isRefreshing, refresh } = useTeamDetail(teamId, true);
@@ -75,8 +83,8 @@ const OpponentDetail: React.FC = () => {
   // Prioritize data from navigation state, fallback to API data
   const team = teamFromState || teamFromApi;
 
-  // Use compatibility score from state or calculate from team quality
-  const compatibilityScore = compatibilityScoreFromState || Math.round(((team?.qualityScore || 0.5) * 100));
+  // Use compatibility score from state or calculate from team compatibility
+  const compatibilityScore = compatibilityScoreFromState || Math.round(((team?.compatibilityScore || 0.5) * 100));
 
   // Only show loading if we don't have state data AND still loading from API
   const isLoadingFinal = !teamFromState && isLoading && !isRefreshing;
@@ -140,8 +148,10 @@ const OpponentDetail: React.FC = () => {
   }
 
   const lastActiveInfo = formatLastActive(team.lastActive);
-  const qualityScore = qualityScoreFromState || (team.qualityScore || 0);
-  const isVerified = qualityScore >= 0.8;
+  const qualityScore = qualityScoreFromState || Math.round((team.qualityScore || 0) * 100);
+  const activityScore = activityScoreFromState || Math.round((team.activityScore || 0) * 100);
+  const compatibilityScoreCalculated = compatibilityScoreFromState || Math.round((team.compatibilityScore || 0) * 100);
+  const isVerified = qualityScore >= 80;
 
   return (
     <div
@@ -301,15 +311,22 @@ const OpponentDetail: React.FC = () => {
             );
           })()}
 
-          {/* Location */}
+          {/* Home Stadium */}
           <div className="bg-white/80 dark:bg-surface-dark/80 backdrop-blur-sm rounded-2xl p-3 border border-gray-100 dark:border-white/5 shadow-sm">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center">
-                <Icon name="location_on" className="text-blue-500 text-lg" />
+                <Icon name="stadium" className="text-blue-500 text-lg" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[10px] text-gray-500 uppercase font-bold">Khu vực</p>
-                <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{team.location?.address || '...'}</p>
+                <p className="text-[10px] text-gray-500 uppercase font-bold">Sân nhà</p>
+                {team.homeStadium ? (
+                  <>
+                    <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{team.homeStadium.name}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{formatStadiumAddress(team.homeStadium)}</p>
+                  </>
+                ) : (
+                  <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{formatStadiumAddress(team.location)}</p>
+                )}
               </div>
             </div>
           </div>
@@ -388,6 +405,105 @@ const OpponentDetail: React.FC = () => {
           </div>
         )}
 
+        {/* Quality Scores Section - Quality, Activity, Compatibility */}
+        {(qualityScore > 0 || activityScore > 0 || compatibilityScoreCalculated > 0) && (
+          <div className="bg-white/80 dark:bg-surface-dark/80 backdrop-blur-sm rounded-2xl p-4 border border-gray-100 dark:border-white/5 shadow-sm">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-3">Chỉ số đánh giá</h3>
+            <div className="grid grid-cols-3 gap-3">
+              {/* Quality Score */}
+              {qualityScore > 0 && (
+                <div className="flex flex-col items-center gap-1.5">
+                  <div className="relative w-14 h-14">
+                    <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                      <path
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="3"
+                        className="text-gray-200 dark:text-gray-700"
+                      />
+                      <path
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="3"
+                        strokeDasharray={`${qualityScore}, 100`}
+                        className={qualityScore >= 80 ? 'text-primary' : qualityScore >= 60 ? 'text-amber-500' : 'text-gray-500'}
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className={`text-xs font-bold ${qualityScore >= 80 ? 'text-primary' : qualityScore >= 60 ? 'text-amber-500' : 'text-gray-500'}`}>
+                        {qualityScore}
+                      </span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase">Chất lượng</span>
+                </div>
+              )}
+
+              {/* Activity Score */}
+              {activityScore > 0 && (
+                <div className="flex flex-col items-center gap-1.5">
+                  <div className="relative w-14 h-14">
+                    <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                      <path
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="3"
+                        className="text-gray-200 dark:text-gray-700"
+                      />
+                      <path
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="3"
+                        strokeDasharray={`${activityScore}, 100`}
+                        className={activityScore >= 80 ? 'text-orange-500' : activityScore >= 60 ? 'text-amber-500' : 'text-gray-500'}
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className={`text-xs font-bold ${activityScore >= 80 ? 'text-orange-500' : activityScore >= 60 ? 'text-amber-500' : 'text-gray-500'}`}>
+                        {activityScore}
+                      </span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase">Hoạt động</span>
+                </div>
+              )}
+
+              {/* Compatibility Score */}
+              {compatibilityScoreCalculated > 0 && (
+                <div className="flex flex-col items-center gap-1.5">
+                  <div className="relative w-14 h-14">
+                    <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                      <path
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="3"
+                        className="text-gray-200 dark:text-gray-700"
+                      />
+                      <path
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="3"
+                        strokeDasharray={`${compatibilityScoreCalculated}, 100`}
+                        className={compatibilityScoreCalculated >= 80 ? 'text-pink-500' : compatibilityScoreCalculated >= 60 ? 'text-amber-500' : 'text-gray-500'}
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Icon name="favorite" filled className={compatibilityScoreCalculated >= 80 ? 'text-pink-500' : compatibilityScoreCalculated >= 60 ? 'text-amber-500' : 'text-gray-500'} />
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase">Hợp cạ</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* About Section */}
         {team.description && (
           <div className="bg-white/80 dark:bg-surface-dark/80 backdrop-blur-sm rounded-2xl p-4 border border-gray-100 dark:border-white/5 shadow-sm">
@@ -443,30 +559,6 @@ const OpponentDetail: React.FC = () => {
         )}
       </div>
 
-      {/* Action Footer - Glassmorphism */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 dark:bg-surface-dark/95 backdrop-blur-lg border-t border-gray-200 dark:border-white/5 z-40">
-        <div className="flex gap-3 max-w-md mx-auto items-center">
-          {/* X button */}
-          <button
-            onClick={() => navigate(-1)}
-            className="size-14 rounded-full bg-gradient-to-br from-red-500 to-red-600 shadow-lg shadow-red-500/30 flex items-center justify-center text-white hover:scale-105 transition-transform active:scale-95"
-          >
-            <Icon name="close" className="text-2xl" />
-          </button>
-
-          {/* Invite button */}
-          <Button
-            className="flex-1 h-14 text-base shadow-lg shadow-primary/30"
-            variant="primary"
-            icon="sports"
-            onClick={() => navigate(appRoutes.matchInvite, {
-              state: { opponentTeam: { id: team.id, name: team.name, logo: team.logo } }
-            })}
-          >
-            Mời giao lưu
-          </Button>
-        </div>
-      </div>
     </div>
   );
 };

@@ -156,7 +156,8 @@ export const useFileStore = create<FileState>((set, get) => ({
       set({ isLoading: true, error: null });
 
       const response = await apiUploadFile(
-        { file, entityType, entityId, fileType },
+        `/files/upload`,
+        file,
         (progress) => {
           get().setUploadProgress(fileId, progress, file.name);
           onProgress?.(progress);
@@ -165,12 +166,12 @@ export const useFileStore = create<FileState>((set, get) => ({
 
       if (response.success && response.data) {
         // Add to uploaded files
-        get().addUploadedFile(entityId, response.data.file);
+        get().addUploadedFile(entityId, response.data);
 
         // Remove upload progress
         get().removeUploadProgress(fileId);
 
-        return response.data.file;
+        return response.data;
       } else {
         throw new Error(response.error?.message || 'Failed to upload file');
       }
@@ -198,22 +199,22 @@ export const useFileStore = create<FileState>((set, get) => ({
       set({ isLoading: true, error: null });
 
       const response = await apiUploadFile(
-        { file, fileType: 'logo' },
+        `/files/team/${teamId}/logo`,
+        file,
         (progress) => {
           get().setUploadProgress(fileId, progress, file.name);
           onProgress?.(progress);
-        },
-        `/files/team/${teamId}/logo`
+        }
       );
 
       if (response.success && response.data) {
         // Add to uploaded files
-        get().addUploadedFile(teamId, response.data.file);
+        get().addUploadedFile(teamId, response.data);
 
         // Remove upload progress
         get().removeUploadProgress(fileId);
 
-        return response.data.file;
+        return response.data;
       } else {
         throw new Error(response.error?.message || 'Failed to upload logo');
       }
@@ -241,22 +242,22 @@ export const useFileStore = create<FileState>((set, get) => ({
       set({ isLoading: true, error: null });
 
       const response = await apiUploadFile(
-        { file, fileType: 'banner' },
+        `/files/team/${teamId}/banners`,
+        file,
         (progress) => {
           get().setUploadProgress(fileId, progress, file.name);
           onProgress?.(progress);
-        },
-        `/files/team/${teamId}/banners`
+        }
       );
 
       if (response.success && response.data) {
         // Add to uploaded files
-        get().addUploadedFile(teamId, response.data.file);
+        get().addUploadedFile(teamId, response.data);
 
         // Remove upload progress
         get().removeUploadProgress(fileId);
 
-        return response.data.file;
+        return response.data;
       } else {
         throw new Error(response.error?.message || 'Failed to upload banner');
       }
@@ -284,19 +285,19 @@ export const useFileStore = create<FileState>((set, get) => ({
       set({ isLoading: true, error: null });
 
       const response = await apiUploadFile(
-        { file, fileType: 'avatar' },
+        `/files/user/avatar`,
+        file,
         (progress) => {
           get().setUploadProgress(fileId, progress, file.name);
           onProgress?.(progress);
-        },
-        `/files/user/avatar`
+        }
       );
 
       if (response.success && response.data) {
         // Remove upload progress
         get().removeUploadProgress(fileId);
 
-        return response.data.file;
+        return response.data;
       } else {
         throw new Error(response.error?.message || 'Failed to upload avatar');
       }
@@ -316,6 +317,8 @@ export const useFileStore = create<FileState>((set, get) => ({
   /**
    * Upload user banner
    * POST /files/user/banner
+   *
+   * Note: Using /files/upload with fileType=banner if dedicated endpoint doesn't exist
    */
   uploadUserBanner: async (file, onProgress) => {
     const fileId = generateFileId();
@@ -324,19 +327,19 @@ export const useFileStore = create<FileState>((set, get) => ({
       set({ isLoading: true, error: null });
 
       const response = await apiUploadFile(
-        { file, fileType: 'banner' },
+        `/files/user/banner`,
+        file,
         (progress) => {
           get().setUploadProgress(fileId, progress, file.name);
           onProgress?.(progress);
-        },
-        `/files/user/banner`
+        }
       );
 
       if (response.success && response.data) {
         // Remove upload progress
         get().removeUploadProgress(fileId);
 
-        return response.data.file;
+        return response.data;
       } else {
         throw new Error(response.error?.message || 'Failed to upload banner');
       }

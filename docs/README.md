@@ -201,14 +201,6 @@ devtools(/* store config */, { name: 'StoreName' })
 // - ❌ API Error
 ```
 
-### Mock Mode
-
-Enable bypass Zalo auth in [src/services/zalo-three-step-auth.ts:63](../src/services/zalo-three-step-auth.ts#L63):
-
-```typescript
-const BYPASS_ZALO_AUTH = true;
-```
-
 ## 📞 Support
 
 ### Zalo Mini App Resources

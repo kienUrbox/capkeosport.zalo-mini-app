@@ -100,7 +100,7 @@ export const SettingsMenuItem: React.FC<SettingsMenuItemProps> = ({
       {/* Left: Icon + Label */}
       <div className="flex items-center gap-3">
         {/* Icon */}
-        <div className={`p-2 rounded-xl ${iconBackground ? classes.iconBg : ''}`}>
+        <div className={`p-2 pb-1 rounded-xl ${iconBackground ? classes.iconBg : ''}`}>
           <Icon name={icon} className={`${iconColorOverride} text-lg`} />
         </div>
 

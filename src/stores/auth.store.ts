@@ -293,7 +293,7 @@ export const useAuthStore = create<AuthState>()(
         try {
           set({ isLoading: true, error: null });
 
-          const response = await api.get('/auth/profile', undefined, forceRefresh ? { noCache: true } : undefined);
+          const response = await api.get('/auth/profile', forceRefresh ? { noCache: true } : undefined);
 
           if (response.success && response.data) {
             set({ user: response.data, error: null });
@@ -446,19 +446,21 @@ export const updateTokens = (tokens: AuthTokens, user?: User): void => {
 
 /**
  * Check if user is authenticated based on token presence and metadata
+ * Uses refresh token expiry (typically 7-30 days) instead of access token expiry (1 hour)
  */
 export const hasValidAuth = (): boolean => {
   const state = useAuthStore.getState();
   const { tokens, metadata } = state;
 
-  if (!tokens?.accessToken) {
+  if (!tokens?.refreshToken) {
     return false;
   }
 
-  // Check if token is expired (1 hour for access tokens)
+  // Check if refresh token is expired (e.g., 30 days)
+  // Access tokens expire in 1 hour but can be refreshed using the refresh token
   if (metadata.authTimestamp) {
     const tokenAge = Date.now() - metadata.authTimestamp;
-    const maxAge = 60 * 60 * 1000; // 1 hour
+    const maxAge = 30 * 24 * 60 * 60 * 1000; // 30 days - match your backend refresh token expiry
     if (tokenAge > maxAge) {
       return false;
     }

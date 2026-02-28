@@ -56,6 +56,7 @@ export interface Match {
   type?: 'matched' | 'received' | 'sent' | 'accepted';
   requestedByTeam?: string;
   acceptedByTeam?: string;
+  proposedPitch?: string;
   notes?: string;
   // Match result fields
   result?: {
@@ -215,6 +216,7 @@ const transformApiMatch = (
     type,
     requestedByTeam: apiMatch.requestedByTeam,
     acceptedByTeam: apiMatch.acceptedByTeam,
+    proposedPitch: apiMatch.proposedPitch,
     notes: apiMatch.notes,
     // Result data - will be populated when includeResult=true
     ...(apiMatch.result && {
@@ -299,7 +301,7 @@ interface MatchState {
 
   // API Actions with pagination support
   fetchUpcomingMatches: (teamId?: string, page?: number, forceRefresh?: boolean) => Promise<void>;
-  fetchPendingMatches: (teamId?: string, page?: number, forceRefresh?: boolean) => Promise<void>;
+  fetchPendingMatches: (teamId?: string, page?: number, forceRefresh?: boolean, filter?: 'matched' | 'requested') => Promise<void>;
   fetchHistoryMatches: (teamId?: string, page?: number, forceRefresh?: boolean) => Promise<void>;
 
   // Match Action Methods
@@ -515,7 +517,7 @@ export const useMatchStore = create<MatchState>()(
         }
       },
 
-      fetchPendingMatches: async (teamId?: string, page: number = 1, forceRefresh: boolean = false) => {
+      fetchPendingMatches: async (teamId?: string, page: number = 1, forceRefresh: boolean = false, filter?: 'matched' | 'requested') => {
         try {
           const currentState = get();
 
@@ -548,7 +550,7 @@ export const useMatchStore = create<MatchState>()(
           }
 
           const response = await MatchService.getMatches({
-            statuses: ['MATCHED', 'REQUESTED', 'ACCEPTED'], // Chờ kèo
+            statuses: filter ? (filter === 'matched' ? ['MATCHED'] : ['REQUESTED', 'ACCEPTED']) : ['MATCHED', 'REQUESTED', 'ACCEPTED'], // Chờ kèo
             teamId,
             page,
             limit: 10

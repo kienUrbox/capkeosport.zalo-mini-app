@@ -56,6 +56,7 @@ export const hasAdminPermission = (userRole?: UserRole): boolean => {
 
 interface TeamState {
   // State
+  _hasFetchedMyTeams: boolean;
   myTeams: Team[];
   selectedTeam: Team | null;
   teamMembers: TeamMember[];
@@ -233,6 +234,7 @@ export const useTeamStore = create<TeamState>()(
   persist(
     (set, get) => ({
       // Initial state
+      _hasFetchedMyTeams: false,
       myTeams: [],
       selectedTeam: null,
       teamMembers: [],
@@ -371,9 +373,9 @@ export const useTeamStore = create<TeamState>()(
             return;
           }
 
-          // Skip if already has teams UNLESS forceRefresh is true
-          if (!forceRefresh && currentState.myTeams.length > 0) {
-            console.log('[TeamStore] Skipping fetchMyTeams - already has teams (use forceRefresh=true to refresh)');
+          // Skip if already fetched and not forcing refresh
+          if (!forceRefresh && currentState._hasFetchedMyTeams) {
+            console.log('[TeamStore] Already fetched myTeams, use forceRefresh=true to refresh');
             return;
           }
 
@@ -387,7 +389,7 @@ export const useTeamStore = create<TeamState>()(
             const currentUserId = getCurrentUserId();
             const transformedTeams: Team[] = teams.map((apiTeam: ApiTeam) => transformApiTeam(apiTeam, currentUserId));
 
-            set({ myTeams: transformedTeams, error: null });
+            set({ _hasFetchedMyTeams: true, myTeams: transformedTeams, error: null });
 
             // Auto-select first team if no team is selected
             const newState = get();
@@ -936,6 +938,7 @@ export const useTeamStore = create<TeamState>()(
     {
       name: 'team-storage',
       partialize: (state) => ({
+        _hasFetchedMyTeams: state._hasFetchedMyTeams,
         myTeams: state.myTeams,
         selectedTeam: state.selectedTeam,
         // Don't persist: currentTeamDetail, currentOpponentDetail (memory only)

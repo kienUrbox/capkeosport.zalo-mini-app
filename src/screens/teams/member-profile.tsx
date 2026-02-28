@@ -82,11 +82,11 @@ const MemberProfileScreen: React.FC = () => {
       <div className="overflow-y-auto">
         {/* Banner */}
         {member.user?.banner ? (
-          <div className="h-40 w-full overflow-hidden">
+          <div className="h-64 w-full overflow-hidden">
             <img src={member.user.banner} className="w-full h-full object-cover" alt="Banner" />
           </div>
         ) : (
-          <div className="h-40 w-full bg-gradient-to-br from-primary/20 via-primary/10 to-background-light dark:from-primary/30 dark:via-primary/20 dark:to-background-dark" />
+          <div className="h-64 w-full bg-gradient-to-br from-primary/20 via-primary/10 to-background-light dark:from-primary/30 dark:via-primary/20 dark:to-background-dark" />
         )}
 
         <div className="p-4">

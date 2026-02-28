@@ -23,11 +23,24 @@ export interface TeamStats {
 
 // Home Stadium Request - For creating/linking stadium when creating team
 export interface HomeStadiumRequest {
-  name: string; // Stadium name (required)
-  mapUrl: string; // Google Maps URL (required)
+  // Option A: ID of existing stadium from database
+  homeStadiumId?: string;
+  // Option B: Goong Place
+  goongPlaceId?: string;
+  stadiumName?: string;
+  confirmedLat?: number;
+  confirmedLng?: number;
+  stadiumAddress?: string;
+  stadiumDistrict?: string;
+  stadiumCity?: string;
+  // Legacy fields for backward compatibility
+  name?: string;
+  mapUrl?: string;
   address?: string;
   district?: string;
   city?: string;
+  lat?: number;
+  lng?: number;
 }
 
 // Create Team Request DTO - Matches API documentation

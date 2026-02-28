@@ -99,13 +99,16 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       }
 
       set({ isLoading: true, error: null });
+      console.log('[NotificationStore] 📥 Fetching notifications with params:', params);
 
-      const response = await api.get<{ items: Notification[]; total: number; unread: number } | Notification[]>('/notifications', params);
+      const response = await api.get<{ items: Notification[]; total: number; unread: number } | Notification[]>('/notifications', { params });
+      console.log('[NotificationStore] 📬 API response:', response);
 
       if (response.success && response.data) {
-        // Handle both response formats:
-        // 1. Paginated: { items: [...], total: ..., unread: ... }
-        // 2. Direct array: [...]
+        // Handle multiple response formats:
+        // 1. API format: { notifications: [...], total: ..., unreadCount: ..., pagination: {...} }
+        // 2. Paginated: { items: [...], total: ..., unread: ... }
+        // 3. Direct array: [...]
         let notifications: Notification[] = [];
         let unread = 0;
 
@@ -113,10 +116,31 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
           // Direct array response
           notifications = response.data;
           unread = notifications.filter((n) => !n.isRead).length;
+        } else if ('notifications' in response.data) {
+          // API format with notifications array
+          notifications = response.data.notifications || [];
+          unread = response.data.unreadCount || notifications.filter((n) => !n.isRead).length;
         } else {
-          // Paginated response
+          // Paginated response with items
           notifications = response.data.items || [];
           unread = response.data.unread || notifications.filter((n) => !n.isRead).length;
+        }
+
+        console.log('[NotificationStore] 📊 Raw notifications:', notifications.length);
+        console.log('[NotificationStore] 🔍 First notification:', notifications[0]);
+
+        // Filter by type if specified in params
+        if (params?.type) {
+          const beforeFilter = notifications.length;
+          notifications = notifications.filter((n) => n.type === params.type);
+          console.log('[NotificationStore] 🎯 Filtered by type:', params.type, 'from', beforeFilter, 'to', notifications.length);
+        }
+
+        // Filter by unread status if specified
+        if (params?.unreadOnly) {
+          const beforeFilter = notifications.length;
+          notifications = notifications.filter((n) => !n.isRead);
+          console.log('[NotificationStore] 📭 Filtered unread only: from', beforeFilter, 'to', notifications.length);
         }
 
         set({

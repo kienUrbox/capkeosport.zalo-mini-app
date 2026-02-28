@@ -233,7 +233,7 @@ const EditProfileScreen: React.FC = () => {
       <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-24">
         {/* Banner Upload */}
         <div className="relative group cursor-pointer -mx-4 -mt-4" onClick={handleBannerClick}>
-          <div className="h-40 overflow-hidden bg-gradient-to-r from-primary to-green-600 relative">
+          <div className="h-64 overflow-hidden bg-gradient-to-r from-primary to-green-600 relative">
             {uploadedBannerUrl ? (
               <>
                 <img

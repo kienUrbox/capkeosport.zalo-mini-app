@@ -53,7 +53,7 @@ const TeamsScreen: React.FC = () => {
   // Fetch teams on mount
   useEffect(() => {
     const loadTeams = async () => {
-      if (myTeams.length === 0 && !teamStore.isLoading) {
+      if (!teamStore.isLoading) {
         try {
           setError(null);
           await fetchMyTeams();

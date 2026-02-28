@@ -232,7 +232,7 @@ export const MatchRequestModal: React.FC<MatchRequestModalProps> = ({
             </label>
             <textarea
               className="w-full bg-white dark:bg-surface-dark border border-gray-200 dark:border-border-dark rounded-xl p-3 text-sm text-slate-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-primary focus:border-transparent min-h-[100px] resize-none"
-              placeholder="Nhắn tin cho đội bạn về áo đấu, kèo nước..."
+              placeholder="Ghi chú: mời giao lưu chân thành, chia sẻ sân 50/50,..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               maxLength={200}

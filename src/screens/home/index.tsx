@@ -211,20 +211,22 @@ const DashboardScreen: React.FC = () => {
             {isLoading ? (
               <InvitationSkeleton />
             ) : (
-              pendingInvitations.map((invite) => {
-                // Handle both PhoneInvite and legacy Notification types
-                const isPhoneInvite = 'teamName' in invite && 'inviterName' in invite;
-                const teamLogo = isPhoneInvite ? (invite as unknown as PhoneInvite).teamLogo : (invite as { data?: { teamLogo?: string } }).data?.teamLogo;
-                const teamName = isPhoneInvite ? (invite as unknown as PhoneInvite).teamName : (invite as { data?: { teamName?: string } }).data?.teamName;
-                const inviterName = isPhoneInvite ? (invite as unknown as PhoneInvite).inviterName : (invite as { data?: { inviterName?: string } }).data?.inviterName;
-                const teamId = isPhoneInvite ? (invite as unknown as PhoneInvite).teamId : (invite as { data?: { teamId?: string } }).data?.teamId;
-                const createdAt = isPhoneInvite ? (invite as unknown as PhoneInvite).createdAt : (invite as { createdAt?: string }).createdAt;
+              <div className="flex overflow-x-auto gap-3 pb-4 no-scrollbar">
+                {pendingInvitations.map((invite) => {
+                  // Handle both PhoneInvite and legacy Notification types
+                  const isPhoneInvite = 'teamName' in invite && 'inviterName' in invite;
+                  const teamLogo = isPhoneInvite ? (invite as unknown as PhoneInvite).teamLogo : (invite as { data?: { teamLogo?: string } }).data?.teamLogo;
+                  const teamName = isPhoneInvite ? (invite as unknown as PhoneInvite).teamName : (invite as { data?: { teamName?: string } }).data?.teamName;
+                  const inviterName = isPhoneInvite ? (invite as unknown as PhoneInvite).inviterName : (invite as { data?: { inviterName?: string } }).data?.inviterName;
+                  const teamId = isPhoneInvite ? (invite as unknown as PhoneInvite).teamId : (invite as { data?: { teamId?: string } }).data?.teamId;
+                  const createdAt = isPhoneInvite ? (invite as unknown as PhoneInvite).createdAt : (invite as { createdAt?: string }).createdAt;
 
-                return (
-                  <div
-                    key={invite.id}
-                    className="bg-white dark:bg-surface-dark border-l-4 border-primary rounded-r-2xl p-4 shadow-md flex flex-col gap-3 relative overflow-hidden mb-3"
-                  >
+                  return (
+                    <div
+                      key={invite.id}
+                      className="min-w-[320px] shrink-0"
+                    >
+                      <div className="bg-white dark:bg-surface-dark border-l-4 border-primary rounded-r-2xl p-4 shadow-md flex flex-col gap-3 relative overflow-hidden h-full">
                     <div className="flex items-center gap-3">
                       {teamLogo ? (
                         <TeamAvatar
@@ -275,8 +277,10 @@ const DashboardScreen: React.FC = () => {
                       </Button>
                     </div>
                   </div>
-                );
-              })
+                </div>
+              );
+              })}
+            </div>
             )}
           </section>
         )}

@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon, Button, TeamAvatar } from '@/components/ui';
 import { appRoutes } from '@/utils/navigation';
+import { getLevelColor } from '@/constants/design';
 import type { Match } from '@/stores/match.store';
 
 // ==================== Pending Match Card ====================
@@ -17,6 +18,7 @@ interface PendingMatchCardProps {
   onSendRequest?: (id: string) => void;
   onEditRequest?: (id: string) => void;
   onShowGuide?: () => void;
+  index?: number; // For staggered entrance animation
 }
 
 export const PendingMatchCard: React.FC<PendingMatchCardProps> = ({
@@ -30,37 +32,80 @@ export const PendingMatchCard: React.FC<PendingMatchCardProps> = ({
   onSendRequest,
   onEditRequest,
   onShowGuide,
+  index = 0,
 }) => {
   const navigate = useNavigate();
+  const [notesExpanded, setNotesExpanded] = useState(false);
+
+  // Truncate team name at 24 chars
+  const displayName = match.teamB.name?.length > 24
+    ? `${match.teamB.name.slice(0, 24)}...`
+    : match.teamB.name;
+
+  // Get level color styling
+  const levelColor = match.teamB.level ? getLevelColor(match.teamB.level) : null;
+
+  // Format relative time for display
+  const getRelativeTime = () => {
+    // This could be enhanced with actual relative time calculation
+    // For now, we'll return empty to keep it simple
+    return '';
+  };
+
+  // Calculate stagger delay based on index (max 6 cards)
+  const animationDelay = Math.min(index * 75, 375);
 
   const renderStatus = () => {
     switch (match.type) {
       case 'matched':
         return (
-          <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
-            Đã match
-          </span>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-md shadow-purple-500/20">
+            <Icon name="handshake" size="sm" />
+            <span className="text-xs font-bold">Đã match</span>
+          </div>
         );
       case 'received':
         return (
-          <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border border-yellow-500/20">
-            Lời mời mới
-          </span>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-yellow-500 to-yellow-600 text-white shadow-md shadow-yellow-500/20 animate-status-pulse">
+            <Icon name="notifications" size="sm" />
+            <span className="text-xs font-bold">Lời mời mới</span>
+          </div>
         );
       case 'sent':
         return (
-          <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-gray-500/10 text-gray-500 border border-gray-500/20">
-            Đã gửi • Chờ phản hồi
-          </span>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-gray-400 to-gray-500 text-white shadow-sm">
+            <Icon name="schedule" size="sm" />
+            <div className="flex flex-col">
+              <span className="text-xs font-bold leading-tight">Đã gửi</span>
+              <span className="text-[10px] opacity-90">Chờ phản hồi</span>
+            </div>
+          </div>
         );
       case 'accepted':
         return (
-          <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20">
-            Đã đồng ý
-          </span>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-green-500 to-green-600 text-white shadow-md shadow-green-500/20">
+            <Icon name="check_circle" size="sm" />
+            <span className="text-xs font-bold">Đã đồng ý</span>
+          </div>
         );
       default:
         return null;
+    }
+  };
+
+  // Get status color for border gradient
+  const getStatusGradient = () => {
+    switch (match.type) {
+      case 'matched':
+        return 'from-purple-500 via-purple-500/50 to-transparent';
+      case 'received':
+        return 'from-yellow-500 via-yellow-500/50 to-transparent';
+      case 'sent':
+        return 'from-gray-400 via-gray-400/50 to-transparent';
+      case 'accepted':
+        return 'from-green-500 via-green-500/50 to-transparent';
+      default:
+        return 'from-transparent via-transparent to-transparent';
     }
   };
 
@@ -80,17 +125,17 @@ export const PendingMatchCard: React.FC<PendingMatchCardProps> = ({
     switch (match.type) {
       case 'matched':
         return (
-          <div className="flex gap-3 mt-3" onClick={(e) => e.stopPropagation()}>
+          <div className="flex gap-3 mt-3 button-press" onClick={(e) => e.stopPropagation()}>
             <Button
               variant="secondary"
-              className="flex-1 h-10 text-xs"
+              className="flex-1 h-11 text-sm"
               icon="close"
               onClick={() => onCancel?.(match.id)}
             >
               Bỏ qua
             </Button>
             <Button
-              className="flex-1 h-10 text-xs"
+              className="flex-1 h-11 text-sm font-semibold shadow-lg shadow-primary/20"
               icon="send"
               onClick={() => onSendRequest?.(match.id)}
             >
@@ -100,17 +145,17 @@ export const PendingMatchCard: React.FC<PendingMatchCardProps> = ({
         );
       case 'received':
         return (
-          <div className="flex gap-3 mt-3" onClick={(e) => e.stopPropagation()}>
+          <div className="flex gap-3 mt-3 button-press" onClick={(e) => e.stopPropagation()}>
             <Button
               variant="secondary"
-              className="flex-1 h-10 text-xs"
+              className="flex-1 h-11 text-sm"
               icon="close"
               onClick={() => onDecline?.(match.id)}
             >
               Từ chối
             </Button>
             <Button
-              className="flex-1 h-10 text-xs"
+              className="flex-1 h-11 text-sm font-semibold shadow-lg shadow-yellow-500/20 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white"
               icon="check"
               onClick={() => onAccept?.(match.id)}
             >
@@ -122,10 +167,10 @@ export const PendingMatchCard: React.FC<PendingMatchCardProps> = ({
         // Nếu không có quyền edit, chỉ hiện button "Hủy lời mời"
         if (!canEditRequest) {
           return (
-            <div className="flex gap-3 mt-3" onClick={(e) => e.stopPropagation()}>
+            <div className="flex gap-3 mt-3 button-press" onClick={(e) => e.stopPropagation()}>
               <Button
                 variant="secondary"
-                className="flex-1 h-10 text-xs border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/30 dark:text-red-400 dark:hover:bg-red-900/10"
+                className="flex-1 h-11 text-sm border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/30 dark:text-red-400 dark:hover:bg-red-900/10"
                 icon="undo"
                 onClick={() => onCancel?.(match.id)}
               >
@@ -136,10 +181,10 @@ export const PendingMatchCard: React.FC<PendingMatchCardProps> = ({
         }
         // Có quyền edit - hiện cả 2 buttons
         return (
-          <div className="flex gap-3 mt-3" onClick={(e) => e.stopPropagation()}>
+          <div className="flex gap-3 mt-3 button-press" onClick={(e) => e.stopPropagation()}>
             <Button
               variant="secondary"
-              className="flex-1 h-10 text-xs"
+              className="flex-1 h-11 text-sm"
               icon="edit"
               onClick={() => onEditRequest?.(match.id)}
             >
@@ -147,7 +192,7 @@ export const PendingMatchCard: React.FC<PendingMatchCardProps> = ({
             </Button>
             <Button
               variant="secondary"
-              className="flex-1 h-10 text-xs border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/30 dark:text-red-400 dark:hover:bg-red-900/10"
+              className="flex-1 h-11 text-sm border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/30 dark:text-red-400 dark:hover:bg-red-900/10"
               icon="undo"
               onClick={() => onCancel?.(match.id)}
             >
@@ -156,32 +201,37 @@ export const PendingMatchCard: React.FC<PendingMatchCardProps> = ({
           </div>
         );
       case 'accepted':
+        // Stacked layout: Primary button top row, secondary buttons bottom row
         return (
-          <div className="flex gap-3 mt-3" onClick={(e) => e.stopPropagation()}>
+          <div className="mt-3 button-press" onClick={(e) => e.stopPropagation()}>
+            {/* Primary action - Chốt kèo - full width top row */}
             <Button
-              variant="secondary"
-              className="flex-1 h-10 text-xs"
-              icon="chat"
-              onClick={() => {
-                /* TODO: Open chat */
-              }}
-            >
-              Nhắn tin
-            </Button>
-            <Button
-              className="flex-1 h-10 text-xs bg-primary text-slate-900 shadow-lg shadow-primary/20"
+              className="w-full h-12 text-sm font-semibold shadow-lg shadow-green-500/20 bg-gradient-to-r from-green-500 to-green-600 text-white mb-2"
               icon="handshake"
               onClick={() => onConfirm?.(match.id)}
             >
               Chốt kèo
             </Button>
-            <Button
-              variant="secondary"
-              className="w-10 h-10 px-0"
-              icon="help_outline"
-              onClick={() => onShowGuide?.()}
-              title="Xem hướng dẫn chốt kèo"
-            />
+            {/* Secondary actions - bottom row */}
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                className="flex-1 h-10 text-xs"
+                icon="chat"
+                onClick={() => {
+                  /* TODO: Open chat */
+                }}
+              >
+                Nhắn tin
+              </Button>
+              <Button
+                variant="secondary"
+                className="w-10 h-10 px-0"
+                icon="help_outline"
+                onClick={() => onShowGuide?.()}
+                title="Xem hướng dẫn chốt kèo"
+              />
+            </div>
           </div>
         );
       default:
@@ -191,70 +241,153 @@ export const PendingMatchCard: React.FC<PendingMatchCardProps> = ({
 
   return (
     <div
-      className="bg-white dark:bg-surface-dark p-4 rounded-xl border border-gray-100 dark:border-white/5 shadow-sm relative overflow-hidden transition-all"
+      className={`
+        bg-white dark:bg-surface-dark rounded-xl border border-gray-100 dark:border-white/5 shadow-sm relative overflow-hidden transition-all cursor-pointer
+        card-entrance
+        hover:border-primary/30 active:scale-[0.99]
+      `}
+      style={{ animationDelay: `${animationDelay}ms` }}
       onClick={() => navigate(appRoutes.matchDetail(match.id))}
     >
+      {/* Status gradient border at top */}
+      <div className={`h-1 w-full bg-gradient-to-r ${getStatusGradient()} animate-status-shimmer`} />
+
+      {/* Corner accent decoration */}
       {match.type === 'matched' && (
-        <div className="absolute top-0 right-0 w-16 h-16 bg-purple-500/5 rounded-bl-full -mr-8 -mt-8" />
+        <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-purple-500/10 to-transparent rounded-bl-full -mr-12 -mt-12 pointer-events-none" />
+      )}
+      {match.type === 'received' && (
+        <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-yellow-500/10 to-transparent rounded-bl-full -mr-12 -mt-12 pointer-events-none" />
       )}
       {match.type === 'accepted' && (
-        <div className="absolute top-0 right-0 w-16 h-16 bg-green-500/5 rounded-bl-full -mr-8 -mt-8" />
+        <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-green-500/10 to-transparent rounded-bl-full -mr-12 -mt-12 pointer-events-none" />
       )}
 
-      <div className="flex items-center justify-between mb-3 relative z-10">
-        <div className="flex items-center gap-3">
-          <TeamAvatar src={match.teamB.logo || ''} size="sm" />
-          <div>
-            <h4 className="flex align-middle justify-start font-bold text-slate-900 dark:text-white">
-              {match.teamB.name}
+      <div className="p-4">
+        {/* Header - Status Badge + Team Info + Menu */}
+        <div className="flex items-center justify-between mb-4 relative z-10">
+          {/* Status Badge - Left side, prominent */}
+          <div className="flex-shrink-0">
+            {renderStatus()}
+          </div>
+
+          {/* Menu button - Right side */}
+          <button
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-1 -mr-1"
+            onClick={(e) => {
+              e.stopPropagation();
+              // TODO: Show more options
+            }}
+          >
+            <Icon name="more_vert" />
+          </button>
+        </div>
+
+        {/* Team Info Section */}
+        <div className="flex items-center gap-3 mb-4">
+          <TeamAvatar src={match.teamB.logo || ''} size="md" />
+          <div className="flex-1 min-w-0">
+            <h4 className="flex items-center gap-2 font-bold text-base text-slate-900 dark:text-white">
+              <span className="truncate" title={match.teamB.name}>{displayName}</span>
               <button
-                className="ml-2 size-5 flex items-center justify-center rounded-full bg-white dark:bg-surface-dark border border-gray-200 dark:border-white/10 shadow-sm"
+                className="flex-shrink-0 size-6 flex items-center justify-center rounded-full bg-gray-100 dark:bg-white/10 border border-gray-200 dark:border-white/10 shadow-sm hover:bg-gray-200 dark:hover:bg-white/15 transition-colors"
                 onClick={(e) => {
                   e.stopPropagation();
                   navigate(appRoutes.teamDetail(match.teamB.id));
                 }}
+                aria-label={`Xem thông tin ${match.teamB.name}`}
               >
-                <Icon name="info" size="sm" className="text-gray-500" />
+                <Icon name="info" size="xs" className="text-gray-500" />
               </button>
             </h4>
-            <div className="mt-1">{renderStatus()}</div>
+            {match.teamB.level && levelColor && (
+              <div className={`mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${levelColor.main} ${levelColor.bg}`}>
+                <Icon name="military_tech" size="xs" />
+                <span>{match.teamB.level}</span>
+              </div>
+            )}
           </div>
         </div>
-        <button
-          className="text-gray-400"
-          onClick={(e) => {
-            e.stopPropagation();
-            // TODO: Show more options
-          }}
-        >
-          <Icon name="more_horiz" />
-        </button>
-      </div>
 
-      {match.type === 'matched' ? (
-        <div className="flex items-center gap-2 text-sm text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/10 p-3 rounded-lg border border-purple-200 dark:border-purple-500/20">
-          <Icon name="info" size="sm" className="shrink-0" />
-          <span className="text-xs font-medium">
-            Đã hợp cạ thành công! Hãy gửi lời mời với đầy đủ thông tin thời gian, địa điểm để chốt kèo.
-          </span>
-        </div>
-      ) : (
-        <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-text-secondary bg-gray-50 dark:bg-white/5 p-3 rounded-lg border border-gray-100 dark:border-white/5">
-          <div className="flex items-center gap-1 shrink-0">
-            <Icon name="calendar_today" size="sm" />
-            <span className="font-semibold text-slate-900 dark:text-white">
-              {match.time} • {match.date}
+        {/* Match Info Section - Different for Matched vs others */}
+        {match.type === 'matched' ? (
+          <div className="flex items-center gap-2 text-sm text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/10 p-3 rounded-lg border border-purple-200 dark:border-purple-500/20">
+            <Icon name="auto_awesome" size="sm" className="shrink-0" />
+            <span className="text-xs font-medium">
+              Đã hợp cạ thành công! Hãy gửi lời mời với đầy đủ thông tin thời gian, địa điểm để chốt kèo.
             </span>
           </div>
-          <div className="w-px h-4 bg-gray-300 dark:bg-white/10 shrink-0" />
-          <div className="flex items-center gap-1 min-w-0">
-            <Icon name="location_on" size="sm" />
-            <span className="truncate">{match.location}</span>
-          </div>
-        </div>
-      )}
+        ) : (
+          <>
+            {/* Quick Info Grid - 3 columns with icons */}
+            <div className="grid grid-cols-3 gap-3 text-sm bg-gray-50 dark:bg-white/5 p-3 rounded-lg border border-gray-100 dark:border-white/5 mb-3">
+              {/* Date */}
+              <div className="flex flex-col items-center">
+                <Icon name="calendar_today" size="sm" className={`text-gray-500 mb-1 ${!match.date && 'text-gray-300 dark:text-gray-600'}`} />
+                <span className={`font-bold text-slate-900 dark:text-white ${!match.date && 'text-gray-400 dark:text-gray-500'}`}>
+                  {match.date || '---'}
+                </span>
+                <span className="text-[10px] uppercase text-gray-400 mt-0.5">Ngày</span>
+              </div>
+              {/* Time */}
+              <div className="flex flex-col items-center">
+                <Icon name="schedule" size="sm" className={`text-gray-500 mb-1 ${!match.time && 'text-gray-300 dark:text-gray-600'}`} />
+                <span className={`font-bold text-slate-900 dark:text-white ${!match.time && 'text-gray-400 dark:text-gray-500'}`}>
+                  {match.time || 'TBD'}
+                </span>
+                <span className="text-[10px] uppercase text-gray-400 mt-0.5">Giờ</span>
+              </div>
+              {/* Pitch Type */}
+              <div className="flex flex-col items-center">
+                <Icon name="sports_soccer" size="sm" className={`text-gray-500 mb-1 ${!match.proposedPitch && 'text-gray-300 dark:text-gray-600'}`} />
+                <span className={`font-bold text-slate-900 dark:text-white ${!match.proposedPitch && 'text-gray-400 dark:text-gray-500'}`}>
+                  {match.proposedPitch || 'TBD'}
+                </span>
+                <span className="text-[10px] uppercase text-gray-400 mt-0.5">Loại sân</span>
+              </div>
+            </div>
 
-      {renderActions()}
+            {/* Notes Section - Expandable */}
+            {match.notes && (
+              <div className={`
+                bg-gray-50 dark:bg-white/5 p-3 rounded-lg border border-gray-100 dark:border-white/5
+                transition-all duration-300 ease-in-out overflow-hidden
+                ${notesExpanded ? 'notes-expanded' : ''}
+              `}>
+                <div className="flex items-start gap-2">
+                  <Icon name="edit_note" size="xs" className="text-gray-400 mt-0.5 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <span className={`text-xs text-gray-600 dark:text-gray-400 ${notesExpanded ? '' : 'line-clamp-2'}`}>
+                      <span className="font-medium">Ghi chú: </span>
+                      {match.notes}
+                    </span>
+                    {match.notes.length > 100 && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setNotesExpanded(!notesExpanded);
+                        }}
+                        className="ml-1 text-primary text-xs font-medium hover:underline"
+                      >
+                        {notesExpanded ? 'Thu gọn' : 'Xem thêm'}
+                      </button>
+                    )}
+                  </div>
+                  {match.notes.length > 100 && !notesExpanded && (
+                    <Icon name="expand_more" size="xs" className="text-gray-400 shrink-0 mt-1" />
+                  )}
+                  {notesExpanded && (
+                    <Icon name="expand_less" size="xs" className="text-gray-400 shrink-0 mt-1" />
+                  )}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Action Buttons */}
+        {renderActions()}
+      </div>
     </div>
   );
 };
@@ -446,6 +579,13 @@ export const UpcomingMatchCard: React.FC<UpcomingMatchCardProps> = ({
         : 'border-gray-100 dark:border-white/5'
         }`}
     >
+      {match.proposedPitch && (
+        <div className="flex justify-start mb-2">
+          <span className="text-xs font-semibold px-2 py-0.5 rounded bg-primary/20 text-primary">
+            {match.proposedPitch}
+          </span>
+        </div>
+      )}
       <div className="flex justify-between items-start mb-4">
         {renderStatus()}
         <div className="flex items-start gap-1.5">
@@ -487,6 +627,12 @@ export const UpcomingMatchCard: React.FC<UpcomingMatchCardProps> = ({
           </div>
         </div>
       </div>
+
+      {match.notes && (
+        <div className="mb-3 text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-white/5 p-2 rounded-lg border border-gray-100 dark:border-white/5">
+          <span className="font-medium">Ghi chú: </span>{match.notes}
+        </div>
+      )}
 
       {/* Match Content - VS Style */}
       <div className="flex items-center justify-between">

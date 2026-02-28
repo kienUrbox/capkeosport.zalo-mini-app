@@ -5,16 +5,36 @@ import { useDiscoveryStore, getDefaultFilters } from '@/stores/discovery.store';
 import { useSelectedTeam } from '@/stores/team.store';
 import { TEAM_LEVELS, TEAM_GENDER } from '@/constants/design';
 
+export type LocationSource = 'current' | 'stadium' | 'default';
+
 export interface FilterBottomSheetProps {
   isOpen: boolean;
   onClose: () => void;
-  onApply: () => void;
+  onApply: (locationSource: LocationSource) => void;
+  /**
+   * When true, user must click "Áp dụng" to close the modal.
+   * The close button and backdrop click will be disabled.
+   */
+  required?: boolean;
+  /**
+   * Optional text to display when required=true
+   */
+  requiredText?: string;
+  /**
+   * When true, this is a filter change (not first time)
+   */
+  isChange?: boolean;
+  /**
+   * Callback for filter changes (not first time) - also receives location source
+   */
+  onChange?: (locationSource: LocationSource) => void;
 }
 
 /**
  * FilterBottomSheet Component
  *
  * Bottom sheet for customizing discovery filters:
+ * - Location source selection
  * - Radius slider (5-50km)
  * - Level multi-select
  * - Gender multi-select
@@ -25,8 +45,12 @@ export const FilterBottomSheet: React.FC<FilterBottomSheetProps> = ({
   isOpen,
   onClose,
   onApply,
+  required = false,
+  requiredText = 'Bắt buộc chọn bộ lọc để tiếp tục',
+  isChange = false,
+  onChange,
 }) => {
-  console.log('FilterBottomSheet render, isOpen:', isOpen);
+  console.log('FilterBottomSheet render, isOpen:', isOpen, 'required:', required, 'isChange:', isChange);
 
   const { filters, setFilters } = useDiscoveryStore();
   const selectedTeam = useSelectedTeam();
@@ -41,6 +65,7 @@ export const FilterBottomSheet: React.FC<FilterBottomSheetProps> = ({
   const [localLevels, setLocalLevels] = useState<string[]>(filters.level);
   const [localGenders, setLocalGenders] = useState<string[]>(filters.gender);
   const [localSortBy, setLocalSortBy] = useState(filters.sortBy);
+  const [localLocationSource, setLocalLocationSource] = useState<LocationSource>('default');
 
   // Sync local state with store when sheet opens
   useEffect(() => {
@@ -49,6 +74,9 @@ export const FilterBottomSheet: React.FC<FilterBottomSheetProps> = ({
       setLocalLevels(filters.level);
       setLocalGenders(filters.gender);
       setLocalSortBy(filters.sortBy);
+      // Restore location source from localStorage, default to 'default' if not found
+      const savedLocationSource = localStorage.getItem('discovery-location-source') as LocationSource | null;
+      setLocalLocationSource(savedLocationSource || 'default');
     }
   }, [isOpen, filters]);
 
@@ -58,6 +86,7 @@ export const FilterBottomSheet: React.FC<FilterBottomSheetProps> = ({
     setLocalLevels(defaults.level);
     setLocalGenders(defaults.gender);
     setLocalSortBy(defaults.sortBy);
+    setLocalLocationSource('default');
   };
 
   const handleApply = () => {
@@ -67,8 +96,26 @@ export const FilterBottomSheet: React.FC<FilterBottomSheetProps> = ({
       gender: localGenders,
       sortBy: localSortBy,
     });
-    onApply();
+
+    if (isChange && onChange) {
+      onChange(localLocationSource);
+    } else {
+      onApply(localLocationSource);
+    }
     onClose();
+  };
+
+  // When required mode, don't allow closing via backdrop or close button
+  const handleBackdropClick = () => {
+    if (!required) {
+      onClose();
+    }
+  };
+
+  const handleCloseClick = () => {
+    if (!required) {
+      onClose();
+    }
   };
 
   const toggleLevel = (level: string) => {
@@ -100,7 +147,7 @@ export const FilterBottomSheet: React.FC<FilterBottomSheetProps> = ({
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in"
-        onClick={onClose}
+        onClick={handleBackdropClick}
       />
 
       {/* Sheet */}
@@ -110,16 +157,114 @@ export const FilterBottomSheet: React.FC<FilterBottomSheetProps> = ({
 
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-bold text-slate-900 dark:text-white">Bộ lọc</h3>
-          <button
-            onClick={onClose}
-            className="size-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 transition-colors"
-          >
-            <Icon name="close" className="text-gray-500 dark:text-gray-400" />
-          </button>
+          <div className="flex flex-col">
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white">Bộ lọc tìm kiếm</h3>
+            {required && (
+              <span className="text-xs text-primary font-medium mt-1">{requiredText}</span>
+            )}
+          </div>
+          {!required && (
+            <button
+              onClick={handleCloseClick}
+              className="size-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 transition-colors"
+            >
+              <Icon name="close" className="text-gray-500 dark:text-gray-400" />
+            </button>
+          )}
         </div>
 
         <div className="flex flex-col gap-6">
+          {/* Location Source Selection */}
+          <div>
+            <label className="text-sm font-semibold text-slate-900 dark:text-white mb-3 block">
+              Vị trí tìm kiếm
+            </label>
+            <div className="space-y-2">
+              {/* Current Location */}
+              <button
+                onClick={() => setLocalLocationSource('current')}
+                className={`w-full p-3 rounded-xl border-2 transition-all ${
+                  localLocationSource === 'current'
+                    ? 'bg-primary/10 border-primary'
+                    : 'bg-gray-50 dark:bg-white/5 border-gray-200 dark:border-gray-700 hover:border-primary/50'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                    localLocationSource === 'current' ? 'bg-primary' : 'bg-gray-200 dark:bg-gray-700'
+                  }`}>
+                    <Icon name="location" className={`${localLocationSource === 'current' ? 'text-white' : 'text-gray-500'}`} />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <p className="text-sm font-bold text-slate-900 dark:text-white">Vị trí hiện tại</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Sử dụng vị trí của bạn</p>
+                  </div>
+                  {localLocationSource === 'current' && (
+                    <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                      <Icon name="check" className="text-white text-xs" />
+                    </div>
+                  )}
+                </div>
+              </button>
+
+              {/* Stadium Location */}
+              <button
+                onClick={() => setLocalLocationSource('stadium')}
+                className={`w-full p-3 rounded-xl border-2 transition-all ${
+                  localLocationSource === 'stadium'
+                    ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-400 dark:border-blue-500'
+                    : 'bg-gray-50 dark:bg-white/5 border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                    localLocationSource === 'stadium' ? 'bg-blue-500' : 'bg-gray-200 dark:bg-gray-700'
+                  }`}>
+                    <Icon name="stadium" className={`${localLocationSource === 'stadium' ? 'text-white' : 'text-gray-500'}`} />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <p className="text-sm font-bold text-slate-900 dark:text-white">Vị trí sân nhà</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {selectedTeam?.name ? `Gần ${selectedTeam.name}` : 'Sân bóng của đội'}
+                    </p>
+                  </div>
+                  {localLocationSource === 'stadium' && (
+                    <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
+                      <Icon name="check" className="text-white text-xs" />
+                    </div>
+                  )}
+                </div>
+              </button>
+
+              {/* Default Location */}
+              <button
+                onClick={() => setLocalLocationSource('default')}
+                className={`w-full p-3 rounded-xl border-2 transition-all ${
+                  localLocationSource === 'default'
+                    ? 'bg-gray-100 border-gray-400'
+                    : 'bg-gray-50 dark:bg-white/5 border-gray-200 dark:border-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                    localLocationSource === 'default' ? 'bg-gray-400' : 'bg-gray-200 dark:bg-gray-700'
+                  }`}>
+                    <Icon name="place" className={`${localLocationSource === 'default' ? 'text-white' : 'text-gray-500'}`} />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <p className="text-sm font-bold text-slate-900 dark:text-white">Mặc định</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Hồ Chí Minh</p>
+                  </div>
+                  {localLocationSource === 'default' && (
+                    <div className="w-5 h-5 rounded-full bg-gray-400 flex items-center justify-center">
+                      <Icon name="check" className="text-white text-xs" />
+                    </div>
+                  )}
+                </div>
+              </button>
+            </div>
+          </div>
+
           {/* Radius Slider */}
           <div>
             <div className="flex items-center justify-between mb-3">

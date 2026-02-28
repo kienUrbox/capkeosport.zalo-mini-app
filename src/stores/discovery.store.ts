@@ -32,6 +32,9 @@ interface DiscoveryState {
   // Filters
   filters: DiscoveryFilters;
 
+  // Track if user has applied filters (required for first-time discovery)
+  hasAppliedFilters: boolean;
+
   // Teams data
   teams: DiscoveredTeam[];
   currentIndex: number;
@@ -55,6 +58,7 @@ interface DiscoveryState {
 
   // ========== State Management Actions ==========
   setFilters: (filters: Partial<DiscoveryFilters>) => void;
+  setHasAppliedFilters: (hasApplied: boolean) => void;
   resetFilters: (teamLevel?: string, teamGender?: string) => void;
   setTeams: (teams: DiscoveredTeam[], total: number) => void;
   setCurrentIndex: (index: number) => void;
@@ -118,6 +122,7 @@ export const useDiscoveryStore = create<DiscoveryState>()(
     (set, get) => ({
       // Initial state
       filters: getDefaultFilters(),
+      hasAppliedFilters: false,
       teams: [],
       currentIndex: 0,
       totalAvailable: 0,
@@ -136,9 +141,13 @@ export const useDiscoveryStore = create<DiscoveryState>()(
           filters: { ...state.filters, ...newFilters },
         })),
 
+      setHasAppliedFilters: (hasApplied) =>
+        set({ hasAppliedFilters: hasApplied }),
+
       resetFilters: (teamLevel, teamGender) =>
         set({
           filters: getDefaultFilters(teamLevel, teamGender),
+          hasAppliedFilters: false,
         }),
 
       setTeams: (teams, total) =>
@@ -313,7 +322,10 @@ export const useDiscoveryStore = create<DiscoveryState>()(
       name: 'discovery-storage',
       partialize: (state) => ({
         filters: state.filters,
+        hasAppliedFilters: state.hasAppliedFilters,
       }),
+      skipHydration: false,
+      version: 1,
     }
   )
 );
@@ -334,6 +346,7 @@ export const useDiscoveryActions = () => {
   const store = useDiscoveryStore();
   return {
     setFilters: store.setFilters,
+    setHasAppliedFilters: store.setHasAppliedFilters,
     resetFilters: store.resetFilters,
     setTeams: store.setTeams,
     setCurrentIndex: store.setCurrentIndex,

@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useMatchStore, type TabType } from '@/stores/match.store';
 
+type PendingFilterType = 'all' | 'matched' | 'requested';
+
 export const useScheduleData = (teamId?: string) => {
   // Subscribe to store changes - this ensures component re-renders when data changes
   const pendingMatches = useMatchStore((state) => state.pendingMatches);
@@ -17,6 +19,12 @@ export const useScheduleData = (teamId?: string) => {
   const [error, setError] = useState<string | null>(null);
 
   const isMounted = useRef(true);
+  const pendingFilter = useRef<PendingFilterType | undefined>(undefined);
+
+  // Set pending filter
+  const setPendingFilter = useCallback((filter: PendingFilterType | undefined) => {
+    pendingFilter.current = filter;
+  }, []);
 
   // Fetch tab data with pagination support
   const fetchTabData = useCallback(
@@ -47,7 +55,7 @@ export const useScheduleData = (teamId?: string) => {
 
       try {
         if (tab === 'pending') {
-          await store.fetchPendingMatches(teamId, page, forceRefresh);
+          await store.fetchPendingMatches(teamId, page, forceRefresh, pendingFilter.current);
         } else if (tab === 'upcoming') {
           await store.fetchUpcomingMatches(teamId, page, forceRefresh);
         } else if (tab === 'history') {
@@ -186,5 +194,6 @@ export const useScheduleData = (teamId?: string) => {
     refreshAll,
     resetAll,
     hasMore,
+    setPendingFilter,
   };
 };
