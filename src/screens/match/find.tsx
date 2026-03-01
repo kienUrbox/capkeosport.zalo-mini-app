@@ -4,7 +4,7 @@ import { Icon, TeamAvatar, FindMatchSkeleton, FilterBottomSheet, MatchModal, But
 import type { LocationSource } from '@/components/ui/FilterBottomSheet';
 import { appRoutes } from '@/utils/navigation';
 import { useDiscovery } from '@/hooks/useDiscovery';
-import { useMyTeams, useSelectedTeam, useTeamActions, useTeamStore } from '@/stores/team.store';
+import { useMyTeams, useSelectedTeam, useTeamStore } from '@/stores/team.store';
 import { useDiscoveryStore } from '@/stores/discovery.store';
 import { toast } from '@/utils/toast';
 import { getLevelColor, LEVEL_ICON } from '@/constants/design';
@@ -19,6 +19,7 @@ type DiscoveryFlowState =
   | 'select-filter'     // User needs to select filters
   | 'select-location'   // User needs to select location source
   | 'discovery'         // Main discovery swipe interface
+  | 'no-more-matches'   // All cards swiped, no more matches
   | 'empty-results';    // No teams found
 
 /**
@@ -54,11 +55,11 @@ const FindMatchScreen: React.FC = () => {
     isRefreshing,
     error,
     handleSwipe,
-    refresh,
     closeMatchModal,
     pendingSwipeCount,
     canSwipe,
     fetchWithLocation,
+    hasNoMore,
   } = useDiscovery();
 
   // Get filters and hasAppliedFilters from discovery store - use individual selectors to avoid cache issues
@@ -136,12 +137,16 @@ const FindMatchScreen: React.FC = () => {
       if (!isLoading && allTeams.length === 0 && !isRefreshing) {
         return 'empty-results';
       }
+      // Check if user has swiped through all cards and no more available
+      if (hasNoMore && !hasMoreCards && allTeams.length > 0) {
+        return 'no-more-matches';
+      }
       return 'discovery';
     }
 
     // Default to loading
     return 'loading';
-  }, [isTeamsLoading, myTeams.length, adminTeams.length, selectedTeam, hasAppliedFilters, allTeams.length, isLoading, isRefreshing]);
+  }, [isTeamsLoading, myTeams.length, adminTeams.length, selectedTeam, hasAppliedFilters, allTeams.length, isLoading, isRefreshing, hasNoMore, hasMoreCards]);
 
   // Initialize flow - auto-select team if single admin team
   useEffect(() => {
@@ -177,8 +182,8 @@ const FindMatchScreen: React.FC = () => {
         stadiumLocation = JSON.parse(savedStadiumLocation);
       }
 
-      // Use saved location source or default to 'default'
-      const locationSource = savedLocationSource || 'default';
+      // Use saved location source or default to 'current'
+      const locationSource = savedLocationSource || 'current';
       autoFetchedRef.current = true;
       fetchWithLocation(locationSource, stadiumLocation, selectedTeam?.id);
     }
@@ -270,8 +275,8 @@ const FindMatchScreen: React.FC = () => {
         stadiumLocation = JSON.parse(savedStadiumLocation);
       }
 
-      // Use saved location source or default to 'default'
-      const locationSource = savedLocationSource || 'default';
+      // Use saved location source or default to 'current'
+      const locationSource = savedLocationSource || 'current';
       console.log('[FindMatch] handleTeamChange: Fetching with locationSource', locationSource);
 
       // Select the new team and defer fetch to next tick to avoid hook errors
@@ -624,11 +629,111 @@ const FindMatchScreen: React.FC = () => {
                   <button
                     key={team.id}
                     onClick={() => handleTeamChange(team.id)}
-                    className={`w-full flex items-center gap-4 p-3 rounded-2xl border transition-all active:scale-[0.98] ${
-                      selectedTeam?.id === team.id
+                    className={`w-full flex items-center gap-4 p-3 rounded-2xl border transition-all active:scale-[0.98] ${selectedTeam?.id === team.id
                         ? 'bg-primary/10 border-primary'
                         : 'bg-gray-50 dark:bg-white/5 border-transparent hover:bg-gray-100 dark:hover:bg-white/10'
-                    }`}
+                      }`}
+                  >
+                    <TeamAvatar src={team.logo} />
+                    <div className="flex-1 text-left">
+                      <h4 className={`font-bold ${selectedTeam?.id === team.id ? 'text-primary' : 'text-slate-900 dark:text-white'}`}>
+                        {team.name}
+                      </h4>
+                      <p className="text-xs text-gray-500">Quản trị viên</p>
+                    </div>
+                    {selectedTeam?.id === team.id && (
+                      <div className="size-6 bg-primary rounded-full flex items-center justify-center text-black">
+                        <Icon name="check" className="text-sm" />
+                      </div>
+                    )}
+                  </button>
+                ))}
+                <button
+                  onClick={() => {
+                    setShowTeamSelector(false);
+                    navigate(appRoutes.teamsCreate);
+                  }}
+                  className="w-full flex items-center justify-center gap-2 p-4 rounded-2xl border border-dashed border-gray-300 dark:border-gray-600 text-gray-500 hover:text-primary hover:border-primary transition-colors"
+                >
+                  <Icon name="add" />
+                  <span className="font-medium">Tạo đội mới</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Filter Bottom Sheet */}
+        <FilterBottomSheet
+          isOpen={showFilterSheet}
+          onClose={() => setShowFilterSheet(false)}
+          onApply={handleFilterApply}
+          onChange={handleFilterChange}
+          isChange={true}
+          required={false}
+        />
+      </>
+    );
+  }
+
+  // No more matches state - user has swiped through all available teams
+  if (flowState === 'no-more-matches') {
+    return (
+      <>
+        <div className="flex flex-col h-dvh bg-background-light dark:bg-background-dark items-center justify-center p-6 text-center">
+          <div className="flex flex-col items-center text-center max-w-[280px] gap-4">
+            <div className="w-20 h-20 rounded-full bg-surface-light dark:bg-surface-dark flex items-center justify-center mb-2">
+              <Icon name="search_off" className="text-text-secondary text-4xl" />
+            </div>
+            <div>
+              <p className="text-slate-900 dark:text-white text-xl font-bold">Hết kèo phù hợp</p>
+              <p className="text-text-secondary text-sm mt-2 leading-relaxed">
+                Hãy thử mở rộng bán kính tìm kiếm hoặc điều chỉnh bộ lọc trình độ.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-3 mt-6">
+            <button
+              onClick={() => setShowTeamSelector(true)}
+              className="px-6 py-3 rounded-xl bg-primary text-background-dark font-bold shadow-lg"
+            >
+              Chọn đội khác
+            </button>
+            <button
+              onClick={() => setShowFilterSheet(true)}
+              className="px-6 py-3 rounded-xl bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 font-bold"
+            >
+              Điều chỉnh bộ lọc
+            </button>
+            <button
+              onClick={() => navigate(appRoutes.dashboard)}
+              className="px-6 py-3 rounded-xl bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 font-bold"
+            >
+              Quay về trang chủ
+            </button>
+          </div>
+        </div>
+
+        {/* Team Selector Modal */}
+        {showTeamSelector && (
+          <div className="fixed inset-0 z-50 flex items-end justify-center">
+            <div
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in"
+              onClick={() => setShowTeamSelector(false)}
+            />
+            <div className="relative w-full max-w-md bg-white dark:bg-surface-dark rounded-t-3xl p-6 pb-safe animate-slide-up shadow-2xl">
+              <div className="w-12 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-6" />
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Chọn đội đi "cáp kèo"</h3>
+              <div className="space-y-3 max-h-[60vh] overflow-y-auto no-scrollbar">
+                {adminTeams.map((team) => (
+                  <button
+                    key={team.id}
+                    onClick={() => handleTeamChange(team.id)}
+                    className={`w-full flex items-center gap-4 p-3 rounded-2xl border transition-all active:scale-[0.98] ${selectedTeam?.id === team.id
+                        ? 'bg-primary/10 border-primary'
+                        : 'bg-gray-50 dark:bg-white/5 border-transparent hover:bg-gray-100 dark:hover:bg-white/10'
+                      }`}
                   >
                     <TeamAvatar src={team.logo} />
                     <div className="flex-1 text-left">
@@ -726,17 +831,16 @@ const FindMatchScreen: React.FC = () => {
           >
             <Icon name="arrow_back" />
           </button>
-
-          {/* Filter Button - Absolute positioned right */}
-          <button
-            onClick={() => {
-              setShowFilterSheet(true);
-            }}
-            className="absolute right-4 top-1/2 -translate-y-1/2 size-10 flex items-center justify-center rounded-full bg-white/10 backdrop-blur-md hover:bg-white/20 transition-colors"
-          >
-            <Icon name="tune" />
-          </button>
         </div>
+
+        {/* Filter FAB - Bottom Right (Fixed) */}
+        <button
+          onClick={() => setShowFilterSheet(true)}
+          className="fixed bottom-24 right-4 z-50 size-14 flex items-center justify-center rounded-full bg-primary text-white shadow-lg hover:bg-primary-dark active:scale-95 transition-all"
+          aria-label="Bộ lọc"
+        >
+          <Icon name="tune" className="text-xl" />
+        </button>
 
         {/* Card Stack Area */}
         <div className="flex-1 relative w-full flex flex-col items-center justify-center p-4 z-10 overflow-hidden">
@@ -745,7 +849,7 @@ const FindMatchScreen: React.FC = () => {
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[calc(50%+4px)] w-[82%] h-[calc(100dvh-220px)] sm:h-[calc(100dvh-200px)] max-h-[580px] sm:max-h-[640px] bg-surface-light/70 dark:bg-surface-dark/70 rounded-[2.5rem] border border-white/5 z-10 shadow-lg backdrop-blur-sm pointer-events-none"></div>
 
           {/* Refreshing skeleton overlay - show when refreshing OR when loading after filter/team change */}
-          {(isRefreshing || (isLoading && !currentTeam)) && (
+          {isRefreshing || isLoading && (
             <div className="absolute w-full max-w-[360px] h-[calc(100dvh-220px)] sm:h-[calc(100dvh-200px)] max-h-[580px] sm:max-h-[640px] bg-surface-light/90 dark:bg-surface-dark/90 rounded-[2.5rem] z-50 flex flex-col items-center justify-center backdrop-blur-sm animate-fade-in">
               <div className="flex flex-col items-center gap-4">
                 <div className="w-16 h-16 rounded-full border-4 border-primary/30 border-t-primary animate-spin" />
@@ -818,10 +922,10 @@ const FindMatchScreen: React.FC = () => {
                     {/* Compatibility Score - Điểm tương thích */}
                     {(() => {
                       const compatibilityScore = Math.round((team.compatibilityScore || 0) * 100);
-                      const compatibilityColor = compatibilityScore >= 80 ? 'bg-pink-500' : compatibilityScore >= 60 ? 'bg-amber-500' : 'bg-gray-500';
+                      const compatibilityColor = compatibilityScore >= 80 ? 'text-pink-500' : compatibilityScore >= 60 ? 'text-amber-500' : 'text-gray-500';
                       return (
                         <div className="px-3 py-1 bg-white/20 dark:bg-black/20 backdrop-blur-md border border-white/30 dark:border-white/10 rounded-lg flex items-center gap-1.5">
-                          <Icon name="favorite" className={`${compatibilityColor} text-[14px]`} />
+                          <Icon name="favorite" filled className={compatibilityColor} />
                           <span className="text-slate-900 dark:text-white text-xs font-bold uppercase tracking-wide">
                             {compatibilityScore}% Hợp cạ
                           </span>

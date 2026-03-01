@@ -36,6 +36,9 @@ interface UseDiscoveryReturn {
   pendingSwipeCount: number;
   canSwipe: boolean; // Whether user can swipe (limited by pending count)
 
+  // No more state
+  hasNoMore: boolean;
+
   // Location permission (DEPRECATED - use location modal options)
   showLocationPermission: boolean;
 
@@ -51,7 +54,7 @@ interface UseDiscoveryReturn {
 
   // New: Manual trigger for fetching with specific location source
   fetchWithLocation: (
-    locationSource: "current" | "stadium" | "default",
+    locationSource: "current" | "stadium",
     stadiumLocation?: { lat: number; lng: number },
     teamId?: string | null,
   ) => Promise<void>;
@@ -85,6 +88,7 @@ export const useDiscovery = (): UseDiscoveryReturn => {
     error,
     matchedTeam,
     matchedMatch,
+    hasNoMore,
     setFilters,
     resetFilters,
     setTeams,
@@ -94,6 +98,7 @@ export const useDiscovery = (): UseDiscoveryReturn => {
     setLoading,
     setRefreshing,
     setError,
+    setHasNoMore,
   } = useDiscoveryStore();
 
   // Track if component is mounted
@@ -170,7 +175,7 @@ export const useDiscovery = (): UseDiscoveryReturn => {
   // New: Fetch with specific location source
   const fetchWithLocation = useCallback(
     async (
-      locationSource: "current" | "stadium" | "default",
+      locationSource: "current" | "stadium",
       stadiumLocation?: { lat: number; lng: number },
       teamId?: string | null,
     ) => {
@@ -209,7 +214,7 @@ export const useDiscovery = (): UseDiscoveryReturn => {
             console.warn("Zalo location error, using default location", error);
             showToast(
               "Không thể lấy vị trí của bạn. Đang sử dụng vị trí mặc định (Hồ Chí Minh)",
-              "warning",
+              "info",
             );
             location = DEFAULT_LOCATION;
           }
@@ -217,14 +222,11 @@ export const useDiscovery = (): UseDiscoveryReturn => {
         case "stadium":
           location = stadiumLocation || DEFAULT_LOCATION;
           break;
-        case "default":
-        default:
-          location = DEFAULT_LOCATION;
-          break;
       }
 
       setLoading(true);
       setError(null);
+      setHasNoMore(false); // Reset hasNoMore when fetching new
 
       try {
         // Get current filters from store directly to avoid dependency on filters
@@ -284,7 +286,7 @@ export const useDiscovery = (): UseDiscoveryReturn => {
         setLoading(false);
       }
     },
-    [setFilters, setTeams, setLoading, setError, showToast],
+    [setFilters, setTeams, setLoading, setError, setHasNoMore, showToast],
   );
 
   // Initialize filters from selected team on first load
@@ -332,12 +334,13 @@ export const useDiscovery = (): UseDiscoveryReturn => {
         setRefreshing(true);
       }
       setError(null);
+      setHasNoMore(false); // Reset hasNoMore when fetching new
 
       try {
-        let location: { lat: number; lng: number };
+        let location: { lat: number; lng: number } = DEFAULT_LOCATION;
 
         // Use stored location source
-        switch (locationSourceRef.current.source) {
+        switch (locationSourceRef.current?.source) {
           case "current":
             try {
               const zaloLocation = (await zmp.getLocation()) as any; // Use any to access deprecated fields
@@ -361,10 +364,6 @@ export const useDiscovery = (): UseDiscoveryReturn => {
           case "stadium":
             location =
               locationSourceRef.current.stadiumLocation || DEFAULT_LOCATION;
-            break;
-          case "default":
-          default:
-            location = DEFAULT_LOCATION;
             break;
         }
 
@@ -411,6 +410,15 @@ export const useDiscovery = (): UseDiscoveryReturn => {
             createdBy: "",
             createdAt: team.lastActive || new Date().toISOString(),
           }));
+
+          // For initial fetch or refresh, replace teams
+          // For auto-fetch (load more), we need different logic
+          // For now, just check if empty and set hasNoMore
+          if (fetchedTeams.length === 0 && teams.length > 0 && !isRefresh) {
+            // No more teams to load
+            setHasNoMore(true);
+          }
+
           setTeams(convertedTeams as any, response.data.total || 0);
           hasFetched.current = true;
         } else {
@@ -434,11 +442,13 @@ export const useDiscovery = (): UseDiscoveryReturn => {
     [
       selectedTeam,
       isLoading,
+      teams.length,
       setFilters,
       setTeams,
       setLoading,
       setRefreshing,
       setError,
+      setHasNoMore,
       showToast,
     ],
   );
@@ -579,11 +589,13 @@ export const useDiscovery = (): UseDiscoveryReturn => {
   useEffect(() => {
     // Fetch more when we have 3 or fewer cards left
     // But NOT immediately after an initial fetch (prevent infinite loop)
+    // Also skip if hasNoMore is true
     const now = Date.now();
     const timeSinceLastFetch = now - lastFetchTimeRef.current;
 
     if (
       locationSourceRef.current && // Only fetch if we have a location source
+      !hasNoMore && // Don't fetch if we know there's no more data
       teams.length > 0 &&
       teams.length - currentIndex <= 3 &&
       !isLoading &&
@@ -593,7 +605,7 @@ export const useDiscovery = (): UseDiscoveryReturn => {
       lastFetchTimeRef.current = now;
       fetchTeamsRef.current(false);
     }
-  }, [currentIndex, teams.length, isRefreshing]); // Removed isLoading from deps to prevent loop
+  }, [currentIndex, teams.length, isRefreshing, isLoading, hasNoMore]); // Include isLoading to prevent unnecessary fetches
 
   // Current team card
   const currentTeam = teams[currentIndex] || null;
@@ -601,6 +613,11 @@ export const useDiscovery = (): UseDiscoveryReturn => {
 
   // Limit swipes: allow only 5 pending at a time
   const canSwipe = pendingSwipeCount < 5;
+
+  // Reset hasNoMore when filters change
+  useEffect(() => {
+    setHasNoMore(false);
+  }, [setHasNoMore]);
 
   // Handle location permission response
   const handleLocationPermissionResponse = useCallback(
@@ -649,6 +666,9 @@ export const useDiscovery = (): UseDiscoveryReturn => {
     // Pending swipes
     pendingSwipeCount,
     canSwipe,
+
+    // No more state
+    hasNoMore,
 
     // Location permission
     showLocationPermission,

@@ -211,21 +211,23 @@ const TeamsScreen: React.FC = () => {
                 <div
                   key={team.id}
                   onClick={() => navigate(appRoutes.teamDetail(team.id))}
-                  className="group bg-white dark:bg-surface-dark rounded-2xl p-4 border border-gray-100 dark:border-white/5 shadow-sm active:scale-[0.98] transition-all cursor-pointer relative overflow-hidden"
+                  className="group bg-white dark:bg-surface-dark rounded-2xl p-4 border border-gray-100 dark:border-white/5 shadow-sm active:scale-[0.98] transition-all cursor-pointer overflow-hidden"
                 >
-                  {/* Role Badge */}
-                  <div className={`absolute top-0 right-0 px-3 py-1 rounded-bl-xl text-[10px] font-bold uppercase tracking-wider ${team.userRole === 'admin'
-                    ? 'bg-primary/10 text-primary'
-                    : 'bg-gray-100 dark:bg-white/10 text-gray-500'
-                    }`}>
-                    {team.userRole === 'admin' ? 'Quản trị viên' : 'Thành viên'}
-                  </div>
-
                   <div className="flex items-center gap-4 mb-4">
                     <TeamAvatar src={team.logo} size="lg" className="shrink-0" />
                     <div className="flex-1">
-                      <h2 className="text-lg font-bold text-slate-900 dark:text-white leading-tight">{team.name}</h2>
-                      <div className="flex items-center gap-2 mt-1 text-gray-500 dark:text-text-secondary text-sm">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h2 className="text-lg font-bold text-slate-900 dark:text-white leading-tight">{team.name}</h2>
+                        {/* Role Badge - Inline */}
+                        <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full shrink-0 ${
+                          team.userRole === 'admin'
+                            ? 'bg-primary/10 text-primary'
+                            : 'bg-gray-100 dark:bg-white/10 text-gray-500'
+                        }`}>
+                          {team.userRole === 'admin' ? 'QTV' : 'TV'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-gray-500 dark:text-text-secondary text-sm">
                         <Icon name="groups" className="text-sm" />
                         <span>{team.memberCount} thành viên</span>
                       </div>

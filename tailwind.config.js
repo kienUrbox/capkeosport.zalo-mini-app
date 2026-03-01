@@ -49,6 +49,35 @@ module.exports = {
         glow: '0 0 20px -5px rgba(59, 130, 246, 0.3)',
         card: '0 12px 30px rgb(6 9 16 / 0.45)',
       },
+      keyframes: {
+        'pulse-glow': {
+          '0%, 100%': { boxShadow: '0 0 0 0 rgba(59, 130, 246, 0.4)' },
+          '50%': { boxShadow: '0 0 0 4px rgba(59, 130, 246, 0)' },
+        },
+        'live-glow': {
+          '0%, 100%': { boxShadow: '0 0 5px 0 rgba(239, 68, 68, 0.3)' },
+          '50%': { boxShadow: '0 0 20px 5px rgba(239, 68, 68, 0.1)' },
+        },
+        'result-in': {
+          'from': { transform: 'scale(0.5)', opacity: '0' },
+          'to': { transform: 'scale(1)', opacity: '1' },
+        },
+        'card-entrance': {
+          'from': { opacity: '0', transform: 'translateY(20px)' },
+          'to': { opacity: '1', transform: 'translateY(0)' },
+        },
+        'shimmer': {
+          '0%': { backgroundPosition: '-200% 0' },
+          '100%': { backgroundPosition: '200% 0' },
+        },
+      },
+      animation: {
+        'pulse-glow': 'pulse-glow 2s ease-in-out infinite',
+        'live-glow': 'live-glow 2s ease-in-out infinite',
+        'result-in': 'result-in 0.3s ease-out forwards',
+        'card-entrance': 'card-entrance 0.4s ease-out forwards',
+        'shimmer': 'shimmer 2s linear infinite',
+      },
     },
   },
   plugins: [],

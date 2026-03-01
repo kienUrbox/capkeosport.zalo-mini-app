@@ -56,6 +56,9 @@ interface DiscoveryState {
   // Track fetched state
   _fetchedStats: boolean;
 
+  // Track if no more teams available (all cards swiped)
+  hasNoMore: boolean;
+
   // ========== State Management Actions ==========
   setFilters: (filters: Partial<DiscoveryFilters>) => void;
   setHasAppliedFilters: (hasApplied: boolean) => void;
@@ -70,6 +73,7 @@ interface DiscoveryState {
   setError: (error: string | null) => void;
   clearError: () => void;
   setStats: (stats: DiscoveryStats) => void;
+  setHasNoMore: (hasNoMore: boolean) => void;
 
   // ========== API Methods ==========
 
@@ -134,6 +138,7 @@ export const useDiscoveryStore = create<DiscoveryState>()(
       stats: null,
       statsLoading: false,
       _fetchedStats: false,
+      hasNoMore: false,
 
       // ========== State Management Actions ==========
       setFilters: (newFilters) =>
@@ -198,6 +203,8 @@ export const useDiscoveryStore = create<DiscoveryState>()(
         }),
 
       setStats: (stats) => set({ stats }),
+
+      setHasNoMore: (hasNoMore) => set({ hasNoMore }),
 
       // ========== API Methods ==========
 
@@ -357,6 +364,7 @@ export const useDiscoveryActions = () => {
     setError: store.setError,
     clearError: store.clearError,
     setStats: store.setStats,
+    setHasNoMore: store.setHasNoMore,
     // API methods
     discoverTeams: store.discoverTeams,
     getStats: store.getStats,

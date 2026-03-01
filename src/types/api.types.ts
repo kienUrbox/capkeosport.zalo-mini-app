@@ -507,7 +507,7 @@ export interface Notification extends BaseEntity {
 export enum NotificationType {
   NEW_MATCH = 'new_match',
   MATCH_STATUS_CHANGE = 'match_status_change',
-  TEAM_INVITATION = 'team_invitation',
+  TEAM_INVITATION = 'team_phone_invitation',
   TEAM_REMOVAL = 'team_removal',
   MATCH_REMINDER = 'match_reminder',
   MATCH_RESULT = 'match_result',

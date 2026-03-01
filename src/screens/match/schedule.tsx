@@ -747,11 +747,12 @@ const MatchScheduleScreen: React.FC = () => {
                 </Button>
               </div>
             ) : (
-              upcomingMatches.map((match) => (
+              upcomingMatches.map((match, index) => (
                 <UpcomingMatchCard
                   key={match.id}
                   match={match}
                   myTeam={currentTeam || { id: '', name: '', logo: '' }}
+                  index={index}
                   isAdmin={hasAdminPermission(currentTeam?.userRole)}
                   onFinish={handleFinishMatch}
                   onUpdateScore={handleUpdateScore}

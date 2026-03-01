@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { Icon, TeamAvatar } from '@/components/ui';
+import { Icon, TeamAvatar, ScoreExplanationModal } from '@/components/ui';
+import type { ScoreType } from '@/components/ui';
 import { Button } from '@/components/ui/Button';
 import { useTeamDetail } from '@/hooks/useTeamDetail';
 import type { DiscoveredTeam } from '@/services/api/discovery.service';
@@ -93,6 +94,11 @@ const OpponentDetail: React.FC = () => {
   const [touchStart, setTouchStart] = useState(0);
   const [pullDistance, setPullDistance] = useState(0);
 
+  // Score explanation modal state
+  const [scoreModalOpen, setScoreModalOpen] = useState(false);
+  const [selectedScoreType, setSelectedScoreType] = useState<ScoreType>('quality');
+  const [selectedScoreValue, setSelectedScoreValue] = useState(0);
+
   const handleTouchStart = (e: React.TouchEvent) => {
     if (window.scrollY === 0) {
       setTouchStart(e.touches[0].clientY);
@@ -114,6 +120,13 @@ const OpponentDetail: React.FC = () => {
     }
     setTouchStart(0);
     setPullDistance(0);
+  };
+
+  // Handle score click - open explanation modal
+  const handleScoreClick = (scoreType: ScoreType, scoreValue: number) => {
+    setSelectedScoreType(scoreType);
+    setSelectedScoreValue(scoreValue);
+    setScoreModalOpen(true);
   };
 
   // Loading state
@@ -408,12 +421,18 @@ const OpponentDetail: React.FC = () => {
         {/* Quality Scores Section - Quality, Activity, Compatibility */}
         {(qualityScore > 0 || activityScore > 0 || compatibilityScoreCalculated > 0) && (
           <div className="bg-white/80 dark:bg-surface-dark/80 backdrop-blur-sm rounded-2xl p-4 border border-gray-100 dark:border-white/5 shadow-sm">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-3">Chỉ số đánh giá</h3>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-3 flex items-center gap-1.5">
+              <Icon name="info" className="text-text-secondary text-xs" />
+              Chỉ số đánh giá
+            </h3>
             <div className="grid grid-cols-3 gap-3">
               {/* Quality Score */}
               {qualityScore > 0 && (
-                <div className="flex flex-col items-center gap-1.5">
-                  <div className="relative w-14 h-14">
+                <button
+                  onClick={() => handleScoreClick('quality', qualityScore)}
+                  className="flex flex-col items-center gap-1.5 group active:scale-95 transition-transform duration-200"
+                >
+                  <div className="relative w-14 h-14 group-hover:scale-110 transition-transform duration-200">
                     <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
                       <path
                         d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
@@ -436,15 +455,20 @@ const OpponentDetail: React.FC = () => {
                         {qualityScore}
                       </span>
                     </div>
+                    {/* Pulse ring on hover */}
+                    <div className={`absolute inset-0 rounded-full ${qualityScore >= 80 ? 'bg-primary' : qualityScore >= 60 ? 'bg-amber-500' : 'bg-gray-500'} opacity-0 group-hover:opacity-20 group-hover:scale-125 transition-all duration-500 -z-10`} />
                   </div>
-                  <span className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase">Chất lượng</span>
-                </div>
+                  <span className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase group-hover:text-primary transition-colors">Chất lượng</span>
+                </button>
               )}
 
               {/* Activity Score */}
               {activityScore > 0 && (
-                <div className="flex flex-col items-center gap-1.5">
-                  <div className="relative w-14 h-14">
+                <button
+                  onClick={() => handleScoreClick('activity', activityScore)}
+                  className="flex flex-col items-center gap-1.5 group active:scale-95 transition-transform duration-200"
+                >
+                  <div className="relative w-14 h-14 group-hover:scale-110 transition-transform duration-200">
                     <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
                       <path
                         d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
@@ -467,15 +491,19 @@ const OpponentDetail: React.FC = () => {
                         {activityScore}
                       </span>
                     </div>
+                    <div className={`absolute inset-0 rounded-full ${activityScore >= 80 ? 'bg-orange-500' : activityScore >= 60 ? 'bg-amber-500' : 'bg-gray-500'} opacity-0 group-hover:opacity-20 group-hover:scale-125 transition-all duration-500 -z-10`} />
                   </div>
-                  <span className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase">Hoạt động</span>
-                </div>
+                  <span className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase group-hover:text-orange-500 transition-colors">Hoạt động</span>
+                </button>
               )}
 
               {/* Compatibility Score */}
               {compatibilityScoreCalculated > 0 && (
-                <div className="flex flex-col items-center gap-1.5">
-                  <div className="relative w-14 h-14">
+                <button
+                  onClick={() => handleScoreClick('compatibility', compatibilityScoreCalculated)}
+                  className="flex flex-col items-center gap-1.5 group active:scale-95 transition-transform duration-200"
+                >
+                  <div className="relative w-14 h-14 group-hover:scale-110 transition-transform duration-200">
                     <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
                       <path
                         d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
@@ -496,9 +524,10 @@ const OpponentDetail: React.FC = () => {
                     <div className="absolute inset-0 flex items-center justify-center">
                       <Icon name="favorite" filled className={compatibilityScoreCalculated >= 80 ? 'text-pink-500' : compatibilityScoreCalculated >= 60 ? 'text-amber-500' : 'text-gray-500'} />
                     </div>
+                    <div className={`absolute inset-0 rounded-full ${compatibilityScoreCalculated >= 80 ? 'bg-pink-500' : compatibilityScoreCalculated >= 60 ? 'bg-amber-500' : 'bg-gray-500'} opacity-0 group-hover:opacity-20 group-hover:scale-125 transition-all duration-500 -z-10`} />
                   </div>
-                  <span className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase">Hợp cạ</span>
-                </div>
+                  <span className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase group-hover:text-pink-500 transition-colors">Hợp cạ</span>
+                </button>
               )}
             </div>
           </div>
@@ -559,6 +588,13 @@ const OpponentDetail: React.FC = () => {
         )}
       </div>
 
+      {/* Score Explanation Modal */}
+      <ScoreExplanationModal
+        isOpen={scoreModalOpen}
+        onClose={() => setScoreModalOpen(false)}
+        scoreType={selectedScoreType}
+        scoreValue={selectedScoreValue}
+      />
     </div>
   );
 };

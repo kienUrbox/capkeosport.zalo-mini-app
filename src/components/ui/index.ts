@@ -167,3 +167,21 @@ export type { LocationPermissionModalProps } from './LocationPermissionModal';
 
 export { StadiumLocationPermissionModal } from './StadiumLocationPermissionModal';
 export type { StadiumLocationPermissionModalProps } from './StadiumLocationPermissionModal';
+
+export { default as ScoreExplanationModal } from './ScoreExplanationModal';
+export type { ScoreExplanationModalProps, ScoreType } from './ScoreExplanationModal';
+
+// Home Screen Components
+export { InvitationSection, InvitationCard } from '../home';
+export type { InvitationSectionProps, InvitationCardProps } from '../home';
+
+// Invitation Types
+export type {
+  TeamPhoneInvitationData,
+  NormalizedInvitation,
+} from '../../types/invitation.types';
+export {
+  isTeamPhoneInvitation,
+  normalizeInvitation,
+  normalizeInvitations,
+} from '../../types/invitation.types';

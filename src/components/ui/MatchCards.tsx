@@ -398,6 +398,7 @@ interface UpcomingMatchCardProps {
   match: Match;
   myTeam: { id: string; name: string; logo?: string };
   isAdmin?: boolean;
+  index?: number; // For staggered entrance animation
   onFinish?: (id: string) => void;
   onUpdateScore?: (id: string) => void;
   onCancel?: (id: string) => void;
@@ -411,6 +412,7 @@ export const UpcomingMatchCard: React.FC<UpcomingMatchCardProps> = ({
   match,
   myTeam,
   isAdmin = true,
+  index = 0,
   onFinish,
   onUpdateScore,
   onCancel,
@@ -420,6 +422,7 @@ export const UpcomingMatchCard: React.FC<UpcomingMatchCardProps> = ({
   onConfirmResult,
 }) => {
   const navigate = useNavigate();
+  const [notesExpanded, setNotesExpanded] = useState(false);
 
   // Use match status to determine stage (status is now calculated by the store)
   const stage: 'upcoming' | 'live' | 'finished' =
@@ -427,17 +430,36 @@ export const UpcomingMatchCard: React.FC<UpcomingMatchCardProps> = ({
       match.status === 'finished' ? 'finished' :
         'upcoming';
 
+  // Calculate stagger delay based on index (max 6 cards = 375ms)
+  const animationDelay = Math.min(index * 75, 375);
+
+  // Handle opening Google Maps
+  const handleOpenMaps = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (match.locationMapLink) {
+      const mapsUrl = match.locationMapLink;
+      const deepLinkUrl = 'comgooglemaps://';
+      const start = Date.now();
+      window.location.href = deepLinkUrl;
+      setTimeout(() => {
+        if (Date.now() - start < 600) {
+          window.location.href = mapsUrl;
+        }
+      }, 500);
+    }
+  };
+
   const renderStatus = () => {
     switch (stage) {
       case 'upcoming':
         return (
-          <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+          <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 animate-pulse-glow">
             Sắp diễn ra
           </span>
         );
       case 'live':
         return (
-          <span className="flex items-center gap-1.5 text-xs font-bold px-2 py-0.5 rounded-md bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
+          <span className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-lg bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
@@ -447,7 +469,7 @@ export const UpcomingMatchCard: React.FC<UpcomingMatchCardProps> = ({
         );
       case 'finished':
         return (
-          <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-gray-500/10 text-gray-500 border border-gray-500/20">
+          <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-gray-500/10 text-gray-500 dark:text-gray-400 border border-gray-500/20">
             Vừa kết thúc
           </span>
         );
@@ -481,7 +503,7 @@ export const UpcomingMatchCard: React.FC<UpcomingMatchCardProps> = ({
           {!hasConfirmed && (
             <Button
               variant="secondary"
-              className="flex-1 h-9 text-xs"
+              className="flex-1 h-10 text-sm"
               icon="edit"
               onClick={() => onSubmitResult?.(match.id)}
             >
@@ -489,7 +511,7 @@ export const UpcomingMatchCard: React.FC<UpcomingMatchCardProps> = ({
             </Button>
           )}
           <Button
-            className={`flex-1 h-9 text-xs ${hasConfirmed
+            className={`flex-1 h-10 text-sm font-semibold ${hasConfirmed
               ? 'bg-green-500 text-white'
               : 'bg-primary text-slate-900'
             }`}
@@ -506,32 +528,32 @@ export const UpcomingMatchCard: React.FC<UpcomingMatchCardProps> = ({
       case 'upcoming':
         return (
           <div
-            className="flex gap-2 mt-4 pt-3 border-t border-gray-100 dark:border-white/5"
+            className="flex gap-3 pt-3 border-t border-gray-100 dark:border-white/5"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Điểm danh - Primary action */}
             <Button
-              variant="secondary"
-              className="flex-1 h-9 text-xs"
+              className="flex-1 h-11 text-sm font-semibold"
               icon="how_to_reg"
               onClick={() => onConfirmAttendance?.(match.id)}
             >
               Điểm danh
             </Button>
+
+            {/* Lực lượng - With attendance badge */}
             <Button
               variant="secondary"
-              className="flex-1 h-9 text-xs"
-              icon="person_off"
-              onClick={() => onCancel?.(match.id)}
-            >
-              Báo bận
-            </Button>
-            <Button
-              variant="secondary"
-              className="flex-1 h-9 text-xs"
+              className="h-11 px-4 text-sm relative"
               icon="groups"
               onClick={() => onAttendanceView?.(match.id)}
             >
               Lực lượng
+              {/* Attendance count badge */}
+              {match.attendanceCount !== undefined && match.attendanceCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
+                  {match.attendanceCount > 9 ? '9+' : match.attendanceCount}
+                </span>
+              )}
             </Button>
           </div>
         );
@@ -540,14 +562,14 @@ export const UpcomingMatchCard: React.FC<UpcomingMatchCardProps> = ({
           <div className="flex gap-3 mt-4" onClick={(e) => e.stopPropagation()}>
             <Button
               variant="secondary"
-              className="flex-1 h-10 text-xs border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/30 dark:text-red-400 dark:hover:bg-red-900/10"
+              className="flex-1 h-11 text-sm border-red-200 text-red-600 dark:border-red-900/30 dark:text-red-400"
               icon="flag"
               onClick={() => onFinish?.(match.id)}
             >
               Kết thúc
             </Button>
             <Button
-              className="flex-[1.5] h-10 text-xs bg-red-500 text-white hover:bg-red-600 shadow-red-500/30"
+              className="flex-1 h-11 text-sm bg-red-500 text-white font-semibold shadow-lg shadow-red-500/30"
               icon="scoreboard"
               onClick={() => onSubmitResult?.(match.id)}
             >
@@ -560,7 +582,7 @@ export const UpcomingMatchCard: React.FC<UpcomingMatchCardProps> = ({
         return (
           <div className="flex gap-3 mt-4" onClick={(e) => e.stopPropagation()}>
             <Button
-              className="flex-1 h-9 text-xs bg-primary text-slate-900"
+              className="flex-1 h-11 text-sm bg-primary text-slate-900 font-semibold"
               icon="scoreboard"
               onClick={() => onSubmitResult?.(match.id)}
             >
@@ -574,93 +596,77 @@ export const UpcomingMatchCard: React.FC<UpcomingMatchCardProps> = ({
   return (
     <div
       onClick={() => navigate(appRoutes.matchDetail(match.id))}
-      className={`bg-white dark:bg-surface-dark p-4 rounded-xl border shadow-sm transition-all cursor-pointer hover:border-primary/50 active:scale-[0.99] ${stage === 'live'
-        ? 'border-red-500/30 ring-1 ring-red-500/20'
-        : 'border-gray-100 dark:border-white/5'
-        }`}
+      style={{ animationDelay: `${animationDelay}ms` }}
+      className={`
+        bg-white dark:bg-surface-dark p-4 rounded-xl border shadow-sm transition-all cursor-pointer
+        hover:border-primary/50 active:scale-[0.99] animate-card-entrance
+        ${stage === 'live'
+          ? 'border-red-500/50 ring-2 ring-red-500/30 animate-live-glow'
+          : 'border-gray-100 dark:border-white/5'
+        }
+      `}
     >
-      {match.proposedPitch && (
-        <div className="flex justify-start mb-2">
-          <span className="text-xs font-semibold px-2 py-0.5 rounded bg-primary/20 text-primary">
-            {match.proposedPitch}
-          </span>
-        </div>
-      )}
-      <div className="flex justify-between items-start mb-4">
-        {renderStatus()}
-        <div className="flex items-start gap-1.5">
-          <div className="w-5 h-5 bg-gray-100 dark:bg-white/5 rounded-md flex items-center justify-center shrink-0 mt-0.5">
-            <Icon name="place" className="text-primary" size="xs" />
+      {/* Header - Pitch Badge + Status Badge */}
+      <div className="flex items-center justify-between mb-3">
+        {/* Left: Pitch type badge - Prominent with icon */}
+        {match.proposedPitch && (
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-primary/10 border border-primary/20">
+            <Icon name="sports_soccer" size="xs" className="text-primary" />
+            <span className="text-xs font-bold text-primary">{match.proposedPitch}</span>
           </div>
-          <div className="flex-1 min-w-0">
-            {match.locationName ? (
-              <>
-                <button
-                  className="text-xs font-bold text-slate-900 dark:text-white truncate text-left hover:text-primary transition-colors"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    // Open Google Maps with deep link fallback
-                    if (match.locationMapLink) {
-                      const mapsUrl = match.locationMapLink;
-                      const deepLinkUrl = 'comgooglemaps://';
-                      const start = Date.now();
-                      window.location.href = deepLinkUrl;
-                      setTimeout(() => {
-                        if (Date.now() - start < 600) {
-                          window.location.href = mapsUrl;
-                        }
-                      }, 500);
-                    }
-                  }}
-                >
-                  {match.locationName}
-                </button>
-                <p className="text-[10px] text-gray-500 dark:text-gray-400 line-clamp-1">
-                  {match.locationAddress}
-                </p>
-              </>
-            ) : (
-              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                {match.location}
-              </p>
-            )}
-          </div>
+        )}
+
+        {/* Right: Status badge */}
+        <div className="flex-shrink-0">
+          {renderStatus()}
         </div>
       </div>
 
-      {match.notes && (
-        <div className="mb-3 text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-white/5 p-2 rounded-lg border border-gray-100 dark:border-white/5">
-          <span className="font-medium">Ghi chú: </span>{match.notes}
+      {/* Location Section - Clear & Readable */}
+      <div className="flex items-start gap-3 mb-4 p-3 bg-gray-50 dark:bg-white/5 rounded-xl">
+        {/* Icon trong container */}
+        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+          <Icon name="place" size="md" className="text-primary" />
         </div>
-      )}
+
+        {/* Location info */}
+        <div className="flex-1 min-w-0">
+          <button
+            className="text-sm font-bold text-slate-900 dark:text-white truncate text-left hover:text-primary transition-colors"
+            onClick={handleOpenMaps}
+          >
+            {match.locationName || match.location}
+          </button>
+          <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-1 mt-0.5">
+            {match.locationAddress}
+          </p>
+        </div>
+      </div>
 
       {/* Match Content - VS Style */}
-      <div className="flex items-center justify-between">
-        <div className="flex flex-col items-center gap-2 w-1/3">
-          <TeamAvatar src={myTeam.logo || ''} size="sm" />
-          <span className="text-xs font-bold truncate w-full text-center">
+      <div className="flex items-center justify-between py-2">
+        {/* My Team - Left */}
+        <div className="flex flex-col items-center gap-2 w-[30%]">
+          <TeamAvatar src={myTeam.logo || ''} size="md" />
+          <span className="text-sm font-bold text-center truncate w-full dark:text-white">
             {myTeam.name}
           </span>
         </div>
 
-        <div className="flex flex-col items-center justify-center w-1/3">
+        {/* Center - Date/Time or Score */}
+        <div className="flex flex-col items-center justify-center w-[40%]">
           {stage === 'upcoming' && !match.result ? (
-            <div className="text-center">
-              <span className="text-2xl font-bold text-slate-900 dark:text-white block">
+            <>
+              <div className="text-2xl font-black text-slate-900 dark:text-white">
                 {match.time}
-              </span>
-              <span className="text-[10px] text-gray-500 uppercase font-bold">
+              </div>
+              <div className="text-xs font-semibold text-primary mt-1 px-2.5 py-0.5 rounded-full bg-primary/10">
                 {match.date}
-              </span>
-            </div>
+              </div>
+            </>
           ) : (
             <div className="text-center">
-              <span
-                className={`text-3xl font-extrabold font-mono block ${stage === 'live'
-                  ? 'text-red-500'
-                  : 'text-slate-900 dark:text-white'
-                  }`}
-              >
+              <span className={`text-3xl font-extrabold font-mono block ${stage === 'live' ? 'text-red-500' : 'text-slate-900 dark:text-white'}`}>
                 {match.result
                   ? `${match.result.teamAScore} - ${match.result.teamBScore}`
                   : (match.scoreA !== undefined && match.scoreB !== undefined
@@ -687,13 +693,42 @@ export const UpcomingMatchCard: React.FC<UpcomingMatchCardProps> = ({
           )}
         </div>
 
-        <div className="flex flex-col items-center gap-2 w-1/3">
-          <TeamAvatar src={match.teamB.logo || ''} size="sm" />
-          <span className="text-xs font-bold truncate w-full text-center">
+        {/* Opponent - Right */}
+        <div className="flex flex-col items-center gap-2 w-[30%]">
+          <TeamAvatar src={match.teamB.logo || ''} size="md" />
+          <span className="text-sm font-bold text-center truncate w-full dark:text-white">
             {match.teamB.name}
           </span>
         </div>
       </div>
+
+      {/* Notes Section - Expandable */}
+      {match.notes && (
+        <div className={`
+          mt-3 p-3 rounded-xl border transition-all
+          ${notesExpanded
+            ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+            : 'bg-gray-50 dark:bg-white/5 border-gray-100 dark:border-white/5'
+          }
+        `}>
+          <div className="flex items-start gap-2">
+            <Icon name="edit_note" size="sm" className="text-gray-500 mt-0.5 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className={`text-sm text-gray-700 dark:text-gray-300 ${notesExpanded ? '' : 'line-clamp-2'}`}>
+                {match.notes}
+              </p>
+              {match.notes.length > 80 && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setNotesExpanded(!notesExpanded); }}
+                  className="mt-1 text-xs font-medium text-primary hover:underline"
+                >
+                  {notesExpanded ? 'Thu gọn' : 'Xem thêm'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {renderActions()}
     </div>

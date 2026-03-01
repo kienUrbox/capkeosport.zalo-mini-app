@@ -5,7 +5,7 @@ import { useDiscoveryStore, getDefaultFilters } from '@/stores/discovery.store';
 import { useSelectedTeam } from '@/stores/team.store';
 import { TEAM_LEVELS, TEAM_GENDER } from '@/constants/design';
 
-export type LocationSource = 'current' | 'stadium' | 'default';
+export type LocationSource = 'current' | 'stadium';
 
 export interface FilterBottomSheetProps {
   isOpen: boolean;
@@ -65,7 +65,7 @@ export const FilterBottomSheet: React.FC<FilterBottomSheetProps> = ({
   const [localLevels, setLocalLevels] = useState<string[]>(filters.level);
   const [localGenders, setLocalGenders] = useState<string[]>(filters.gender);
   const [localSortBy, setLocalSortBy] = useState(filters.sortBy);
-  const [localLocationSource, setLocalLocationSource] = useState<LocationSource>('default');
+  const [localLocationSource, setLocalLocationSource] = useState<LocationSource>('current');
 
   // Sync local state with store when sheet opens
   useEffect(() => {
@@ -74,9 +74,9 @@ export const FilterBottomSheet: React.FC<FilterBottomSheetProps> = ({
       setLocalLevels(filters.level);
       setLocalGenders(filters.gender);
       setLocalSortBy(filters.sortBy);
-      // Restore location source from localStorage, default to 'default' if not found
+      // Restore location source from localStorage, default to 'current' if not found
       const savedLocationSource = localStorage.getItem('discovery-location-source') as LocationSource | null;
-      setLocalLocationSource(savedLocationSource || 'default');
+      setLocalLocationSource(savedLocationSource || 'current');
     }
   }, [isOpen, filters]);
 
@@ -86,7 +86,7 @@ export const FilterBottomSheet: React.FC<FilterBottomSheetProps> = ({
     setLocalLevels(defaults.level);
     setLocalGenders(defaults.gender);
     setLocalSortBy(defaults.sortBy);
-    setLocalLocationSource('default');
+    setLocalLocationSource('current');
   };
 
   const handleApply = () => {
@@ -193,7 +193,7 @@ export const FilterBottomSheet: React.FC<FilterBottomSheetProps> = ({
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
                     localLocationSource === 'current' ? 'bg-primary' : 'bg-gray-200 dark:bg-gray-700'
                   }`}>
-                    <Icon name="location" className={`${localLocationSource === 'current' ? 'text-white' : 'text-gray-500'}`} />
+                    <Icon name="location_on" className={`${localLocationSource === 'current' ? 'text-white' : 'text-gray-500'}`} />
                   </div>
                   <div className="flex-1 text-left">
                     <p className="text-sm font-bold text-slate-900 dark:text-white">Vị trí hiện tại</p>
@@ -230,33 +230,6 @@ export const FilterBottomSheet: React.FC<FilterBottomSheetProps> = ({
                   </div>
                   {localLocationSource === 'stadium' && (
                     <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
-                      <Icon name="check" className="text-white text-xs" />
-                    </div>
-                  )}
-                </div>
-              </button>
-
-              {/* Default Location */}
-              <button
-                onClick={() => setLocalLocationSource('default')}
-                className={`w-full p-3 rounded-xl border-2 transition-all ${
-                  localLocationSource === 'default'
-                    ? 'bg-gray-100 border-gray-400'
-                    : 'bg-gray-50 dark:bg-white/5 border-gray-200 dark:border-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                    localLocationSource === 'default' ? 'bg-gray-400' : 'bg-gray-200 dark:bg-gray-700'
-                  }`}>
-                    <Icon name="place" className={`${localLocationSource === 'default' ? 'text-white' : 'text-gray-500'}`} />
-                  </div>
-                  <div className="flex-1 text-left">
-                    <p className="text-sm font-bold text-slate-900 dark:text-white">Mặc định</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Hồ Chí Minh</p>
-                  </div>
-                  {localLocationSource === 'default' && (
-                    <div className="w-5 h-5 rounded-full bg-gray-400 flex items-center justify-center">
                       <Icon name="check" className="text-white text-xs" />
                     </div>
                   )}

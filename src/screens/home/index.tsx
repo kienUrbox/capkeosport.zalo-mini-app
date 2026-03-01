@@ -1,14 +1,14 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Icon, TeamAvatar, InvitationSkeleton, MatchCardSkeleton, NoMatches, DashboardError } from '@/components/ui';
+import { Button, Icon, MatchCardSkeleton, NoMatches, DashboardError } from '@/components/ui';
+import { InvitationSection } from '@/components/home';
 import { appRoutes } from '@/utils/navigation';
 import { useUser } from '@/stores/auth.store';
 import { useUpcomingMatches } from '@/stores/match.store';
 import { usePendingInvitations, useHomeLoading, useHomeError, useHomeActions } from '@/stores/home.store';
-import { usePhoneInviteActions } from '@/stores/phone-invite.store';
-import { PhoneInvite } from '@/types/api.types';
-import { formatDistanceToNow, parseISO } from 'date-fns';
-import { vi } from 'date-fns/locale';
+import { useInvitationActions } from '@/hooks/useInvitationActions';
+import { useNotificationStore } from '@/stores/notification.store';
+import { NotificationType } from '@/types/api.types';
 
 /**
  * Dashboard Screen (Home)
@@ -24,7 +24,7 @@ const DashboardScreen: React.FC = () => {
   const pendingInvitations = usePendingInvitations();
   const isLoading = useHomeLoading();
   const error = useHomeError();
-  const { fetchHomeData } = useHomeActions();
+  const { fetchHomeData, setPendingInvitations } = useHomeActions();
 
   // Initialize data fetch on first mount
   useEffect(() => {
@@ -35,8 +35,26 @@ const DashboardScreen: React.FC = () => {
   // Refresh function for pull-to-refresh
   const refresh = useCallback(async () => {
     console.log('[Dashboard] 🔄 Manual refresh triggered');
-    await fetchHomeData();
+    await fetchHomeData(true);
   }, [fetchHomeData]);
+
+  // Refresh invitations only (after accept/decline)
+  const refreshInvitations = useCallback(async () => {
+    console.log('[Dashboard] 🔄 Refreshing invitations...');
+    const notificationState = useNotificationStore.getState();
+    const invitations = await notificationState.fetchNotifications({
+      type: NotificationType.TEAM_INVITATION,
+      unreadOnly: true,
+    });
+    // Update home store with new invitations
+    setPendingInvitations(invitations);
+  }, [setPendingInvitations]);
+
+  // Use invitation actions hook (must be called before early return)
+  const { acceptInvite, declineInvite, isProcessing } = useInvitationActions({
+    onRefresh: refreshInvitations,
+    onSuccess: refresh,
+  });
 
   // Pull-to-refresh state
   const [pullState, setPullState] = useState({
@@ -91,40 +109,6 @@ const DashboardScreen: React.FC = () => {
   if (error && !user) {
     return <DashboardError error={error} onRetry={refresh} />;
   }
-
-  // Use phone invite actions from store
-  const phoneInviteActions = usePhoneInviteActions();
-
-  const handleRejectInvite = async (id: string) => {
-    try {
-      await phoneInviteActions.respondInvite(id, 'decline');
-      // Refresh data after responding
-      refresh();
-    } catch (err) {
-      console.error('Reject invitation error:', err);
-    }
-  };
-
-  const handleAcceptInvite = async (id: string) => {
-    try {
-      await phoneInviteActions.respondInvite(id, 'accept');
-      // Note: PhoneInviteStore's respondInvite updates the invite status
-      // We need to check if the response contains team info for navigation
-      // For now, just refresh and let user navigate manually
-      refresh();
-    } catch (err) {
-      console.error('Accept invitation error:', err);
-    }
-  };
-
-  // Format time ago for invitations
-  const formatTimeAgo = (dateString: string) => {
-    try {
-      return formatDistanceToNow(parseISO(dateString), { addSuffix: true, locale: vi });
-    } catch {
-      return 'vừa xong';
-    }
-  };
 
   return (
     <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark">
@@ -191,99 +175,15 @@ const DashboardScreen: React.FC = () => {
         </header>
 
         {/* --- PENDING INVITATIONS SECTION --- */}
-        {(isLoading || pendingInvitations.length > 0) && (
-          <section className="px-5">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <div className="size-2 rounded-full bg-red-500 animate-pulse"></div>
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
-                  Lời mời tham gia
-                </h3>
-              </div>
-              <button
-                onClick={() => navigate(appRoutes.myInvites)}
-                className="text-xs font-semibold text-primary py-1 px-3 rounded-full hover:bg-primary/10 transition-colors"
-              >
-                Xem tất cả
-              </button>
-            </div>
-
-            {isLoading ? (
-              <InvitationSkeleton />
-            ) : (
-              <div className="flex overflow-x-auto gap-3 pb-4 no-scrollbar">
-                {pendingInvitations.map((invite) => {
-                  // Handle both PhoneInvite and legacy Notification types
-                  const isPhoneInvite = 'teamName' in invite && 'inviterName' in invite;
-                  const teamLogo = isPhoneInvite ? (invite as unknown as PhoneInvite).teamLogo : (invite as { data?: { teamLogo?: string } }).data?.teamLogo;
-                  const teamName = isPhoneInvite ? (invite as unknown as PhoneInvite).teamName : (invite as { data?: { teamName?: string } }).data?.teamName;
-                  const inviterName = isPhoneInvite ? (invite as unknown as PhoneInvite).inviterName : (invite as { data?: { inviterName?: string } }).data?.inviterName;
-                  const teamId = isPhoneInvite ? (invite as unknown as PhoneInvite).teamId : (invite as { data?: { teamId?: string } }).data?.teamId;
-                  const createdAt = isPhoneInvite ? (invite as unknown as PhoneInvite).createdAt : (invite as { createdAt?: string }).createdAt;
-
-                  return (
-                    <div
-                      key={invite.id}
-                      className="min-w-[320px] shrink-0"
-                    >
-                      <div className="bg-white dark:bg-surface-dark border-l-4 border-primary rounded-r-2xl p-4 shadow-md flex flex-col gap-3 relative overflow-hidden h-full">
-                    <div className="flex items-center gap-3">
-                      {teamLogo ? (
-                        <TeamAvatar
-                          src={teamLogo}
-                          size="md"
-                        />
-                      ) : (
-                        <div className="h-14 w-14 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold text-lg border-2 border-white dark:border-white/10">
-                          {teamName?.charAt(0).toUpperCase() || 'T'}
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs text-gray-500 mb-0.5">
-                          <span className="font-bold text-slate-900 dark:text-white">
-                            {inviterName || 'Người dùng'}
-                          </span>{' '}
-                          đã mời bạn vào:
-                        </p>
-                        <h4 className="text-lg font-bold text-slate-900 dark:text-white leading-none">
-                          {teamName || 'Đội bóng'}
-                        </h4>
-                        <p className="text-[10px] text-gray-400 mt-1">
-                          {createdAt && formatTimeAgo(createdAt)}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-2 mt-1">
-                      <Button
-                        className="h-9 flex-1 text-xs"
-                        onClick={() => handleAcceptInvite(invite.id)}
-                      >
-                        Chấp nhận
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        className="h-9 flex-1 text-xs bg-gray-50 dark:bg-white/5"
-                        onClick={() => handleRejectInvite(invite.id)}
-                      >
-                        Từ chối
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        className="h-9 w-9 p-0 rounded-full"
-                        onClick={() => navigate(appRoutes.teamDetail(teamId || ''))}
-                      >
-                        <Icon name="visibility" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              );
-              })}
-            </div>
-            )}
-          </section>
-        )}
+        <InvitationSection
+          invitations={pendingInvitations}
+          isLoading={isLoading}
+          isProcessing={isProcessing}
+          onAccept={acceptInvite}
+          onDecline={declineInvite}
+          onViewTeam={(teamId) => navigate(appRoutes.teamDetail(teamId))}
+          onViewAll={() => navigate(appRoutes.myInvites)}
+        />
 
         {/* Main Actions */}
         <section className="px-5 flex flex-col gap-4">
